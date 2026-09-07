@@ -1,0 +1,12 @@
+{
+  "name": "kendali-natara-v2",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "migrate": "wrangler d1 migrations apply kendali-natara-db-v2 --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
