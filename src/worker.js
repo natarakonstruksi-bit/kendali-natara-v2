@@ -205,7 +205,7 @@ export default {
     if (url.pathname === "/app-build.json") {
       return json({
         ok: true,
-        appVersion: "APP-V2.3",
+        appVersion: "APP-V2.4",
         singleDeploy: true,
         architecture: "single-app",
         frontend: "KENDALI App",
@@ -223,14 +223,18 @@ export default {
       let userCount = 0;
       let importedProjects = 0;
       let importedEmployees = 0;
+      let linkedPm = 0;
+      let linkedPelaksana = 0;
       try {
-        const [s, allRows, projects, users, importedP, importedE] = await Promise.all([
+        const [s, allRows, projects, users, importedP, importedE, linkedP, linkedL] = await Promise.all([
           env.DB.prepare("SELECT value FROM schema_meta WHERE key='schema_version'").first(),
           env.DB.prepare("SELECT COUNT(*) AS c FROM app_records").first(),
           env.DB.prepare("SELECT COUNT(*) AS c FROM app_records WHERE collection='projects'").first(),
           env.DB.prepare("SELECT COUNT(*) AS c FROM app_records WHERE collection='users'").first(),
           env.DB.prepare("SELECT COUNT(*) AS c FROM app_records WHERE collection='projects' AND id LIKE 'NK-IMP-%'").first(),
-          env.DB.prepare("SELECT COUNT(*) AS c FROM app_records WHERE collection='users' AND id LIKE 'EMP-%'").first()
+          env.DB.prepare("SELECT COUNT(*) AS c FROM app_records WHERE collection='users' AND id LIKE 'EMP-%'").first(),
+          env.DB.prepare("SELECT COUNT(*) AS c FROM app_records WHERE collection='projects' AND COALESCE(json_extract(data_json,'$.pmUsername'),'') <> ''").first(),
+          env.DB.prepare("SELECT COUNT(*) AS c FROM app_records WHERE collection='projects' AND COALESCE(json_extract(data_json,'$.pengawasUsername'),'') <> ''").first()
         ]);
         schema = s?.value || null;
         recordCount = Number(allRows?.c || 0);
@@ -238,11 +242,13 @@ export default {
         userCount = Number(users?.c || 0);
         importedProjects = Number(importedP?.c || 0);
         importedEmployees = Number(importedE?.c || 0);
+        linkedPm = Number(linkedP?.c || 0);
+        linkedPelaksana = Number(linkedL?.c || 0);
       } catch (e) {
         return json({
           ok:false,
           service:"KENDALI Natara App V2",
-          app_version:"APP-V2.3",
+          app_version:"APP-V2.4",
           error:String(e?.message || e)
         }, 503);
       }
@@ -250,7 +256,7 @@ export default {
       return json({
         ok: schema === "FULL-UI-01",
         service: "KENDALI Natara App V2",
-        app_version: "APP-V2.3",
+        app_version: "APP-V2.4",
         single_deploy: true,
         architecture: "single-app",
         database: "Cloudflare D1",
@@ -261,6 +267,8 @@ export default {
         users: userCount,
         imported_projects: importedProjects,
         imported_employees: importedEmployees,
+        linked_project_pm: linkedPm,
+        linked_project_pelaksana: linkedPelaksana,
         d1_binding: Boolean(env.DB),
         r2_binding: Boolean(env.FILES)
       }, schema === "FULL-UI-01" ? 200 : 503);
@@ -272,7 +280,7 @@ export default {
         const meta = await env.DB.prepare(`
           SELECT key,value,updated_at
           FROM schema_meta
-          WHERE key IN ('schema_version','project_import_version','employee_import_version')
+          WHERE key IN ('schema_version','project_import_version','employee_import_version','project_assignment_version')
           ORDER BY key
         `).all();
 
@@ -285,7 +293,7 @@ export default {
 
         return json({
           ok:true,
-          app_version:"APP-V2.3",
+          app_version:"APP-V2.4",
           meta:meta.results || [],
           collections:counts.results || []
         });

@@ -50,7 +50,7 @@ await writeFile(indexPath, html, "utf8");
 
 const manifest = {
   builtAt: new Date().toISOString(),
-  appVersion: "APP-V2.3",
+  appVersion: "APP-V2.4",
   frontend: "KENDALI existing UI + source extension layer",
   backend: "Cloudflare Worker",
   database: "D1",

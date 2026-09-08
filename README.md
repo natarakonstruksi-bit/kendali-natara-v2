@@ -1,50 +1,49 @@
-# KENDALI Natara App V2.3 — Single App / Single Deploy
+# KENDALI Natara App V2.4 — Project Assignment Otomatis
 
-Versi ini menggabungkan kondisi KENDALI terbaru dalam satu struktur aplikasi.
+Versi ini melanjutkan baseline V2.3 dan menghubungkan akun karyawan ke proyek yang sudah diimport.
 
-## Sudah termasuk
-- UI KENDALI existing.
-- Backend Cloudflare Worker.
-- Database Cloudflare D1.
-- File Cloudflare R2.
-- 46 proyek dari DATA PROYEK + Keuangan PROYEK.
-- Import 23 karyawan.
-- Username karyawan bisa diubah.
-- Perubahan username mengikuti relasi atasan dan assignment proyek.
-- `/app-build.json` dijawab langsung oleh Worker.
-- `/api/health` menampilkan jumlah proyek dan karyawan.
-- `/api/diagnostics` untuk melihat versi import dan jumlah data per collection.
-- Build preflight mencegah regresi koneksi Supabase/username terkunci.
+## Yang dikerjakan
+- Project Manager / Superintendent yang sudah dikenal otomatis diberi `pmUsername`.
+- Pelaksana/Pengawas yang sudah dikenal otomatis diberi `pengawasUsername`.
+- Setelah itu login user non-full-access dapat melihat proyek yang memang ditugaskan kepadanya.
+- Data yang belum mempunyai pasangan karyawan pasti tetap kosong, tidak ditebak.
 
-## Konsep mulai sekarang
-Tidak ada lagi patch manual ke `public/assets`.
+## Mapping yang dipastikan
 
-Alur pengembangan:
-`ubah source -> commit GitHub -> Cloudflare build -> deploy`
+### Project Manager / Superintendent
+- Sayyid / Sayyid Triwardhana → `sayyidtriwardhana`
+- Hilal / Muhammad Hilal → `muhammadhilalp765`
+- Zul / Zulkarnaen → `dzuljob`
 
-Folder `public/` adalah HASIL BUILD dan akan dibuat ulang otomatis.
+### Pelaksana / Pengawas
+- Aan → `aanmks0326`
+- Anas → `anasmunandar18`
+- Fadhly → `muhammadfadhly300`
+- Fadli → `nurulfadli00`
+- Fikry → `muhammdnurfikry`
+- Gazali → `raikah536`
+- Hilal → `muhammadhilalp765`
+- Sayyid → `sayyidtriwardhana`
+- Syawal → `muhammadsyawal26001`
+- Zulfikar → `muhzulfikarf14`
 
-## Cloudflare Builds
-Build command:
-`npm run build`
+Nama yang belum ada pasangan pasti seperti Ade, Arman, Raslin, Hilmi, Uais, Ansari, dan Fikar sengaja dibiarkan kosong.
 
-Deploy command:
-`npx wrangler d1 migrations apply DB --remote && npx wrangler deploy`
+## Migration baru
+`migrations/0008_link_project_assignment_usernames.sql`
 
-Root:
-`/`
+## Deploy
+Tetap satu kali:
+- Build: `npm run build`
+- Deploy: `npx wrangler d1 migrations apply DB --remote && npx wrangler deploy`
 
 ## Verifikasi
-`/app-build.json`
-harus menampilkan `APP-V2.3` dan `singleDeploy: true`.
+Buka `/api/health`.
 
-`/api/health`
-harus menampilkan minimal:
-- `imported_projects: 46`
-- `imported_employees: 23` setelah migration karyawan sudah applied
-- `d1_binding: true`
-- `r2_binding: true`
+Versi harus `APP-V2.4`.
 
-## Upload
-Untuk paling aman, replace seluruh isi repository dengan isi folder paket ini lalu commit sekali ke `main`.
-Migration yang sudah pernah applied tidak akan dijalankan ulang.
+Health juga menampilkan:
+- `linked_project_pm`
+- `linked_project_pelaksana`
+
+Buka dengan akun Project Manager/Pelaksana yang sudah punya username. User tersebut seharusnya hanya melihat proyek yang terkait dengannya, kecuali role memang mempunyai akses melihat semua proyek.

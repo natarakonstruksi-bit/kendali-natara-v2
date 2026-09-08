@@ -9,6 +9,7 @@ const required = [
   "migrations/0005_full_ui_cloudflare_adapter.sql",
   "migrations/0006_import_46_projects.sql",
   "migrations/0007_import_23_karyawan.sql",
+  "migrations/0008_link_project_assignment_usernames.sql",
   "src/worker.js",
   "src/app-config.js",
   "src/app-overrides.js",
