@@ -26,6 +26,12 @@ for (const token of forbidden) {
 if (!bundleText.includes("window.location.origin")) {
   throw new Error("Build dibatalkan: adapter same-origin Cloudflare belum aktif");
 }
+if (bundleText.includes("disabled:!!r")) {
+  throw new Error("Build dibatalkan: username karyawan masih terkunci pada mode edit");
+}
+if (!bundleText.includes("pmUsername:z.pmUsername===O?C:z.pmUsername")) {
+  throw new Error("Build dibatalkan: cascade perubahan username ke assignment proyek belum aktif");
+}
 
 await rm(publicDir, { recursive: true, force: true });
 await mkdir(publicDir, { recursive: true });
@@ -44,7 +50,7 @@ await writeFile(indexPath, html, "utf8");
 
 const manifest = {
   builtAt: new Date().toISOString(),
-  appVersion: "APP-V2.2",
+  appVersion: "APP-V2.3",
   frontend: "KENDALI existing UI + source extension layer",
   backend: "Cloudflare Worker",
   database: "D1",

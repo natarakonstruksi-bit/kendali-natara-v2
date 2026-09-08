@@ -1,0 +1,9 @@
+{
+  "builtAt": "2026-09-08T06:41:52.250Z",
+  "appVersion": "APP-V2.1",
+  "frontend": "KENDALI existing UI + source extension layer",
+  "backend": "Cloudflare Worker",
+  "database": "D1",
+  "files": "R2",
+  "singleDeploy": true
+}

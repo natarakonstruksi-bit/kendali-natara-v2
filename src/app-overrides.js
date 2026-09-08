@@ -1,10 +1,15 @@
 /**
- * KENDALI App extension point.
- *
- * Mulai versi App terpadu, perubahan kecil/non-destruktif dapat diletakkan
- * di file ini tanpa menyentuh bundle legacy hasil build lama.
- * Perubahan besar akan dipindahkan bertahap menjadi modul source terpisah.
+ * KENDALI App V2.3 extension layer.
+ * Semua pengembangan berikutnya ditempatkan di source ini / modul source lain,
+ * bukan mengedit public/assets hasil build secara manual.
  */
 const cfg = window.KENDALI_CONFIG || {};
 document.documentElement.dataset.kendaliApp = cfg.appVersion || "APP";
+
+window.KENDALI_APP = Object.freeze({
+  config: cfg,
+  health: () => fetch("/api/health", { credentials: "same-origin" }).then(r => r.json()),
+  diagnostics: () => fetch("/api/diagnostics", { credentials: "same-origin" }).then(r => r.json())
+});
+
 window.dispatchEvent(new CustomEvent("kendali:app-ready", { detail: cfg }));

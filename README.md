@@ -1,60 +1,50 @@
-# KENDALI Natara App V2 — Single Deploy
+# KENDALI Natara App V2.3 — Single App / Single Deploy
 
-Ini adalah struktur App terpadu untuk KENDALI Natara.
+Versi ini menggabungkan kondisi KENDALI terbaru dalam satu struktur aplikasi.
 
-## Tujuan
-Setelah paket ini menjadi root repository `kendali-natara-v2`, perubahan KENDALI tidak lagi dipasang sebagai patch asset satu per satu.
-Alurnya menjadi:
+## Sudah termasuk
+- UI KENDALI existing.
+- Backend Cloudflare Worker.
+- Database Cloudflare D1.
+- File Cloudflare R2.
+- 46 proyek dari DATA PROYEK + Keuangan PROYEK.
+- Import 23 karyawan.
+- Username karyawan bisa diubah.
+- Perubahan username mengikuti relasi atasan dan assignment proyek.
+- `/app-build.json` dijawab langsung oleh Worker.
+- `/api/health` menampilkan jumlah proyek dan karyawan.
+- `/api/diagnostics` untuk melihat versi import dan jumlah data per collection.
+- Build preflight mencegah regresi koneksi Supabase/username terkunci.
 
-**Edit App → Commit GitHub → Build Cloudflare → Migration D1 (jika ada) → Deploy Worker**
+## Konsep mulai sekarang
+Tidak ada lagi patch manual ke `public/assets`.
 
-Satu commit menghasilkan satu pipeline deploy.
+Alur pengembangan:
+`ubah source -> commit GitHub -> Cloudflare build -> deploy`
 
-## Struktur
-- `app/` = UI KENDALI yang saat ini sudah jadi dan stabil.
-- `src/worker.js` = API Cloudflare D1 + R2.
-- `src/app-config.js` = konfigurasi App.
-- `src/app-overrides.js` = extension point source untuk perubahan baru.
-- `scripts/build.mjs` = membangun `public/` otomatis.
-- `migrations/` = seluruh migration D1 yang relevan, termasuk 46 proyek dan 23 karyawan.
-- `public/` = hasil build; **jangan diedit manual**.
+Folder `public/` adalah HASIL BUILD dan akan dibuat ulang otomatis.
 
-## Catatan penting tentang source lama
-File KENDALI awal yang tersedia adalah hasil build/dist, bukan source React asli. Karena itu UI existing dipertahankan sebagai base di `app/` supaya seluruh fungsi/tampilan tidak hilang. Mulai versi ini, perubahan baru dikelola dari source App dan build script. Modul lama dapat dimigrasikan bertahap tanpa mengubah pola deploy lagi.
-
-## Cloudflare Build Settings
+## Cloudflare Builds
 Build command:
-
 `npm run build`
 
 Deploy command:
-
 `npx wrangler d1 migrations apply DB --remote && npx wrangler deploy`
 
-Root directory:
-
+Root:
 `/`
 
-## Data yang dipertahankan
-Paket tetap memakai resource yang sudah aktif:
-- Worker: `kendali-natara-v2`
-- D1: `kendali-natara-db-v2`
-- D1 ID: `04849d77-cb23-4d50-9cfc-4e0d9c542d6b`
-- R2: `kendali-natara-files-v2`
+## Verifikasi
+`/app-build.json`
+harus menampilkan `APP-V2.3` dan `singleDeploy: true`.
 
-Migration import ikut disertakan:
-- `0006_import_46_projects.sql`
-- `0007_import_23_karyawan.sql`
+`/api/health`
+harus menampilkan minimal:
+- `imported_projects: 46`
+- `imported_employees: 23` setelah migration karyawan sudah applied
+- `d1_binding: true`
+- `r2_binding: true`
 
-Migration yang sudah pernah applied akan otomatis dilewati oleh D1.
-
-## Setelah deploy
-1. Buka `/api/health`.
-2. Buka `/` dan login KENDALI.
-3. Pastikan 46 proyek terbaca.
-4. Buka Karyawan & Org; 23 karyawan harus tersedia setelah migration 0007 applied.
-5. Username karyawan bisa diedit dari form Edit Karyawan.
-
-## Aturan mulai sekarang
-Jangan lagi replace file `public/assets/index-HRmtcOom.js` secara manual.
-`public/` adalah hasil build. Perubahan dilakukan pada App/source lalu commit satu kali.
+## Upload
+Untuk paling aman, replace seluruh isi repository dengan isi folder paket ini lalu commit sekali ke `main`.
+Migration yang sudah pernah applied tidak akan dijalankan ulang.
