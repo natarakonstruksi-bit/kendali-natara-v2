@@ -20,3 +20,4 @@ Setelah build Success:
 
 
 This SAFE package removes ALTER TABLE from migration 0002 so it can be applied cleanly on the current CF-01 database.
+trigger cf02 migration
