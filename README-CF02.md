@@ -48,3 +48,5 @@ Deploy command:
    - Administrator
    - jobdesk Administrator
    - permission `system.full_access`
+
+edit README
