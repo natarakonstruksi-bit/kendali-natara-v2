@@ -1,36 +1,22 @@
-# KENDALI Natara V2 — CF-01
+# KENDALI Natara V2 — CF-02 FULL REPLACE
 
-Database D1:
-- Name: `kendali-natara-db-v2`
-- ID: `04849d77-cb23-4d50-9cfc-4e0d9c542d6b`
-- Worker binding: `DB`
+Gunakan paket ini untuk mengganti seluruh isi repo GitHub `kendali-natara-v2`.
 
-R2:
-- Name: `kendali-natara-files-v2`
-- Worker binding: `FILES`
+Struktur root:
+- migrations/0001_cf01_foundation.sql
+- migrations/0002_cf02_identity_permissions.sql
+- src/index.js
+- public/index.html
+- package.json
+- wrangler.jsonc
 
-Worker:
-- Name: `kendali-natara-v2`
+Cloudflare Builds:
+- Build command: `npx wrangler d1 migrations apply kendali-natara-db-v2 --remote`
+- Deploy command: `npx wrangler deploy`
 
-## Cloudflare Builds
+Setelah build Success:
+- `/api/health` harus menunjukkan `schema_version: "CF-02"`
+- `/api/db/check` harus menunjukkan roles > 0, users >= 1, permissions > 0
 
-Build command:
-`npx wrangler d1 migrations apply kendali-natara-db-v2 --remote`
 
-Deploy command:
-`npx wrangler deploy`
-
-## Expected test
-After a successful build:
-- `/api/health`
-- `/api/db/health`
-- `/api/r2/health`
-
-The main `/api/health` result should include:
-- `ok: true`
-- `d1_binding: true`
-- `r2_binding: true`
-- `schema_version: "CF-01"`
-- `database_ready: true`
-
-Do not add other KENDALI modules until CF-01 passes.
+This SAFE package removes ALTER TABLE from migration 0002 so it can be applied cleanly on the current CF-01 database.

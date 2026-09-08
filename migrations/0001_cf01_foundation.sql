@@ -6,9 +6,6 @@ CREATE TABLE IF NOT EXISTS schema_meta (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT OR REPLACE INTO schema_meta(key, value)
-VALUES ('schema_version', 'CF-01');
-
 CREATE TABLE IF NOT EXISTS roles (
   id TEXT PRIMARY KEY,
   code TEXT NOT NULL UNIQUE,
@@ -85,22 +82,25 @@ CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(projec
 CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id);
 
 INSERT OR IGNORE INTO roles(id, code, name, department, is_admin) VALUES
-('role-admin', 'ADMINISTRATOR', 'Administrator', 'SYSTEM', 1),
-('role-director', 'DIRECTOR', 'Direksi', 'MANAGEMENT', 0),
-('role-manager', 'CONSTRUCTION_MANAGER', 'Manager Konstruksi', 'OPERATIONAL', 0),
-('role-head-op', 'HEAD_OPERATIONAL', 'Head of Operational', 'OPERATIONAL', 0),
-('role-superintendent', 'SUPERINTENDENT', 'Superintendent', 'OPERATIONAL', 0),
-('role-field', 'FIELD_EXECUTOR', 'Pelaksana Lapangan', 'OPERATIONAL', 0),
-('role-head-support', 'HEAD_SUPPORTING', 'Head of Supporting', 'SUPPORTING', 0),
-('role-senior-qc', 'SENIOR_QC', 'Senior QC', 'SUPPORTING', 0),
-('role-qc', 'QC_INSPECTOR', 'QC Inspector', 'SUPPORTING', 0),
-('role-head-ati', 'HEAD_ATI', 'Kepala ATI', 'SUPPORTING', 0),
-('role-ati-instructor', 'ATI_INSTRUCTOR', 'Instruktur ATI', 'SUPPORTING', 0),
-('role-head-eng', 'HEAD_ENGINEERING', 'Head of Engineering', 'ENGINEERING', 0),
-('role-senior-estimator', 'SENIOR_ESTIMATOR', 'Senior Estimator', 'ENGINEERING', 0),
-('role-estimator', 'ESTIMATOR', 'Estimator', 'ENGINEERING', 0),
-('role-qs', 'QS', 'Quantity Surveyor', 'ENGINEERING', 0),
-('role-admin-teknik', 'ADMIN_TEKNIK', 'Admin Teknik', 'ENGINEERING', 0),
-('role-admin-logistik', 'ADMIN_LOGISTIK', 'Admin Logistik', 'LOGISTICS', 0),
-('role-cost-control', 'COST_CONTROL', 'Cost Control', 'FINANCE', 0),
-('role-finance', 'FINANCE', 'Finance', 'FINANCE', 0);
+('role-admin','ADMINISTRATOR','Administrator','SYSTEM',1),
+('role-director','DIRECTOR','Direksi','MANAGEMENT',0),
+('role-manager','CONSTRUCTION_MANAGER','Manager Konstruksi','OPERATIONAL',0),
+('role-head-op','HEAD_OPERATIONAL','Head of Operational','OPERATIONAL',0),
+('role-superintendent','SUPERINTENDENT','Superintendent','OPERATIONAL',0),
+('role-field','FIELD_EXECUTOR','Pelaksana Lapangan','OPERATIONAL',0),
+('role-head-support','HEAD_SUPPORTING','Head of Supporting','SUPPORTING',0),
+('role-senior-qc','SENIOR_QC','Senior QC','SUPPORTING',0),
+('role-qc','QC_INSPECTOR','QC Inspector','SUPPORTING',0),
+('role-head-ati','HEAD_ATI','Kepala ATI','SUPPORTING',0),
+('role-ati-instructor','ATI_INSTRUCTOR','Instruktur ATI','SUPPORTING',0),
+('role-head-eng','HEAD_ENGINEERING','Head of Engineering','ENGINEERING',0),
+('role-senior-estimator','SENIOR_ESTIMATOR','Senior Estimator','ENGINEERING',0),
+('role-estimator','ESTIMATOR','Estimator','ENGINEERING',0),
+('role-qs','QS','Quantity Surveyor','ENGINEERING',0),
+('role-admin-teknik','ADMIN_TEKNIK','Admin Teknik','ENGINEERING',0),
+('role-admin-logistik','ADMIN_LOGISTIK','Admin Logistik','LOGISTICS',0),
+('role-cost-control','COST_CONTROL','Cost Control','FINANCE',0),
+('role-finance','FINANCE','Finance','FINANCE',0);
+
+INSERT OR REPLACE INTO schema_meta(key, value, updated_at)
+VALUES ('schema_version', 'CF-01', CURRENT_TIMESTAMP);
