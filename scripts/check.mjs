@@ -37,3 +37,7 @@ if (!bundle.includes("Superintendent / PM")) {
 }
 
 console.log("KENDALI APP-V2.3 preflight OK");
+
+if (!bundle.includes('typeof x!=="object"')) {
+  throw new Error("matcher assignment aman V2.5.1 belum aktif");
+}

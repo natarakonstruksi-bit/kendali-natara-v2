@@ -1,32 +1,32 @@
-# KENDALI Natara App V2.5 — Karyawan & Project Assignment UI
+# KENDALI Natara App V2.5.1 — Hotfix Halaman Karyawan
 
-Baseline ini melanjutkan V2.4 dan tetap memakai single App / single deploy.
+Hotfix ini memperbaiki layar putih pada `/users` setelah V2.5.
 
-## Fitur baru
-- Menu **Karyawan & Org** sekarang punya tab **Penugasan Proyek**.
-- Administrator dapat melihat proyek yang dipegang masing-masing karyawan.
-- Nama proyek pada tab Penugasan dapat diklik untuk membuka detail proyek.
-- Tombol **Atur dari Master Proyek** membuka Master Data.
-- Master Data Proyek sekarang langsung menampilkan:
-  - Superintendent / PM
-  - username PM
-  - Pelaksana
-  - username Pelaksana
-- Edit Proyek tetap memakai dropdown akun aktif untuk PM/Superintendent dan Pelaksana.
-- User Nonaktif tetap tidak bisa login.
-- Username tetap bisa diedit dan cascade assignment tetap aktif.
-
-## Tidak ada migration baru
-V2.5 adalah peningkatan UI di atas data D1 V2.4.
+## Perbaikan
+- `users` dan `projects` diberi default array agar halaman tidak crash saat data masih memuat.
+- Matcher penugasan proyek dibuat lebih defensif terhadap data kosong/legacy.
+- Navigasi dari tab Penugasan Proyek tidak lagi bergantung pada hook tambahan.
+- Nama/role/key yang kosong diberi fallback aman.
+- Ditambahkan runtime error overlay agar jika ada error tampilan berikutnya tidak lagi hanya layar putih.
+- Fitur V2.5 tetap dipertahankan:
+  - tab Penugasan Proyek,
+  - kolom PM/Superintendent dan Pelaksana di Master,
+  - username editable,
+  - project assignment V2.4,
+  - 46 proyek + 23 karyawan.
 
 ## Deploy
+Replace seluruh isi repo dengan paket ini, commit sekali ke `main`.
+
 Build:
 `npm run build`
 
 Deploy:
 `npx wrangler d1 migrations apply DB --remote && npx wrangler deploy`
 
+Tidak ada migration baru.
+
 ## Verifikasi
-- `/app-build.json` → `APP-V2.5`
-- Buka `/users` → ada tab **Penugasan Proyek**
-- Buka `/master` → tabel menampilkan **Superintendent / PM** dan **Pelaksana**
+- `/app-build.json` → APP-V2.5.1
+- `/users` tidak boleh blank.
+- Tab Daftar Karyawan, Penugasan Proyek, Struktur Organisasi, dan Role Legacy harus bisa dibuka.

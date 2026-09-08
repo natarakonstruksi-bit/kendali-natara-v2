@@ -53,7 +53,7 @@ await writeFile(indexPath, html, "utf8");
 
 const manifest = {
   builtAt: new Date().toISOString(),
-  appVersion: "APP-V2.5",
+  appVersion: "APP-V2.5.1",
   frontend: "KENDALI existing UI + source extension layer",
   backend: "Cloudflare Worker",
   database: "D1",
@@ -62,3 +62,8 @@ const manifest = {
 };
 await writeFile(path.join(publicDir, "app-build.json"), JSON.stringify(manifest, null, 2));
 console.log("KENDALI App build selesai:", manifest.appVersion);
+
+// runtime guard V2.5.1
+if (!bundleText.includes('typeof x!=="object"')) {
+  throw new Error("Build dibatalkan: hotfix /users V2.5.1 belum aktif");
+}
