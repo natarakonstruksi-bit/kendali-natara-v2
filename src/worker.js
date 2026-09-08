@@ -202,19 +202,38 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
 
+    if (url.pathname === "/app-build.json") {
+      return json({
+        ok: true,
+        appVersion: "APP-V2.2",
+        singleDeploy: true,
+        frontend: "KENDALI App",
+        backend: "Cloudflare Worker",
+        database: "D1",
+        files: "R2",
+        verification_route: "worker-direct"
+      });
+    }
+
     if (url.pathname === "/api/health") {
       let schema = null;
       let recordCount = 0;
+      let projectCount = 0;
+      let userCount = 0;
       try {
         const s = await env.DB.prepare(
           "SELECT value FROM schema_meta WHERE key='schema_version'"
         ).first();
         schema = s?.value || null;
 
-        const c = await env.DB.prepare(
-          "SELECT COUNT(*) AS c FROM app_records"
-        ).first();
-        recordCount = Number(c?.c || 0);
+        const [allRows, projects, users] = await Promise.all([
+          env.DB.prepare("SELECT COUNT(*) AS c FROM app_records").first(),
+          env.DB.prepare("SELECT COUNT(*) AS c FROM app_records WHERE collection='projects'").first(),
+          env.DB.prepare("SELECT COUNT(*) AS c FROM app_records WHERE collection='users'").first()
+        ]);
+        recordCount = Number(allRows?.c || 0);
+        projectCount = Number(projects?.c || 0);
+        userCount = Number(users?.c || 0);
       } catch (e) {
         return json({
           ok:false,
@@ -225,12 +244,15 @@ export default {
 
       return json({
         ok: schema === "FULL-UI-01",
-        service: "KENDALI Full UI Cloudflare",
-        frontend: "existing KENDALI dist",
+        service: "KENDALI Natara App V2",
+        app_version: "APP-V2.2",
+        single_deploy: true,
         database: "Cloudflare D1",
         files: "Cloudflare R2",
         schema_version: schema,
         records: recordCount,
+        projects: projectCount,
+        users: userCount,
         d1_binding: Boolean(env.DB),
         r2_binding: Boolean(env.FILES)
       }, schema === "FULL-UI-01" ? 200 : 503);
