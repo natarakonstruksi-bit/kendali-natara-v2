@@ -1,9 +1,11 @@
 {
-  "name": "kendali-natara-full-ui-cloudflare",
-  "version": "1.0.0",
+  "name": "kendali-natara-app-v2",
+  "version": "2.1.0",
   "private": true,
   "scripts": {
-    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy"
+    "check": "node scripts/check.mjs",
+    "build": "npm run check && node scripts/build.mjs",
+    "deploy": "npm run build && wrangler d1 migrations apply DB --remote && wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
