@@ -5,20 +5,60 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>KENDALI Natara V2</title>
   <style>
-    body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#eef2f6;color:#132231}
-    main{max-width:760px;margin:12vh auto;padding:32px}
-    .card{background:white;border:1px solid #dbe3ea;border-radius:18px;padding:32px;box-shadow:0 12px 35px rgba(0,0,0,.06)}
-    h1{margin-top:0}
-    code{background:#f3f6f8;padding:3px 7px;border-radius:6px}
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#eef2f6;color:#142331}
+    main{max-width:900px;margin:9vh auto;padding:24px}
+    .card{background:#fff;border:1px solid #dbe3ea;border-radius:18px;padding:30px;box-shadow:0 12px 35px rgba(0,0,0,.06)}
+    .muted{color:#657484}
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#edf3f7;font-size:13px;margin:3px}
+    button{border:0;border-radius:10px;padding:11px 16px;background:#102435;color:white;cursor:pointer}
+    .error{color:#b42318}
+    code{background:#f2f5f7;padding:3px 6px;border-radius:6px}
   </style>
 </head>
 <body>
 <main>
-  <div class="card">
+  <div class="card" id="app">
     <h1>KENDALI Natara V2</h1>
-    <p>Foundation Cloudflare aktif. Tahap ini hanya untuk memastikan Worker, D1, R2, GitHub, dan deployment bersih sebelum modul KENDALI dibangun.</p>
-    <p>Health check: <code>/api/health</code></p>
+    <p class="muted">Memeriksa identitas Cloudflare Access...</p>
   </div>
 </main>
+<script>
+async function boot(){
+  const app=document.getElementById('app');
+  try{
+    const r=await fetch('/api/auth/me',{credentials:'same-origin',cache:'no-store'});
+    const data=await r.json();
+    if(!r.ok){
+      app.innerHTML=`
+        <h1>KENDALI Natara V2</h1>
+        <p class="error"><b>${data.code||'ACCESS_ERROR'}</b></p>
+        <p>${data.message||'Akses tidak tersedia.'}</p>
+        ${data.email?`<p>Email: <code>${data.email}</code></p>`:''}
+      `;
+      return;
+    }
+
+    const isField=data.user.role_code==='FIELD_EXECUTOR';
+    if(isField && location.hash!=='#/lapangan') location.hash='#/lapangan';
+    if(!isField && !location.hash) location.hash='#/dashboard';
+
+    app.innerHTML=`
+      <p class="muted">KENDALI • ${isField?'Mode Lapangan':'Dashboard'}</p>
+      <h1>Halo, ${data.user.full_name}</h1>
+      <p><b>${data.user.role_name}</b> · ${data.user.department||data.user.role_department||''}</p>
+      <p>${data.user.jobdesk_summary||''}</p>
+      <div>${data.permissions.slice(0,16).map(x=>`<span class="pill">${x}</span>`).join('')}</div>
+      ${data.permissions.length>16?`<p class="muted">+ ${data.permissions.length-16} permission lainnya</p>`:''}
+      <hr style="border:0;border-top:1px solid #e3e8ed;margin:24px 0">
+      <p class="muted">CF-02 berhasil jika identitas, role dan permission di atas terbaca dari D1.</p>
+      <button onclick="location.href='/cdn-cgi/access/logout'">Keluar</button>
+    `;
+  }catch(e){
+    app.innerHTML=`<h1>KENDALI Natara V2</h1><p class="error">Gagal membaca session: ${String(e)}</p>`;
+  }
+}
+boot();
+</script>
 </body>
 </html>
