@@ -29,5 +29,11 @@ if (bundle.includes("disabled:!!r")) throw new Error("Username karyawan masih te
 if (!bundle.includes("pmUsername:z.pmUsername===O?C:z.pmUsername")) {
   throw new Error("Cascade username ke proyek belum aktif");
 }
+if (!bundle.includes("Penugasan Karyawan ke Proyek")) {
+  throw new Error("UI Penugasan Proyek V2.5 belum aktif");
+}
+if (!bundle.includes("Superintendent / PM")) {
+  throw new Error("Kolom assignment pada Master Proyek belum aktif");
+}
 
 console.log("KENDALI APP-V2.3 preflight OK");

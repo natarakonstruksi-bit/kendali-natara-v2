@@ -32,6 +32,9 @@ if (bundleText.includes("disabled:!!r")) {
 if (!bundleText.includes("pmUsername:z.pmUsername===O?C:z.pmUsername")) {
   throw new Error("Build dibatalkan: cascade perubahan username ke assignment proyek belum aktif");
 }
+if (!bundleText.includes("Penugasan Karyawan ke Proyek")) {
+  throw new Error("Build dibatalkan: UI Penugasan Proyek V2.5 belum aktif");
+}
 
 await rm(publicDir, { recursive: true, force: true });
 await mkdir(publicDir, { recursive: true });
@@ -50,7 +53,7 @@ await writeFile(indexPath, html, "utf8");
 
 const manifest = {
   builtAt: new Date().toISOString(),
-  appVersion: "APP-V2.4",
+  appVersion: "APP-V2.5",
   frontend: "KENDALI existing UI + source extension layer",
   backend: "Cloudflare Worker",
   database: "D1",

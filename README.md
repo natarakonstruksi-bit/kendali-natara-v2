@@ -1,49 +1,32 @@
-# KENDALI Natara App V2.4 — Project Assignment Otomatis
+# KENDALI Natara App V2.5 — Karyawan & Project Assignment UI
 
-Versi ini melanjutkan baseline V2.3 dan menghubungkan akun karyawan ke proyek yang sudah diimport.
+Baseline ini melanjutkan V2.4 dan tetap memakai single App / single deploy.
 
-## Yang dikerjakan
-- Project Manager / Superintendent yang sudah dikenal otomatis diberi `pmUsername`.
-- Pelaksana/Pengawas yang sudah dikenal otomatis diberi `pengawasUsername`.
-- Setelah itu login user non-full-access dapat melihat proyek yang memang ditugaskan kepadanya.
-- Data yang belum mempunyai pasangan karyawan pasti tetap kosong, tidak ditebak.
+## Fitur baru
+- Menu **Karyawan & Org** sekarang punya tab **Penugasan Proyek**.
+- Administrator dapat melihat proyek yang dipegang masing-masing karyawan.
+- Nama proyek pada tab Penugasan dapat diklik untuk membuka detail proyek.
+- Tombol **Atur dari Master Proyek** membuka Master Data.
+- Master Data Proyek sekarang langsung menampilkan:
+  - Superintendent / PM
+  - username PM
+  - Pelaksana
+  - username Pelaksana
+- Edit Proyek tetap memakai dropdown akun aktif untuk PM/Superintendent dan Pelaksana.
+- User Nonaktif tetap tidak bisa login.
+- Username tetap bisa diedit dan cascade assignment tetap aktif.
 
-## Mapping yang dipastikan
-
-### Project Manager / Superintendent
-- Sayyid / Sayyid Triwardhana → `sayyidtriwardhana`
-- Hilal / Muhammad Hilal → `muhammadhilalp765`
-- Zul / Zulkarnaen → `dzuljob`
-
-### Pelaksana / Pengawas
-- Aan → `aanmks0326`
-- Anas → `anasmunandar18`
-- Fadhly → `muhammadfadhly300`
-- Fadli → `nurulfadli00`
-- Fikry → `muhammdnurfikry`
-- Gazali → `raikah536`
-- Hilal → `muhammadhilalp765`
-- Sayyid → `sayyidtriwardhana`
-- Syawal → `muhammadsyawal26001`
-- Zulfikar → `muhzulfikarf14`
-
-Nama yang belum ada pasangan pasti seperti Ade, Arman, Raslin, Hilmi, Uais, Ansari, dan Fikar sengaja dibiarkan kosong.
-
-## Migration baru
-`migrations/0008_link_project_assignment_usernames.sql`
+## Tidak ada migration baru
+V2.5 adalah peningkatan UI di atas data D1 V2.4.
 
 ## Deploy
-Tetap satu kali:
-- Build: `npm run build`
-- Deploy: `npx wrangler d1 migrations apply DB --remote && npx wrangler deploy`
+Build:
+`npm run build`
+
+Deploy:
+`npx wrangler d1 migrations apply DB --remote && npx wrangler deploy`
 
 ## Verifikasi
-Buka `/api/health`.
-
-Versi harus `APP-V2.4`.
-
-Health juga menampilkan:
-- `linked_project_pm`
-- `linked_project_pelaksana`
-
-Buka dengan akun Project Manager/Pelaksana yang sudah punya username. User tersebut seharusnya hanya melihat proyek yang terkait dengannya, kecuali role memang mempunyai akses melihat semua proyek.
+- `/app-build.json` → `APP-V2.5`
+- Buka `/users` → ada tab **Penugasan Proyek**
+- Buka `/master` → tabel menampilkan **Superintendent / PM** dan **Pelaksana**

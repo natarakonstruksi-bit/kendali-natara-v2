@@ -205,7 +205,7 @@ export default {
     if (url.pathname === "/app-build.json") {
       return json({
         ok: true,
-        appVersion: "APP-V2.4",
+        appVersion: "APP-V2.5",
         singleDeploy: true,
         architecture: "single-app",
         frontend: "KENDALI App",
@@ -248,7 +248,7 @@ export default {
         return json({
           ok:false,
           service:"KENDALI Natara App V2",
-          app_version:"APP-V2.4",
+          app_version:"APP-V2.5",
           error:String(e?.message || e)
         }, 503);
       }
@@ -256,7 +256,7 @@ export default {
       return json({
         ok: schema === "FULL-UI-01",
         service: "KENDALI Natara App V2",
-        app_version: "APP-V2.4",
+        app_version: "APP-V2.5",
         single_deploy: true,
         architecture: "single-app",
         database: "Cloudflare D1",
@@ -293,7 +293,7 @@ export default {
 
         return json({
           ok:true,
-          app_version:"APP-V2.4",
+          app_version:"APP-V2.5",
           meta:meta.results || [],
           collections:counts.results || []
         });
