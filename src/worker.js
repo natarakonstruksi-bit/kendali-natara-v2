@@ -17,7 +17,6 @@ function json(data, status = 200, extra = {}) {
       headers
     }
   );
-}
 
 
 function corsHeaders(request) {
@@ -1004,13 +1003,6 @@ export default {
           corsHeaders(request)
         }
       );
-
-    }
-
-
-
-
-
 
 
 
