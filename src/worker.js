@@ -416,22 +416,34 @@ export default {
       return json({message:"Auth handled by KENDALI/Cloudflare, not Supabase"}, 404);
     }
 
-    // Serve frontend assets with SPA fallback
+    // Serve frontend assets with SPA fallback + global error protection
     if (env.ASSETS) {
-      const assetResponse = await env.ASSETS.fetch(request);
+      try {
+        const assetResponse = await env.ASSETS.fetch(request);
 
-      if (assetResponse.status !== 404) {
-        return assetResponse;
+        if (assetResponse.status !== 404) {
+          return assetResponse;
+        }
+
+        return env.ASSETS.fetch(
+          new Request(new URL("/index.html", request.url), {
+            method: "GET",
+            headers: request.headers
+          })
+        );
+      } catch (e) {
+        console.error("ASSETS_FETCH_ERROR", e);
+        return json({
+          ok: false,
+          error: "Frontend asset loading failed",
+          detail: String(e?.message || e)
+        }, 500);
       }
-
-      return env.ASSETS.fetch(
-        new Request(new URL("/index.html", request.url), request)
-      );
     }
 
-    return new Response("ASSETS binding tidak tersedia", {
-      status: 500,
-      headers: { "content-type": "text/plain" }
-    });
+    return json({
+      ok:false,
+      error:"ASSETS binding tidak tersedia"
+    },500);
   }
 };

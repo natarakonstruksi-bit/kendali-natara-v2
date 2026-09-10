@@ -3,7 +3,6 @@
   "name": "kendali-natara-v2",
   "main": "src/worker.js",
   "compatibility_date": "2026-09-08",
-
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
@@ -16,7 +15,6 @@
       "/auth/*"
     ]
   },
-
   "d1_databases": [
     {
       "binding": "DB",
@@ -25,25 +23,10 @@
       "migrations_dir": "migrations"
     }
   ],
-
   "r2_buckets": [
     {
       "binding": "FILES",
       "bucket_name": "kendali-natara-files-v2"
     }
-  ],
-
-  "observability": {
-    "logs": {
-      "enabled": true,
-      "head_sampling_rate": 1,
-      "invocation_logs": true,
-      "persist": true
-    },
-    "traces": {
-      "enabled": true,
-      "head_sampling_rate": 1,
-      "persist": true
-    }
-  }
+  ]
 }
