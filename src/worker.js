@@ -17,7 +17,7 @@ function json(data, status = 200, extra = {}) {
       headers
     }
   );
-
+}
 
 function corsHeaders(request) {
   const origin = request.headers.get("origin");
@@ -467,7 +467,7 @@ async function storageHandler(request,env,url){
 
 
 
-    return new Response(
+return new Response(
       request.method==="HEAD"
       ?
       null
@@ -477,6 +477,8 @@ async function storageHandler(request,env,url){
         headers
       }
     );
+
+  }
 
 
   if(
@@ -991,18 +993,20 @@ export default {
     // CORS
     // ==========================
 
-    if(
-      request.method === "OPTIONS"
-    ){
+if(
+ request.method === "OPTIONS"
+){
 
-      return new Response(
-        null,
-        {
-          status:204,
-          headers:
-          corsHeaders(request)
-        }
-      );
+ return new Response(
+   null,
+   {
+     status:204,
+     headers:
+     corsHeaders(request)
+   }
+ );
+
+}
 
 
 
