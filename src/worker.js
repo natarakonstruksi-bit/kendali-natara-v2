@@ -479,12 +479,6 @@ async function storageHandler(request,env,url){
       }
     );
 
-  }
-
-
-
-
-
 
   if(
     request.method==="POST" ||
