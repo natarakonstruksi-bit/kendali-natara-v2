@@ -268,6 +268,17 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    // Cloudflare Access identity bridge
+    if (url.pathname === "/api/auth/me") {
+      const auth = await registeredAccessUser(env, ctx);
+      if (!auth.ok) return accessFailure(auth);
+      return json({
+        ok: true,
+        identity: auth.identity,
+        user: auth.user
+      });
+    }
+
     if (url.pathname === "/api/access/session") {
       const auth = await registeredAccessUser(env, ctx);
       if (!auth.ok) return accessFailure(auth);
