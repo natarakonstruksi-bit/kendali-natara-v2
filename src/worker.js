@@ -382,39 +382,157 @@ function storageParts(pathname){
 
 
 
-async function storageHandler(request,env,url){
+async function storageHandler(request, env, url){
 
-
-  const parts =
-    storageParts(url.pathname);
-
-
+  const parts = storageParts(url.pathname);
 
   if(!parts){
-
     return json(
       {
-        message:
-        "Invalid storage path"
+        message:"Invalid storage path"
       },
       400
     );
-
   }
-
 
 
   if(parts.bucket !== "kendali-files"){
-
     return json(
       {
-        message:
-        "Bucket not found"
+        message:"Bucket not found"
       },
       404
     );
+  }
+
+
+  if(
+    request.method === "GET" ||
+    request.method === "HEAD"
+  ){
+
+    const obj = await env.FILES.get(parts.key);
+
+
+    if(!obj){
+      return json(
+        {
+          message:"Object not found"
+        },
+        404
+      );
+    }
+
+
+    const headers = new Headers();
+
+
+    obj.writeHttpMetadata(headers);
+
+
+    headers.set(
+      "etag",
+      obj.httpEtag
+    );
+
+
+    headers.set(
+      "cache-control",
+      parts.isPublic
+        ? "public,max-age=31536000,immutable"
+        : "private,no-store"
+    );
+
+
+    return new Response(
+      request.method==="HEAD"
+        ? null
+        : obj.body,
+      {
+        headers
+      }
+    );
 
   }
+
+
+  if(
+    request.method === "POST" ||
+    request.method === "PUT"
+  ){
+
+    const contentType =
+      request.headers.get("content-type")
+      ||
+      "application/octet-stream";
+
+
+    const length =
+      Number(
+        request.headers.get("content-length")
+        ||
+        0
+      );
+
+
+    if(length > 25 * 1024 * 1024){
+
+      return json(
+        {
+          message:"File too large",
+          max_mb:25
+        },
+        413
+      );
+
+    }
+
+
+    await env.FILES.put(
+      parts.key,
+      request.body,
+      {
+        httpMetadata:{
+          contentType
+        }
+      }
+    );
+
+
+    return json(
+      {
+        success:true,
+        key:parts.key
+      },
+      201
+    );
+
+  }
+
+
+  if(request.method==="DELETE"){
+
+    await env.FILES.delete(parts.key);
+
+
+    return json(
+      {
+        success:true
+      },
+      200
+    );
+
+  }
+
+
+  return json(
+    {
+      message:"Method not allowed"
+    },
+    405
+  );
+
+}
 
 
 
