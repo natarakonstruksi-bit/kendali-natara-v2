@@ -268,17 +268,6 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Cloudflare Access identity bridge
-    if (url.pathname === "/api/auth/me") {
-      const auth = await registeredAccessUser(env, ctx);
-      if (!auth.ok) return accessFailure(auth);
-      return json({
-        ok: true,
-        identity: auth.identity,
-        user: auth.user
-      });
-    }
-
     if (url.pathname === "/api/access/session") {
       const auth = await registeredAccessUser(env, ctx);
       if (!auth.ok) return accessFailure(auth);
@@ -427,6 +416,16 @@ export default {
       return json({message:"Auth handled by KENDALI/Cloudflare, not Supabase"}, 404);
     }
 
-    return env.ASSETS.fetch(request);
+    // SPA fallback: semua route frontend diarahkan ke index.html
+    // agar React Router tetap bekerja di Cloudflare Worker.
+    const assetResponse = await env.ASSETS.fetch(request);
+
+    if (assetResponse.status === 404) {
+      return env.ASSETS.fetch(
+        new Request(new URL("/index.html", request.url), request)
+      );
+    }
+
+    return assetResponse;
   }
 };
