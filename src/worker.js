@@ -689,13 +689,13 @@ return new Response(
 
 
 
-  return json(
-    {
-      message:
-      "Method not allowed"
-    },
-    405
-  );
+return json(
+  {
+    message:
+    "Method not allowed"
+  },
+  405
+);
 
 }
 
