@@ -416,16 +416,22 @@ export default {
       return json({message:"Auth handled by KENDALI/Cloudflare, not Supabase"}, 404);
     }
 
-    // SPA fallback: semua route frontend diarahkan ke index.html
-    // agar React Router tetap bekerja di Cloudflare Worker.
-    const assetResponse = await env.ASSETS.fetch(request);
+    // Serve frontend assets with SPA fallback
+    if (env.ASSETS) {
+      const assetResponse = await env.ASSETS.fetch(request);
 
-    if (assetResponse.status === 404) {
+      if (assetResponse.status !== 404) {
+        return assetResponse;
+      }
+
       return env.ASSETS.fetch(
         new Request(new URL("/index.html", request.url), request)
       );
     }
 
-    return assetResponse;
+    return new Response("ASSETS binding tidak tersedia", {
+      status: 500,
+      headers: { "content-type": "text/plain" }
+    });
   }
 };
