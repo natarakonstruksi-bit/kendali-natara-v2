@@ -473,7 +473,7 @@ async function storageHandler(request, env, url){
         ||
         0
       );
-
+ 
 
     if(length > 25 * 1024 * 1024){
 
@@ -664,39 +664,38 @@ return new Response(
       200
     );
 
-  }
+  
 
 
 
 
 
 
-  if(request.method==="DELETE"){
+async function storageHandler(request,env,url){
+
+    if(request.method==="POST"){
+       return json(...)
+    }
 
 
-    await env.FILES.delete(
-      parts.key
-    );
+    if(request.method==="DELETE"){
+       return json(...)
+    }
+
+
+    if(request.method==="GET"){
+       return new Response(...)
+    }
 
 
     return json(
-      {},
-      200
+       {
+        message:"Method not allowed"
+       },
+       405
     );
 
-  }
-
-
-
-
-return json(
-  {
-    message:
-    "Method not allowed"
-  },
-  405
-);
-
+} 
 
 
 
