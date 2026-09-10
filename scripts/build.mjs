@@ -53,7 +53,7 @@ await writeFile(indexPath, html, "utf8");
 
 const manifest = {
   builtAt: new Date().toISOString(),
-  appVersion: "APP-V2.5.1",
+  appVersion: "APP-V2.6",
   frontend: "KENDALI existing UI + source extension layer",
   backend: "Cloudflare Worker",
   database: "D1",
@@ -66,4 +66,9 @@ console.log("KENDALI App build selesai:", manifest.appVersion);
 // runtime guard V2.5.1
 if (!bundleText.includes('typeof x!=="object"')) {
   throw new Error("Build dibatalkan: hotfix /users V2.5.1 belum aktif");
+}
+
+// single-login Cloudflare Access V2.6
+if (!bundleText.includes("/api/access/session")) {
+  throw new Error("Build dibatalkan: SSO Cloudflare Access V2.6 belum aktif");
 }

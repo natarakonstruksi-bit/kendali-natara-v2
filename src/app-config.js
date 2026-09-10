@@ -1,6 +1,6 @@
 window.KENDALI_CONFIG = Object.freeze({
   appName: "KENDALI Natara",
-  appVersion: "APP-V2.5.1",
+  appVersion: "APP-V2.6",
   apiBase: window.location.origin,
   database: "Cloudflare D1",
   files: "Cloudflare R2",

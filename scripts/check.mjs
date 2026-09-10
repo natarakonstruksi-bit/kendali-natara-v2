@@ -41,3 +41,9 @@ console.log("KENDALI APP-V2.3 preflight OK");
 if (!bundle.includes('typeof x!=="object"')) {
   throw new Error("matcher assignment aman V2.5.1 belum aktif");
 }
+
+if (!bundle.includes("/api/access/session")) throw new Error("SSO Access session belum aktif");
+
+if (!bundle.includes("Login otomatis")) throw new Error("UI single login belum aktif");
+
+if (!bundle.includes("Tidak ada password KENDALI.")) throw new Error("Form karyawan masih memakai password lama");

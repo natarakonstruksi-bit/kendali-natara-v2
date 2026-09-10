@@ -194,9 +194,92 @@ async function storageHandler(request, env, url) {
   return json({message:"Method not allowed"}, 405);
 }
 
+
+const ACTIVE_KENDALI_ROLES = new Set([
+  "Direktur","Admin","Manager Konstruksi","Head of Operational","Finance",
+  "Head of Engineering","Head of Supporting","Superintendent","Pelaksana Lapangan",
+  "Senior Estimator","MEP Engineer","Cost Control","Quantity Surveyor","Drafter/BIM",
+  "Admin Teknik","Admin Logistik","Senior QC","QC Inspector","Kepala ATI","Instruktur ATI"
+]);
+
+async function accessIdentity(ctx) {
+  if (!ctx?.access) return null;
+  try {
+    const identity = await ctx.access.getIdentity();
+    if (!identity?.email) return null;
+    return {
+      email: String(identity.email).trim().toLowerCase(),
+      name: identity.name || null
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function registeredAccessUser(env, ctx) {
+  const identity = await accessIdentity(ctx);
+  if (!identity) return { ok:false, status:401, reason:"ACCESS_REQUIRED", identity:null, user:null };
+
+  const row = await env.DB.prepare(`
+    SELECT id,data_json
+    FROM app_records
+    WHERE collection='users'
+      AND lower(COALESCE(json_extract(data_json,'$.email'),''))=?
+    LIMIT 1
+  `).bind(identity.email).first();
+
+  if (!row) return { ok:false, status:403, reason:"EMAIL_NOT_REGISTERED", identity, user:null };
+
+  let user = {};
+  try { user = JSON.parse(row.data_json); } catch {}
+  user.id = row.id;
+
+  if (String(user.status || "Aktif").toLowerCase() === "nonaktif") {
+    return { ok:false, status:403, reason:"USER_INACTIVE", identity, user:null };
+  }
+
+  const role = String(user.role || "").trim();
+  if (!role) return { ok:false, status:403, reason:"ROLE_NOT_SET", identity, user:null };
+  if (!ACTIVE_KENDALI_ROLES.has(role)) {
+    return { ok:false, status:403, reason:"ROLE_NOT_ACTIVE", identity, user:null };
+  }
+
+  delete user.password;
+  return { ok:true, status:200, reason:null, identity, user };
+}
+
+function accessFailure(auth) {
+  const messages = {
+    ACCESS_REQUIRED: "Cloudflare Access belum mengautentikasi request.",
+    EMAIL_NOT_REGISTERED: "Email ini belum terdaftar sebagai karyawan KENDALI.",
+    USER_INACTIVE: "Akun KENDALI sudah dinonaktifkan.",
+    ROLE_NOT_SET: "Role KENDALI belum ditentukan oleh Administrator.",
+    ROLE_NOT_ACTIVE: "Role akun masih legacy/belum aktif dan perlu diperbarui Administrator."
+  };
+  return json({
+    ok:false,
+    code:auth.reason,
+    message:messages[auth.reason] || "Akses ditolak.",
+    email:auth.identity?.email || null
+  }, auth.status || 403);
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/access/session") {
+      const auth = await registeredAccessUser(env, ctx);
+      if (!auth.ok) return accessFailure(auth);
+
+      return json({
+        ok:true,
+        email:auth.identity.email,
+        identity:auth.identity,
+        user:auth.user,
+        landing_route:auth.user.role === "Pelaksana Lapangan" ? "/lapangan" : "/"
+      });
+    }
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(request) });
@@ -205,7 +288,7 @@ export default {
     if (url.pathname === "/app-build.json") {
       return json({
         ok: true,
-        appVersion: "APP-V2.5.1",
+        appVersion: "APP-V2.6",
         singleDeploy: true,
         architecture: "single-app",
         frontend: "KENDALI App",
@@ -248,7 +331,7 @@ export default {
         return json({
           ok:false,
           service:"KENDALI Natara App V2",
-          app_version:"APP-V2.5.1",
+          app_version:"APP-V2.6",
           error:String(e?.message || e)
         }, 503);
       }
@@ -256,7 +339,7 @@ export default {
       return json({
         ok: schema === "FULL-UI-01",
         service: "KENDALI Natara App V2",
-        app_version: "APP-V2.5.1",
+        app_version: "APP-V2.6",
         single_deploy: true,
         architecture: "single-app",
         database: "Cloudflare D1",
@@ -276,6 +359,11 @@ export default {
     }
 
     if (url.pathname === "/api/diagnostics") {
+      const auth = await registeredAccessUser(env, ctx);
+      if (!auth.ok) return accessFailure(auth);
+      if (auth.user.role !== "Admin" && auth.user.role !== "Direktur") {
+        return json({ok:false,code:"FORBIDDEN",message:"Diagnostics hanya untuk Administrator/Direktur."},403);
+      }
       try {
         const meta = await env.DB.prepare(`
           SELECT key,value,updated_at
@@ -293,7 +381,7 @@ export default {
 
         return json({
           ok:true,
-          app_version:"APP-V2.5.1",
+          app_version:"APP-V2.6",
           meta:meta.results || [],
           collections:counts.results || []
         });
@@ -303,6 +391,9 @@ export default {
     }
 
     if (url.pathname.startsWith("/rest/v1/")) {
+      const auth = await registeredAccessUser(env, ctx);
+      if (!auth.ok) return accessFailure(auth);
+
       const collection = safeCollection(
         decodeURIComponent(url.pathname.slice("/rest/v1/".length).split("/")[0])
       );
@@ -315,6 +406,8 @@ export default {
     }
 
     if (url.pathname.startsWith("/storage/v1/object/")) {
+      const auth = await registeredAccessUser(env, ctx);
+      if (!auth.ok) return accessFailure(auth);
       return storageHandler(request, env, url);
     }
 
