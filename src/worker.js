@@ -510,30 +510,30 @@ async function storageHandler(request, env, url){
   }
 
 
-  if(request.method==="DELETE"){
+ if(request.method==="DELETE"){
 
-    await env.FILES.delete(parts.key);
-
-
-    return json(
-      {
-        success:true
-      },
-      200
-    );
-
-  }
-
+  await env.FILES.delete(
+    parts.key
+  );
 
   return json(
     {
-      message:"Method not allowed"
+      success:true
     },
-    405
+    200
   );
 
 }
 
+
+return json(
+  {
+    message:"Method not allowed"
+  },
+  405
+);
+
+}
 
 
   if(
@@ -671,33 +671,85 @@ return new Response(
 
 
 
-async function storageHandler(request,env,url){
+async function storageHandler(request, env, url){
 
-    if(request.method==="POST"){
-       return json(...)
-    }
+  const parts = storageParts(url.pathname);
 
-
-    if(request.method==="DELETE"){
-       return json(...)
-    }
-
-
-    if(request.method==="GET"){
-       return new Response(...)
-    }
-
-
+  if(!parts){
     return json(
-       {
-        message:"Method not allowed"
-       },
-       405
+      {
+        message:"Invalid storage path"
+      },
+      400
+    );
+  }
+
+
+  if(request.method==="GET" || request.method==="HEAD"){
+
+    const obj = await env.FILES.get(parts.key);
+
+    if(!obj){
+      return json(
+        {
+          message:"Object not found"
+        },
+        404
+      );
+    }
+
+    return new Response(
+      request.method==="HEAD"
+        ? null
+        : obj.body,
+      {
+        headers:new Headers()
+      }
     );
 
-} 
+  }
 
 
+  if(request.method==="DELETE"){
+
+    await env.FILES.delete(parts.key);
+
+    return json(
+      {
+        success:true
+      },
+      200
+    );
+
+  }
+
+
+  if(request.method==="POST" || request.method==="PUT"){
+
+    await env.FILES.put(
+      parts.key,
+      request.body
+    );
+
+    return json(
+      {
+        success:true,
+        key:parts.key
+      },
+      200
+    );
+
+  }
+
+
+  return json(
+    {
+      message:"Method not allowed"
+    },
+    405
+  );
+
+}
 
 
 
