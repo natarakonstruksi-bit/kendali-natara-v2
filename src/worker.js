@@ -1366,12 +1366,20 @@ export default {
       });
     }
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders(request)
-      });
+   if(
+  request.method === "OPTIONS"
+){
+
+  return new Response(
+    null,
+    {
+      status:204,
+      headers:
+      corsHeaders(request)
     }
+  );
+
+}
 
     if (url.pathname === "/app-build.json") {
       return json({
