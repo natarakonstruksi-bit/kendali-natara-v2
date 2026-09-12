@@ -1586,18 +1586,19 @@ return json(
     }
 
 
-    // ==========================
-    // FALLBACK
-    // ==========================
+// ===========================
+// FRONTEND FALLBACK
+// ===========================
 
-    return json(
-      {
-        ok:false,
+if (env.ASSETS) {
+  return env.ASSETS.fetch(request);
+}
 
-        error:
-          "ASSETS binding tidak tersedia"
-      },
-      500
-    );
-
+return json(
+{
+  ok:false,
+  error:"ASSETS binding tidak tersedia"
+},
+500
+);
 } }; 
