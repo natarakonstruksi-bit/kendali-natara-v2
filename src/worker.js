@@ -1078,13 +1078,16 @@ const url = new URL(request.url);
 
 
 // STATIC ASSET HANDLER
-if (request.method === "GET") {
+if (env.ASSETS) {
+      return env.ASSETS.fetch(request);
+   }
 
- const assetResponse = await env.ASSETS.fetch(request);
+   return new Response("Not Found", {
+      status:404
+   });
 
- if(assetResponse.status !== 404){
-   return assetResponse;
  }
+}
 
  return env.ASSETS.fetch(
    new Request(
