@@ -1114,12 +1114,25 @@ if (
 }
 
 
+// ===============================
+// STATIC FRONTEND
+// ===============================
+if (request.method === "GET") {
+  return env.ASSETS.fetch(request);
+}
+
+
+// ===============================
+// METHOD ERROR
+// ===============================
 return json(
 {
  message:"Method not allowed"
 },
 405
 );
+
+}
     if (url.pathname === "/app-build.json") {
       return json({
         ok: true,
