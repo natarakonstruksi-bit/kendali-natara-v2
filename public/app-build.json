@@ -1,10 +1,10 @@
 {
-  "builtAt": "2026-09-12T15:22:05.232Z",
-  "appVersion": "APP-V2.6",
+  "builtAt": "2026-09-12T15:38:16.172Z",
+  "appVersion": "APP-V2.7",
   "frontend": "KENDALI existing UI + source extension layer",
   "backend": "Cloudflare Worker",
   "database": "D1",
   "files": "R2",
-  "auth": "Cloudflare Access (single login)",
+  "auth": "Username + password KENDALI (sesi Worker)",
   "singleDeploy": true
 }

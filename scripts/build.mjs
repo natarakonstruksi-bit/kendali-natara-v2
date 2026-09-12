@@ -1,5 +1,5 @@
 /**
- * Build KENDALI App V2.6:
+ * Build KENDALI App V2.7:
  *   app/ (bundle UI hasil Vite) + src/app-config.js + src/app-overrides.js  ->  public/
  * Folder public/ kemudian diunggah wrangler sebagai Static Assets.
  * Jangan mengedit public/ secara manual — selalu lewat `npm run build`.
@@ -8,11 +8,11 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-const APP_VERSION = "APP-V2.6";
+const APP_VERSION = "APP-V2.7";
 const root = process.cwd();
 const appDir = path.join(root, "app");
 const publicDir = path.join(root, "public");
-const bundleName = "index-HRmtcOom.js";
+const bundleName = "index-KNDLv27a.js";
 
 if (!existsSync(path.join(appDir, "index.html"))) throw new Error("app/index.html tidak ditemukan");
 if (!existsSync(path.join(appDir, "assets", bundleName))) throw new Error("Bundle KENDALI tidak ditemukan");
@@ -41,7 +41,7 @@ const manifest = {
   backend: "Cloudflare Worker",
   database: "D1",
   files: "R2",
-  auth: "Cloudflare Access (single login)",
+  auth: "Username + password KENDALI (sesi Worker)",
   singleDeploy: true
 };
 await writeFile(path.join(publicDir, "app-build.json"), JSON.stringify(manifest, null, 2));

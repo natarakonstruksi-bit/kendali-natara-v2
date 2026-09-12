@@ -1,5 +1,5 @@
 /**
- * Preflight KENDALI App V2.6 — dijalankan sebelum build/deploy.
+ * Preflight KENDALI App V2.7 — dijalankan sebelum build/deploy.
  * Memastikan file wajib ada dan bundle frontend memang versi Cloudflare (bukan Supabase lama).
  */
 import { existsSync } from "node:fs";
@@ -7,7 +7,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 const root = process.cwd();
-const BUNDLE = "app/assets/index-HRmtcOom.js";
+const BUNDLE = "app/assets/index-KNDLv27a.js";
 
 const required = [
   "app/index.html",
@@ -17,6 +17,8 @@ const required = [
   "migrations/0006_import_46_projects.sql",
   "migrations/0008_link_project_assignment_usernames.sql",
   "migrations/0009_cloudflare_access_sso.sql",
+  "migrations/0011_username_password_login.sql",
+  "src/pages.js",
   "src/worker.js",
   "src/app-config.js",
   "src/app-overrides.js",
@@ -38,13 +40,16 @@ const mustInclude = [
   ["Penugasan Karyawan ke Proyek", "UI Penugasan Proyek V2.5 belum aktif"],
   ["Superintendent / PM", "Kolom assignment pada Master Proyek belum aktif"],
   ['typeof x!=="object"', "Matcher assignment aman V2.5.1 belum aktif"],
-  ["/api/access/session", "SSO Cloudflare Access session belum aktif"],
-  ["Login otomatis", "UI single login belum aktif"],
-  ["Tidak ada password KENDALI.", "Form karyawan masih memakai password lama"]
+  ["/api/access/session", "Pemeriksaan sesi login belum aktif"],
+  ['window.location.replace("/login")', "Redirect ke halaman login belum aktif"],
+  ['window.location.href="/api/auth/logout"', "Logout via Worker belum aktif"],
+  ['type:"password"', "Field password pada form karyawan belum aktif"]
 ];
 const mustExclude = [
   ["disabled:!!r", "Username karyawan masih terkunci pada mode edit"],
-  ["https://fsymvtwwpkzmrizaxblg.supabase.co", "Koneksi Supabase lama masih ada di bundle"]
+  ["https://fsymvtwwpkzmrizaxblg.supabase.co", "Koneksi Supabase lama masih ada di bundle"],
+  ["Cloudflare Access", "Bundle masih memakai login Cloudflare Access"],
+  ["/cdn-cgi/access/logout", "Logout masih mengarah ke Cloudflare Access"]
 ];
 
 for (const [token, message] of mustInclude) {
@@ -61,4 +66,4 @@ try {
   throw new Error(`src/worker.js gagal dimuat: ${e.message}`);
 }
 
-console.log("KENDALI APP-V2.6 preflight OK");
+console.log("KENDALI APP-V2.7 preflight OK");

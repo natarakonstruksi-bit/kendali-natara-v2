@@ -1,21 +1,28 @@
 /**
- * KENDALI Natara App V2.6 — Cloudflare Worker
+ * KENDALI Natara App V2.7 — Cloudflare Worker
  *
  * Satu deploy: Worker (API) + Static Assets (frontend) + D1 (data) + R2 (file).
- * Autentikasi: Cloudflare Access (email) -> dicocokkan ke master karyawan di D1.
+ * Autentikasi: username + password KENDALI (server-side, sesi cookie HttpOnly).
  *
  * Route:
+ *   GET  /login                   — halaman login (HTML dari Worker)
+ *   GET  /ganti-password          — ubah password sendiri (butuh sesi)
+ *   POST /api/auth/login          — {username,password,remember} -> cookie sesi
+ *   GET|POST /api/auth/logout     — hapus sesi
+ *   POST /api/auth/change-password
+ *   GET  /api/auth/me, /api/access/session — sesi -> user KENDALI (dipakai bundle UI)
  *   GET  /api/health              — status layanan (publik, tanpa data sensitif)
- *   GET  /api/access/session      — identitas Access -> user KENDALI
- *   GET  /api/auth/me             — alias /api/access/session
  *   GET  /api/diagnostics         — Admin/Direktur saja
- *   *    /rest/v1/:collection     — adapter PostgREST -> D1 (app_records)
- *   *    /storage/v1/object/...   — adapter Supabase Storage -> R2
+ *   *    /rest/v1/:collection     — adapter PostgREST -> D1 (app_records), butuh sesi
+ *   *    /storage/v1/object/...   — adapter Supabase Storage -> R2, butuh sesi
  *   *    /auth/v1/*, /api/broadcast — dimatikan (Supabase lama)
+ *   GET  /                        — index.html bila ada sesi, jika tidak -> /login
  *   *    lainnya                  — static assets (SPA)
  */
 
-const APP_VERSION = "APP-V2.6";
+import { loginPage, changePasswordPage } from "./pages.js";
+
+const APP_VERSION = "APP-V2.7";
 const SERVICE_NAME = "KENDALI Natara App V2";
 const SCHEMA_VERSION = "FULL-UI-01";
 const STORAGE_BUCKET = "kendali-files";
@@ -29,6 +36,18 @@ const COLLECTIONS = new Set([
 const DIAGNOSTIC_ROLES = new Set(["admin", "direktur"]);
 const FIELD_ROLE = "Pelaksana Lapangan";
 
+// Sesi
+const SESSION_COOKIE = "kendali_session";
+const SESSION_TTL_SEC = 12 * 60 * 60;            // 12 jam
+const SESSION_TTL_REMEMBER_SEC = 30 * 24 * 60 * 60; // 30 hari ("ingat saya")
+// Pembatasan percobaan login per username
+const LOGIN_MAX_FAILS = 8;
+const LOGIN_WINDOW_SEC = 15 * 60;
+// Format hash password — HARUS sama dengan bundle UI (md/fB): "h1$" + sha256hex("kendali-natara-v1:" + password)
+const PASSWORD_SALT_PREFIX = "kendali-natara-v1:";
+const PASSWORD_HASH_PREFIX = "h1$";
+const PASSWORD_MIN_LEN = 6;
+
 /* ------------------------------------------------------------------ */
 /* helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -40,6 +59,17 @@ function json(data, status = 200, extra = {}) {
     ...extra
   });
   return new Response(data === null ? null : JSON.stringify(data), { status, headers });
+}
+
+function html(markup, status = 200, extra = {}) {
+  return new Response(markup, {
+    status,
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", ...extra }
+  });
+}
+
+function redirect(location, extra = {}) {
+  return new Response(null, { status: 302, headers: { location, "cache-control": "no-store", ...extra } });
 }
 
 function corsHeaders(request) {
@@ -100,22 +130,8 @@ function parseInFilter(value) {
   }
   out.push(cur);
 
-  // URLSearchParams sudah melakukan decode satu kali; jangan decode ulang
-  // agar id yang mengandung karakter "%" tidak rusak.
+  // URLSearchParams sudah melakukan decode satu kali; jangan decode ulang.
   return out.map((x) => x.trim()).filter(Boolean);
-}
-
-/* ------------------------------------------------------------------ */
-/* Cloudflare Access identity                                          */
-/* ------------------------------------------------------------------ */
-
-function base64UrlDecode(str) {
-  const pad = "=".repeat((4 - (str.length % 4)) % 4);
-  const b64 = (str + pad).replace(/-/g, "+").replace(/_/g, "/");
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
 }
 
 function getCookie(request, name) {
@@ -127,91 +143,80 @@ function getCookie(request, name) {
   return null;
 }
 
-/**
- * Verifikasi JWT Cloudflare Access (opsional, aktif bila ACCESS_TEAM_DOMAIN + ACCESS_AUD diisi).
- * Bila tidak diisi, Worker mempercayai header Cf-Access-Authenticated-User-Email,
- * yang hanya aman selama Worker berada di belakang Cloudflare Access.
- */
-async function verifyAccessJwt(token, env) {
-  const team = String(env.ACCESS_TEAM_DOMAIN || "").trim();
-  const aud = String(env.ACCESS_AUD || "").trim();
-  if (!team || !aud || !token) return null;
-
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-
-  const header = safeJsonParse(new TextDecoder().decode(base64UrlDecode(parts[0])), null);
-  const payload = safeJsonParse(new TextDecoder().decode(base64UrlDecode(parts[1])), null);
-  if (!header || !payload || header.alg !== "RS256") return null;
-
-  const now = Math.floor(Date.now() / 1000);
-  if (payload.exp && payload.exp < now) return null;
-  const audList = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  if (!audList.includes(aud)) return null;
-
-  const certsUrl = `https://${team.replace(/^https?:\/\//, "").replace(/\/+$/, "")}/cdn-cgi/access/certs`;
-  const certs = await fetch(certsUrl, { cf: { cacheTtl: 300, cacheEverything: true } })
-    .then((r) => (r.ok ? r.json() : null))
-    .catch(() => null);
-  const jwk = certs?.keys?.find((k) => k.kid === header.kid);
-  if (!jwk) return null;
-
-  try {
-    const key = await crypto.subtle.importKey(
-      "jwk",
-      jwk,
-      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-      false,
-      ["verify"]
-    );
-    const ok = await crypto.subtle.verify(
-      "RSASSA-PKCS1-v1_5",
-      key,
-      base64UrlDecode(parts[2]),
-      new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
-    );
-    return ok ? payload : null;
-  } catch {
-    return null;
-  }
+async function sha256Hex(text) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function accessEmail(request, env) {
-  const strict = Boolean(env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD);
-
-  if (strict) {
-    const token =
-      request.headers.get("cf-access-jwt-assertion") ||
-      getCookie(request, "CF_Authorization");
-    const payload = await verifyAccessJwt(token, env);
-    return payload?.email ? String(payload.email).trim().toLowerCase() : null;
-  }
-
-  const header = request.headers.get("cf-access-authenticated-user-email");
-  if (header) return header.trim().toLowerCase();
-
-  // Hanya untuk `wrangler dev` lokal (.dev.vars) dan hanya bila host-nya localhost.
-  if (env.DEV_ACCESS_EMAIL && isLocalRequest(request)) {
-    return String(env.DEV_ACCESS_EMAIL).trim().toLowerCase();
-  }
-
-  return null;
+function randomToken(bytes = 32) {
+  const buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  let bin = "";
+  for (const b of buf) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function isLocalRequest(request) {
-  try {
-    const host = new URL(request.url).hostname;
-    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "0.0.0.0";
-  } catch {
-    return false;
-  }
+function timingSafeEqual(a, b) {
+  const x = new TextEncoder().encode(String(a));
+  const y = new TextEncoder().encode(String(b));
+  if (x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  return diff === 0;
 }
+
+async function readBody(request) {
+  const type = (request.headers.get("content-type") || "").toLowerCase();
+  if (type.includes("application/json")) {
+    try {
+      return { data: await request.json(), form: false };
+    } catch {
+      return { data: {}, form: false };
+    }
+  }
+  if (type.includes("application/x-www-form-urlencoded") || type.includes("multipart/form-data")) {
+    try {
+      const fd = await request.formData();
+      const data = {};
+      for (const [k, v] of fd.entries()) data[k] = typeof v === "string" ? v : "";
+      return { data, form: true };
+    } catch {
+      return { data: {}, form: true };
+    }
+  }
+  return { data: {}, form: false };
+}
+
+/* ------------------------------------------------------------------ */
+/* Password                                                            */
+/* ------------------------------------------------------------------ */
+
+function isHashed(v) {
+  return typeof v === "string" && v.startsWith(PASSWORD_HASH_PREFIX);
+}
+
+async function hashPassword(plain) {
+  return PASSWORD_HASH_PREFIX + (await sha256Hex(PASSWORD_SALT_PREFIX + plain));
+}
+
+/** Verifikasi password terhadap nilai tersimpan (hash h1$ atau plaintext legacy). */
+async function verifyPassword(plain, stored) {
+  if (!stored) return { ok: false, upgrade: false };
+  if (isHashed(stored)) {
+    return { ok: timingSafeEqual(await hashPassword(plain), stored), upgrade: false };
+  }
+  return { ok: timingSafeEqual(plain, stored), upgrade: true };
+}
+
+/* ------------------------------------------------------------------ */
+/* Users & sesi (D1)                                                   */
+/* ------------------------------------------------------------------ */
 
 function publicUser(u) {
   return {
     id: u.id,
     username: u.username || u.id,
-    name: u.name || u.username || u.email,
+    name: u.name || u.username || u.email || "",
     role: u.role || "",
     jabatan: u.jabatan || u.role || "",
     unit: u.unit || "",
@@ -221,56 +226,245 @@ function publicUser(u) {
   };
 }
 
-async function findUserByEmail(env, email) {
+async function findUserByUsername(env, username) {
+  const key = String(username || "").trim().toLowerCase();
+  if (!key) return null;
   const row = await env.DB.prepare(`
     SELECT id, data_json
     FROM app_records
     WHERE collection = 'users'
-      AND lower(trim(COALESCE(json_extract(data_json, '$.email'), ''))) = ?
+      AND (lower(id) = ? OR lower(trim(COALESCE(json_extract(data_json, '$.username'), ''))) = ?)
     LIMIT 1
-  `).bind(email).first();
-
+  `).bind(key, key).first();
   if (!row) return null;
   return { id: row.id, ...safeJsonParse(row.data_json, {}) };
 }
 
-/**
- * Identitas Access -> user KENDALI aktif.
- * Mengembalikan { ok, status, reason, email, user }.
- */
-async function registeredAccessUser(request, env) {
-  const email = await accessEmail(request, env);
-  if (!email) {
-    return { ok: false, status: 401, reason: "UNAUTHORIZED", email: null, user: null };
-  }
-
-  const user = await findUserByEmail(env, email);
-  if (!user) {
-    return { ok: false, status: 403, reason: "NOT_REGISTERED", email, user: null };
-  }
-
-  if (String(user.status || "").trim().toLowerCase() === "nonaktif") {
-    return { ok: false, status: 403, reason: "INACTIVE", email, user: publicUser(user) };
-  }
-
-  return { ok: true, status: 200, reason: null, email, user: publicUser(user) };
+async function setUserPassword(env, userId, hash) {
+  await env.DB.prepare(`
+    UPDATE app_records
+    SET data_json = json_set(data_json, '$.password', ?), updated_at = CURRENT_TIMESTAMP
+    WHERE collection = 'users' AND id = ?
+  `).bind(hash, userId).run();
 }
 
-function accessFailure(auth) {
+function nowIso() {
+  return new Date().toISOString();
+}
+
+async function createSession(env, request, user, remember) {
+  const token = randomToken(32);
+  const tokenHash = await sha256Hex(token);
+  const ttl = remember ? SESSION_TTL_REMEMBER_SEC : SESSION_TTL_SEC;
+  const expiresAt = new Date(Date.now() + ttl * 1000).toISOString();
+  await env.DB.prepare(`
+    INSERT INTO app_sessions (token_hash, user_id, username, expires_at, user_agent, ip)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).bind(
+    tokenHash,
+    user.id,
+    user.username || user.id,
+    expiresAt,
+    (request.headers.get("user-agent") || "").slice(0, 300),
+    request.headers.get("cf-connecting-ip") || ""
+  ).run();
+  return { token, ttl };
+}
+
+function sessionCookie(request, token, ttl) {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ttl}${secure}`;
+}
+
+function clearSessionCookie(request) {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+/**
+ * Sesi -> user KENDALI aktif.
+ * Mengembalikan { ok, status, reason, user, sessionHash }.
+ */
+async function authenticate(request, env) {
+  const token = getCookie(request, SESSION_COOKIE);
+  if (!token || token.length < 20 || token.length > 200) {
+    return { ok: false, status: 401, reason: "NO_SESSION", user: null };
+  }
+
+  const tokenHash = await sha256Hex(token);
+  const sess = await env.DB.prepare(`
+    SELECT user_id, expires_at FROM app_sessions WHERE token_hash = ? LIMIT 1
+  `).bind(tokenHash).first();
+
+  if (!sess) return { ok: false, status: 401, reason: "NO_SESSION", user: null };
+  if (new Date(sess.expires_at).getTime() < Date.now()) {
+    await env.DB.prepare("DELETE FROM app_sessions WHERE token_hash = ?").bind(tokenHash).run();
+    return { ok: false, status: 401, reason: "EXPIRED", user: null };
+  }
+
+  const row = await env.DB.prepare(
+    "SELECT id, data_json FROM app_records WHERE collection='users' AND id = ? LIMIT 1"
+  ).bind(sess.user_id).first();
+  if (!row) return { ok: false, status: 403, reason: "NOT_REGISTERED", user: null };
+
+  const user = { id: row.id, ...safeJsonParse(row.data_json, {}) };
+  if (String(user.status || "").trim().toLowerCase() === "nonaktif") {
+    return { ok: false, status: 403, reason: "INACTIVE", user: publicUser(user) };
+  }
+
+  // sentuh sesi (jarang) agar bisa dibersihkan berdasarkan last_seen
+  return { ok: true, status: 200, reason: null, user: publicUser(user), sessionHash: tokenHash };
+}
+
+function authFailure(auth) {
   const messages = {
-    UNAUTHORIZED: "Identitas Cloudflare Access tidak ditemukan. Pastikan Worker dilindungi Cloudflare Access.",
-    NOT_REGISTERED: "Email Cloudflare Access belum terdaftar di database karyawan KENDALI.",
+    NO_SESSION: "Belum login.",
+    EXPIRED: "Sesi sudah berakhir. Silakan login kembali.",
+    NOT_REGISTERED: "Akun tidak ditemukan di database karyawan KENDALI.",
     INACTIVE: "Akun KENDALI nonaktif."
   };
   return json(
-    {
-      ok: false,
-      code: auth.reason,
-      message: messages[auth.reason] || "Akses ditolak.",
-      email: auth.email || null
-    },
+    { ok: false, code: auth.reason, message: messages[auth.reason] || "Akses ditolak.", login_url: "/login" },
     auth.status || 403
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* Login attempts (rate limit per username)                            */
+/* ------------------------------------------------------------------ */
+
+async function loginBlocked(env, username) {
+  const row = await env.DB.prepare(
+    "SELECT fails, last_fail_at FROM app_login_attempts WHERE username = ?"
+  ).bind(username).first();
+  if (!row) return false;
+  const age = (Date.now() - new Date(row.last_fail_at).getTime()) / 1000;
+  return Number(row.fails) >= LOGIN_MAX_FAILS && age < LOGIN_WINDOW_SEC;
+}
+
+async function recordLoginFail(env, username) {
+  await env.DB.prepare(`
+    INSERT INTO app_login_attempts (username, fails, last_fail_at) VALUES (?, 1, ?)
+    ON CONFLICT(username) DO UPDATE SET
+      fails = CASE WHEN (julianday(?) - julianday(last_fail_at)) * 86400 > ? THEN 1 ELSE fails + 1 END,
+      last_fail_at = excluded.last_fail_at
+  `).bind(username, nowIso(), nowIso(), LOGIN_WINDOW_SEC).run();
+}
+
+async function clearLoginFails(env, username) {
+  await env.DB.prepare("DELETE FROM app_login_attempts WHERE username = ?").bind(username).run();
+}
+
+/* ------------------------------------------------------------------ */
+/* Auth handlers                                                       */
+/* ------------------------------------------------------------------ */
+
+function landingFor(user) {
+  return user.role === FIELD_ROLE ? "/#/lapangan" : "/";
+}
+
+async function loginHandler(request, env) {
+  const { data, form } = await readBody(request);
+  const username = String(data.username || "").trim();
+  const password = String(data.password || "");
+  const remember = data.remember === true || data.remember === "1" || data.remember === "on" || data.remember === "true";
+  const wantsRedirect = form || data.redirect === "1";
+
+  const fail = (status, message) =>
+    wantsRedirect
+      ? html(loginPage({ error: message, username }), status)
+      : json({ ok: false, message }, status);
+
+  if (!username || !password) return fail(400, "Username dan password wajib diisi.");
+
+  const key = username.toLowerCase();
+  if (await loginBlocked(env, key)) {
+    return fail(429, "Terlalu banyak percobaan gagal. Coba lagi 15 menit lagi.");
+  }
+
+  const user = await findUserByUsername(env, username);
+  if (!user) {
+    await recordLoginFail(env, key);
+    return fail(401, "Username atau password salah.");
+  }
+  if (!user.password) {
+    return fail(403, "Password akun ini belum diatur. Hubungi Administrator.");
+  }
+
+  const check = await verifyPassword(password, user.password);
+  if (!check.ok) {
+    await recordLoginFail(env, key);
+    return fail(401, "Username atau password salah.");
+  }
+  if (String(user.status || "").trim().toLowerCase() === "nonaktif") {
+    return fail(403, "Akun KENDALI nonaktif. Hubungi Administrator.");
+  }
+  if (check.upgrade) {
+    await setUserPassword(env, user.id, await hashPassword(password));
+  }
+
+  await clearLoginFails(env, key);
+  const { token, ttl } = await createSession(env, request, user, remember);
+  const cookie = sessionCookie(request, token, ttl);
+  const pub = publicUser(user);
+  const landing = landingFor(pub);
+
+  if (wantsRedirect) return redirect(landing, { "set-cookie": cookie });
+  return json(
+    { ok: true, user: pub, username: pub.username, landing_route: pub.role === FIELD_ROLE ? "/lapangan" : "/", landing_url: landing },
+    200,
+    { "set-cookie": cookie }
+  );
+}
+
+async function logoutHandler(request, env) {
+  const token = getCookie(request, SESSION_COOKIE);
+  if (token) {
+    try {
+      await env.DB.prepare("DELETE FROM app_sessions WHERE token_hash = ?").bind(await sha256Hex(token)).run();
+    } catch {}
+  }
+  const cookie = clearSessionCookie(request);
+  if (request.method === "GET") return redirect("/login", { "set-cookie": cookie });
+  return json({ ok: true, login_url: "/login" }, 200, { "set-cookie": cookie });
+}
+
+async function sessionHandler(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth.ok) return authFailure(auth);
+  return json({
+    ok: true,
+    username: auth.user.username,
+    email: auth.user.email || "",
+    user: auth.user,
+    identity: { username: auth.user.username, email: auth.user.email || "" },
+    landing_route: auth.user.role === FIELD_ROLE ? "/lapangan" : "/"
+  });
+}
+
+async function changePasswordHandler(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth.ok) return authFailure(auth);
+
+  const { data } = await readBody(request);
+  const oldPassword = String(data.oldPassword || "");
+  const newPassword = String(data.newPassword || "");
+  if (newPassword.length < PASSWORD_MIN_LEN) {
+    return json({ ok: false, message: `Password baru minimal ${PASSWORD_MIN_LEN} karakter.` }, 400);
+  }
+
+  const full = await findUserByUsername(env, auth.user.username);
+  if (!full) return json({ ok: false, message: "Akun tidak ditemukan." }, 404);
+
+  const check = await verifyPassword(oldPassword, full.password);
+  if (!check.ok) return json({ ok: false, message: "Password saat ini salah." }, 401);
+
+  await setUserPassword(env, full.id, await hashPassword(newPassword));
+  // sesi lain untuk user ini diputus, sesi saat ini dipertahankan
+  await env.DB.prepare("DELETE FROM app_sessions WHERE user_id = ? AND token_hash <> ?")
+    .bind(full.id, auth.sessionHash).run();
+
+  return json({ ok: true, message: "Password berhasil diperbarui." });
 }
 
 /* ------------------------------------------------------------------ */
@@ -307,11 +501,12 @@ async function restGet(env, collection, url) {
   }
 
   const result = await stmt.all();
-  const rows = (result.results || []).map((r) => ({
-    id: r.id,
-    data: safeJsonParse(r.data_json, null),
-    updated_at: r.updated_at
-  }));
+  const rows = (result.results || []).map((r) => {
+    const data = safeJsonParse(r.data_json, null);
+    // Hash password tidak pernah dikirim ke browser; verifikasi login terjadi di Worker.
+    if (collection === "users" && data && typeof data === "object") data.password = "";
+    return { id: r.id, data, updated_at: r.updated_at };
+  });
 
   return json(rows, 200, {
     "content-range": `0-${Math.max(rows.length - 1, 0)}/${rows.length}`
@@ -332,12 +527,36 @@ async function restUpsert(request, env, collection) {
   const now = new Date().toISOString();
   const statements = [];
 
+  // Collection users: password kosong dari UI berarti "tidak diubah" -> pertahankan hash lama;
+  // password plaintext (bukan h1$) di-hash di sini.
+  let existingPasswords = null;
+  if (collection === "users") {
+    existingPasswords = new Map();
+    const ids = rows.map((r) => cleanId(r?.id)).filter(Boolean);
+    for (let i = 0; i < ids.length; i += 50) {
+      const chunk = ids.slice(i, i + 50);
+      const res = await env.DB.prepare(
+        `SELECT id, json_extract(data_json, '$.password') AS password FROM app_records WHERE collection='users' AND id IN (${chunk.map(() => "?").join(",")})`
+      ).bind(...chunk).all();
+      for (const r of res.results || []) existingPasswords.set(r.id, r.password || "");
+    }
+  }
+
   for (const row of rows) {
     const id = cleanId(row?.id);
     if (!id || row?.data === undefined) {
       return json({ message: "Each row requires id and data" }, 400);
     }
     const updatedAt = row.updated_at || now;
+
+    if (existingPasswords && row.data && typeof row.data === "object") {
+      const incoming = String(row.data.password || "");
+      if (!incoming) {
+        row.data.password = existingPasswords.get(id) || "";
+      } else if (!isHashed(incoming)) {
+        row.data.password = await hashPassword(incoming);
+      }
+    }
 
     statements.push(
       env.DB.prepare(`
@@ -638,22 +857,9 @@ async function healthHandler(env) {
   }
 }
 
-async function sessionHandler(request, env) {
-  const auth = await registeredAccessUser(request, env);
-  if (!auth.ok) return accessFailure(auth);
-
-  return json({
-    ok: true,
-    email: auth.email,
-    identity: { email: auth.email },
-    user: auth.user,
-    landing_route: auth.user.role === FIELD_ROLE ? "/lapangan" : "/"
-  });
-}
-
 async function diagnosticsHandler(request, env) {
-  const auth = await registeredAccessUser(request, env);
-  if (!auth.ok) return accessFailure(auth);
+  const auth = await authenticate(request, env);
+  if (!auth.ok) return authFailure(auth);
 
   if (!DIAGNOSTIC_ROLES.has(String(auth.user.role || "").trim().toLowerCase())) {
     return json(
@@ -689,14 +895,39 @@ async function diagnosticsHandler(request, env) {
 async function route(request, env) {
   const url = new URL(request.url);
   const { pathname } = url;
+  const method = request.method;
 
-  if (request.method === "OPTIONS") {
+  if (method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders(request) });
   }
 
-  // ---- API
+  // ---- Halaman login / ganti password (HTML dari Worker)
+  if (pathname === "/login") {
+    if (method !== "GET" && method !== "HEAD") return json({ message: "Method not allowed" }, 405);
+    const auth = await authenticate(request, env);
+    if (auth.ok) return redirect(landingFor(auth.user));
+    return html(loginPage(), 200, auth.reason === "EXPIRED" ? { "set-cookie": clearSessionCookie(request) } : {});
+  }
+  if (pathname === "/ganti-password") {
+    const auth = await authenticate(request, env);
+    if (!auth.ok) return redirect("/login");
+    return html(changePasswordPage({ user: auth.user }));
+  }
+
+  // ---- Auth API
+  if (pathname === "/api/auth/login") {
+    if (method !== "POST") return json({ message: "Method not allowed" }, 405);
+    return loginHandler(request, env);
+  }
+  if (pathname === "/api/auth/logout") return logoutHandler(request, env);
+  if (pathname === "/api/auth/change-password") {
+    if (method !== "POST") return json({ message: "Method not allowed" }, 405);
+    return changePasswordHandler(request, env);
+  }
+  if (pathname === "/api/auth/me" || pathname === "/api/access/session") return sessionHandler(request, env);
+
+  // ---- API lain
   if (pathname === "/api/health") return healthHandler(env);
-  if (pathname === "/api/access/session" || pathname === "/api/auth/me") return sessionHandler(request, env);
   if (pathname === "/api/diagnostics") return diagnosticsHandler(request, env);
   if (pathname.startsWith("/api/broadcast")) {
     return json({ ok: false, message: "Realtime dimatikan. Sinkronisasi memakai request/response ke D1." }, 410);
@@ -705,34 +936,40 @@ async function route(request, env) {
     return json({ ok: false, message: "Endpoint tidak ditemukan" }, 404);
   }
 
-  // ---- Data & file (wajib identitas terdaftar & aktif)
+  // ---- Data & file (wajib sesi login aktif)
   if (pathname.startsWith("/rest/v1/")) {
-    const auth = await registeredAccessUser(request, env);
-    if (!auth.ok) return accessFailure(auth);
+    const auth = await authenticate(request, env);
+    if (!auth.ok) return authFailure(auth);
     return restHandler(request, env, url);
   }
-
   if (pathname.startsWith("/storage/v1/object/")) {
-    const auth = await registeredAccessUser(request, env);
-    if (!auth.ok) return accessFailure(auth);
+    const auth = await authenticate(request, env);
+    if (!auth.ok) return authFailure(auth);
     return storageHandler(request, env, url);
   }
-
   if (pathname.startsWith("/storage/v1/")) {
     return json({ statusCode: "404", error: "not_found", message: "Storage endpoint not supported" }, 404);
   }
 
   // ---- Supabase Auth lama dimatikan
   if (pathname.startsWith("/auth/v1/")) {
-    return json({ message: "Authentication is handled by Cloudflare Access." }, 404);
+    return json({ message: "Authentication is handled by KENDALI (/login)." }, 404);
   }
 
-  // ---- Frontend (static assets + SPA fallback dari wrangler.jsonc)
-  if (request.method !== "GET" && request.method !== "HEAD") {
+  // ---- Frontend
+  if (method !== "GET" && method !== "HEAD") {
     return json({ message: "Method not allowed" }, 405);
   }
   if (!env.ASSETS) {
     return json({ ok: false, error: "ASSETS binding tidak tersedia" }, 500);
+  }
+
+  // Halaman utama hanya untuk yang sudah login; selain itu ke /login.
+  if (pathname === "/" || pathname === "/index.html") {
+    const auth = await authenticate(request, env);
+    if (!auth.ok) {
+      return redirect("/login", auth.reason === "EXPIRED" ? { "set-cookie": clearSessionCookie(request) } : {});
+    }
   }
   return env.ASSETS.fetch(request);
 }

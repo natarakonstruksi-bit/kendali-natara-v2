@@ -1,5 +1,5 @@
 /**
- * KENDALI App V2.3 extension layer.
+ * KENDALI App V2.7 extension layer.
  * Semua pengembangan berikutnya ditempatkan di source ini / modul source lain,
  * bukan mengedit public/assets hasil build secara manual.
  */
@@ -26,3 +26,27 @@ window.addEventListener("error", (event) => {
     box.textContent = "KENDALI mendeteksi error tampilan: " + (event.message || "Unknown error");
   } catch {}
 });
+
+/**
+ * Penjaga sesi: cache user di sessionStorage (kendali_session_v1) harus selalu
+ * sama dengan sesi login di Worker. Bila sesi habis/berbeda, bersihkan dan ke /login.
+ */
+(async () => {
+  const KEY = "kendali_session_v1";
+  let cached = null;
+  try { cached = JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch {}
+  try {
+    const r = await fetch("/api/auth/me", { credentials: "same-origin", cache: "no-store" });
+    if (r.status === 401) {
+      try { sessionStorage.removeItem(KEY); } catch {}
+      window.location.replace("/login");
+      return;
+    }
+    const me = await r.json().catch(() => ({}));
+    if (r.ok && me.ok && cached && cached.username && me.username &&
+        String(cached.username).toLowerCase() !== String(me.username).toLowerCase()) {
+      try { sessionStorage.removeItem(KEY); } catch {}
+      window.location.reload();
+    }
+  } catch {}
+})();
