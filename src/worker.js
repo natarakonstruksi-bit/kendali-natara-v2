@@ -1062,8 +1062,29 @@ return json(
 
 );
 
-export default { async fetch(request, env, ctx) { const url = new
-URL(request.url);
+export default { 
+    async fetch(request, env, ctx){
+
+const url = new URL(request.url);
+
+
+// STATIC ASSET HANDLER
+if (request.method === "GET") {
+
+ const assetResponse = await env.ASSETS.fetch(request);
+
+ if(assetResponse.status !== 404){
+   return assetResponse;
+ }
+
+ return env.ASSETS.fetch(
+   new Request(
+    new URL("/index.html",request.url),
+    request
+   )
+ );
+}
+
 
     if (url.pathname === "/api/access/session") {
       const auth = await registeredAccessUser(request, env);
