@@ -1,10 +1,10 @@
-const COLLECTIONS = new Set([ “projects”, “users”, “rabs”, “surat”,
-“tukang”, “pelatihan”, “aset”, “proyeksi”, “vendor”, “po”]);
+const COLLECTIONS = new Set([ "projects", "users", "rabs", "surat",
+"tukang", "pelatihan", "aset", "proyeksi", "vendor", "po"]);
 
 function json(data, status = 200, extra = {}) {
 
-const headers = new Headers({ “content-type”: “application/json;
-charset=utf-8”,
+const headers = new Headers({ "content-type": "application/json;
+charset=utf-8",
 
     "cache-control":
       "no-store",
@@ -26,7 +26,7 @@ return new Response( data === null ? null : JSON.stringify(data),
 
 function corsHeaders(request){
 
-const origin = request.headers.get(“origin”);
+const origin = request.headers.get("origin");
 
 const h = {
 
@@ -64,7 +64,7 @@ return COLLECTIONS.has(name) ? name : null;
 
 function cleanId(v){
 
-const s = String(v ?? ““).trim();
+const s = String(v ?? "").trim();
 
 if(!s || s.length > 250){
 
@@ -360,7 +360,7 @@ return json(
 
 } async function restDelete(request,env,collection,url){
 
-const ids = parseInFilter( url.searchParams.get(“id”) );
+const ids = parseInFilter( url.searchParams.get("id") );
 
 if(!ids.length){
 
@@ -449,7 +449,7 @@ return json(
 
 function storageParts(pathname){
 
-const prefix = “/storage/v1/object/”;
+const prefix = "/storage/v1/object/";
 
 if(!pathname.startsWith(prefix)){
 
@@ -461,7 +461,7 @@ let rest = pathname.slice(prefix.length);
 
 let isPublic=false;
 
-if(rest.startsWith(“public/”)){
+if(rest.startsWith("public/")){
 
     isPublic=true;
 
@@ -471,7 +471,7 @@ if(rest.startsWith(“public/”)){
 
 }
 
-const slash = rest.indexOf(“/”);
+const slash = rest.indexOf("/");
 
 if(slash < 1){
 
@@ -520,7 +520,7 @@ if(!parts){
 
 }
 
-if(parts.bucket !== “kendali-files”){
+if(parts.bucket !== "kendali-files"){
 
     return json(
 
@@ -751,7 +751,7 @@ if(
 
 }
 
-if(request.method===“DELETE”){
+if(request.method==="DELETE"){
 
     await env.FILES.delete(
 
@@ -791,27 +791,27 @@ return json(
 
 } const ACTIVE_KENDALI_ROLES = new Set([
 
-“Direktur”,
+"Direktur",
 
-“Superadmin”,
+"Superadmin",
 
-“Head Business Unit”,
+"Head Business Unit",
 
-“Head Unit Bisnis”,
+"Head Unit Bisnis",
 
-“Manager”,
+"Manager",
 
-“Admin”,
+"Admin",
 
-“QC”,
+"QC",
 
-“Project Manager”,
+"Project Manager",
 
-“Estimator”,
+"Estimator",
 
-“Drafter”,
+"Drafter",
 
-“Pelaksana Lapangan”
+"Pelaksana Lapangan"
 
 ]);
 
@@ -835,7 +835,7 @@ if(!auth){
 
 }
 
-if( auth.startsWith(“Bearer”) ){
+if( auth.startsWith("Bearer") ){
 
     return auth.slice(7).trim();
 
@@ -919,7 +919,7 @@ catch(e){
 
 function normalizeRole(role){
 
-return String(role || ““)
+return String(role || "")
 
     .trim()
 
@@ -1099,7 +1099,7 @@ if (request.method === "GET") {
       });
     }
 
-if( request.method === “OPTIONS” ){
+if( request.method === "OPTIONS" ){
 
 return new Response( null, { status:204, headers: corsHeaders(request) }
 );
