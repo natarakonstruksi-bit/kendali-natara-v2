@@ -1,52 +1,34 @@
-const COLLECTIONS = new Set([
-  "projects",
-  "users",
-  "rabs",
-  "surat",
-  "tukang",
-  "pelatihan",
-  "aset",
-  "proyeksi",
-  "vendor",
-  "po"
-]);
-
+const COLLECTIONS = new Set([ “projects”, “users”, “rabs”, “surat”,
+“tukang”, “pelatihan”, “aset”, “proyeksi”, “vendor”, “po”]);
 
 function json(data, status = 200, extra = {}) {
 
-  const headers = new Headers({
-    "content-type":
-      "application/json; charset=utf-8",
+const headers = new Headers({ “content-type”: “application/json;
+charset=utf-8”,
 
     "cache-control":
       "no-store",
 
     ...extra
-  });
 
+});
 
-  return new Response(
-    data === null
-      ? null
-      : JSON.stringify(data),
+return new Response( data === null ? null : JSON.stringify(data),
 
     {
       status,
       headers
     }
-  );
+
+);
 
 }
 
-
-
 function corsHeaders(request){
 
-  const origin =
-    request.headers.get("origin");
+const origin = request.headers.get(“origin”);
 
-
-  const h = {
+const h = {
 
     "access-control-allow-methods":
       "GET,POST,PUT,PATCH,DELETE,OPTIONS",
@@ -61,72 +43,52 @@ function corsHeaders(request){
     "access-control-max-age":
       "86400"
 
-  };
+};
 
-
-  if(origin){
+if(origin){
 
     h["access-control-allow-origin"] =
       origin;
 
-  }
-
-
-  return h;
-
 }
 
+return h;
 
+}
 
 function safeCollection(name){
 
-  return COLLECTIONS.has(name)
-    ? name
-    : null;
+return COLLECTIONS.has(name) ? name : null;
 
 }
-
-
 
 function cleanId(v){
 
-  const s =
-    String(v ?? "").trim();
+const s = String(v ?? ““).trim();
 
-
-  if(!s || s.length > 250){
+if(!s || s.length > 250){
 
     return null;
 
-  }
+}
 
-
-  return s;
+return s;
 
 }
 
-
-
 function parseInFilter(value){
 
-  if(!value) return [];
+if(!value) return [];
 
+let s = String(value).trim();
 
-  let s =
-    String(value).trim();
+const m = s.match(/^in.((.*))$/s);
 
+if(!m) return [];
 
-  const m =
-    s.match(/^in\.\((.*)\)$/s);
+s = m[1];
 
-
-  if(!m) return [];
-
-
-  s = m[1];
-
-
-  return s
+return s
 
     .split(",")
 
@@ -156,14 +118,9 @@ function parseInFilter(value){
 
 }
 
-
-
-
-
 async function restGet(env,collection){
 
-
-  const result =
+const result =
 
     await env.DB.prepare(`
 
@@ -181,9 +138,7 @@ async function restGet(env,collection){
 
     .all();
 
-
-
-  const rows =
+const rows =
 
     (result.results || [])
 
@@ -199,9 +154,7 @@ async function restGet(env,collection){
 
     }));
 
-
-
-  return json(
+return json(
 
     rows,
 
@@ -214,28 +167,22 @@ async function restGet(env,collection){
 
     }
 
-  );
+);
 
 }
 
-
-
-
-
 async function restUpsert(request,env,collection){
 
+let payload;
 
-  let payload;
-
-
-  try{
+try{
 
     payload =
       await request.json();
 
-  }
+}
 
-  catch(e){
+catch(e){
 
     return json(
 
@@ -248,11 +195,9 @@ async function restUpsert(request,env,collection){
 
     );
 
-  }
+}
 
-
-
-  const rows =
+const rows =
 
     Array.isArray(payload)
 
@@ -260,28 +205,19 @@ async function restUpsert(request,env,collection){
 
     : [payload];
 
-
-
-  if(!rows.length){
+if(!rows.length){
 
     return json(null,201);
 
-  }
+}
 
+const statements=[];
 
+const audits=[];
 
-  const statements=[];
+const now = new Date().toISOString();
 
-  const audits=[];
-
-
-  const now =
-    new Date().toISOString();
-
-
-
-  for(const row of rows){
-
+for(const row of rows){
 
     const id =
       cleanId(row?.id);
@@ -392,28 +328,21 @@ async function restUpsert(request,env,collection){
 
     );
 
+}
 
-  }
-
-
-
-  if(statements.length){
+if(statements.length){
 
     await env.DB.batch(statements);
 
-  }
+}
 
-
-
-  if(audits.length){
+if(audits.length){
 
     await env.DB.batch(audits);
 
-  }
+}
 
-
-
-  return json(
+return json(
 
     null,
 
@@ -427,32 +356,22 @@ async function restUpsert(request,env,collection){
 
     }
 
-  );
+);
 
+} async function restDelete(request,env,collection,url){
 
-}
-async function restDelete(request,env,collection,url){
+const ids = parseInFilter( url.searchParams.get(“id”) );
 
-
-  const ids =
-    parseInFilter(
-      url.searchParams.get("id")
-    );
-
-
-
-  if(!ids.length){
+if(!ids.length){
 
     return json(
       null,
       204
     );
 
-  }
+}
 
-
-
-  const statements =
+const statements =
 
     ids.map(id =>
 
@@ -476,11 +395,7 @@ async function restDelete(request,env,collection,url){
 
     );
 
-
-
-
-
-  const audits =
+const audits =
 
     ids.map(id =>
 
@@ -518,61 +433,35 @@ async function restDelete(request,env,collection,url){
 
     );
 
+await env.DB.batch(statements);
 
+await env.DB.batch(audits);
 
-
-
-  await env.DB.batch(statements);
-
-
-  await env.DB.batch(audits);
-
-
-
-  return json(
+return json(
 
     null,
 
     204
 
-  );
-
+);
 
 }
 
-
-
-
-
-
-
 function storageParts(pathname){
 
+const prefix = “/storage/v1/object/”;
 
-  const prefix =
-    "/storage/v1/object/";
-
-
-
-  if(!pathname.startsWith(prefix)){
+if(!pathname.startsWith(prefix)){
 
     return null;
 
-  }
+}
 
+let rest = pathname.slice(prefix.length);
 
+let isPublic=false;
 
-  let rest =
-    pathname.slice(prefix.length);
-
-
-
-  let isPublic=false;
-
-
-
-  if(rest.startsWith("public/")){
-
+if(rest.startsWith(“public/”)){
 
     isPublic=true;
 
@@ -580,45 +469,27 @@ function storageParts(pathname){
     rest =
       rest.slice("public/".length);
 
+}
 
-  }
+const slash = rest.indexOf(“/”);
 
-
-
-
-
-  const slash =
-    rest.indexOf("/");
-
-
-
-  if(slash < 1){
+if(slash < 1){
 
     return null;
 
-  }
+}
 
+const bucket = rest.slice(0,slash);
 
+const key = rest.slice(slash+1);
 
-  const bucket =
-    rest.slice(0,slash);
-
-
-
-  const key =
-    rest.slice(slash+1);
-
-
-
-  if(!key){
+if(!key){
 
     return null;
 
-  }
+}
 
-
-
-  return {
+return {
 
     isPublic,
 
@@ -626,27 +497,15 @@ function storageParts(pathname){
 
     key
 
-  };
-
+};
 
 }
 
-
-
-
-
-
-
-
 async function storageHandler(request,env,url){
 
+const parts = storageParts(url.pathname);
 
-  const parts =
-    storageParts(url.pathname);
-
-
-
-  if(!parts){
+if(!parts){
 
     return json(
 
@@ -659,13 +518,9 @@ async function storageHandler(request,env,url){
 
     );
 
-  }
+}
 
-
-
-
-  if(parts.bucket !== "kendali-files"){
-
+if(parts.bucket !== “kendali-files”){
 
     return json(
 
@@ -678,14 +533,9 @@ async function storageHandler(request,env,url){
 
     );
 
+}
 
-  }
-
-
-
-
-
-  if(
+if(
 
     request.method === "GET"
 
@@ -693,9 +543,7 @@ async function storageHandler(request,env,url){
 
     request.method === "HEAD"
 
-  ){
-
-
+){
 
     const obj =
 
@@ -785,17 +633,9 @@ async function storageHandler(request,env,url){
 
     );
 
+}
 
-  }
-
-
-
-
-
-
-
-
-  if(
+if(
 
     request.method === "POST"
 
@@ -803,9 +643,7 @@ async function storageHandler(request,env,url){
 
     request.method === "PUT"
 
-  ){
-
-
+){
 
     const contentType =
 
@@ -911,18 +749,9 @@ async function storageHandler(request,env,url){
 
     );
 
+}
 
-
-  }
-
-
-
-
-
-
-
-  if(request.method==="DELETE"){
-
+if(request.method===“DELETE”){
 
     await env.FILES.delete(
 
@@ -944,14 +773,9 @@ async function storageHandler(request,env,url){
 
     );
 
+}
 
-  }
-
-
-
-
-
-  return json(
+return json(
 
     {
 
@@ -963,45 +787,37 @@ async function storageHandler(request,env,url){
 
     405
 
-  );
+);
 
+} const ACTIVE_KENDALI_ROLES = new Set([
 
-}
-const ACTIVE_KENDALI_ROLES =
-new Set([
+“Direktur”,
 
-  "Direktur",
+“Superadmin”,
 
-  "Superadmin",
+“Head Business Unit”,
 
-  "Head Business Unit",
+“Head Unit Bisnis”,
 
-  "Head Unit Bisnis",
+“Manager”,
 
-  "Manager",
+“Admin”,
 
-  "Admin",
+“QC”,
 
-  "QC",
+“Project Manager”,
 
-  "Project Manager",
+“Estimator”,
 
-  "Estimator",
+“Drafter”,
 
-  "Drafter",
-
-  "Pelaksana Lapangan"
+“Pelaksana Lapangan”
 
 ]);
 
-
-
-
-
 function getAccessToken(request){
 
-
-  const auth =
+const auth =
 
     request.headers.get(
       "authorization"
@@ -1013,59 +829,33 @@ function getAccessToken(request){
       "Authorization"
     );
 
-
-
-  if(!auth){
+if(!auth){
 
     return null;
-
-  }
-
-
-
-  if(
-    auth.startsWith("Bearer ")
-  ){
-
-    return auth.slice(7).trim();
-
-  }
-
-
-
-  return null;
-
 
 }
 
+if( auth.startsWith(“Bearer”) ){
 
+    return auth.slice(7).trim();
 
+}
 
+return null;
 
-
-
+}
 
 async function accessIdentity(request,env){
 
+const token = getAccessToken(request);
 
-
-  const token =
-    getAccessToken(request);
-
-
-
-  if(!token){
+if(!token){
 
     return null;
 
-  }
+}
 
-
-
-
-
-  try{
-
+try{
 
     const result =
 
@@ -1117,68 +907,39 @@ async function accessIdentity(request,env){
 
     };
 
+}
 
-
-  }
-
-  catch(e){
-
+catch(e){
 
     return null;
 
-
-  }
-
+}
 
 }
 
-
-
-
-
-
-
-
-
 function normalizeRole(role){
 
-
-  return String(role || "")
+return String(role || ““)
 
     .trim()
 
     .toLowerCase();
 
-
 }
-
-
-
-
-
-
-
 
 function roleAllowed(role){
 
-
-  if(!role){
+if(!role){
 
     return false;
 
-  }
+}
 
-
-
-  const normalized =
+const normalized =
 
     normalizeRole(role);
 
-
-
-  for(
-    const item of ACTIVE_KENDALI_ROLES
-  ){
+for( const item of ACTIVE_KENDALI_ROLES ){
 
     if(
       normalizeRole(item)
@@ -1190,27 +951,15 @@ function roleAllowed(role){
 
     }
 
-  }
+}
 
-
-
-  return false;
-
+return false;
 
 }
 
-
-
-
-
-
-
-
-
 async function registeredAccessUser(request,env){
 
-
-  const identity =
+const identity =
 
     await accessIdentity(
 
@@ -1220,10 +969,7 @@ async function registeredAccessUser(request,env){
 
     );
 
-
-
-  if(!identity){
-
+if(!identity){
 
     return {
 
@@ -1235,20 +981,9 @@ async function registeredAccessUser(request,env){
 
     };
 
+}
 
-  }
-
-
-
-
-
-
-  if(
-    !roleAllowed(
-      identity.role
-    )
-  ){
-
+if( !roleAllowed( identity.role ) ){
 
     return {
 
@@ -1262,16 +997,9 @@ async function registeredAccessUser(request,env){
 
     };
 
+}
 
-  }
-
-
-
-
-
-
-
-  return {
+return {
 
     ok:true,
 
@@ -1281,22 +1009,13 @@ async function registeredAccessUser(request,env){
 
     identity
 
-  };
-
+};
 
 }
 
-
-
-
-
-
-
 function accessFailure(auth){
 
-
-  const messages = {
-
+const messages = {
 
     UNAUTHORIZED:
 
@@ -1308,12 +1027,9 @@ function accessFailure(auth){
 
     "Role tidak memiliki akses."
 
+};
 
-  };
-
-
-
-  return json(
+return json(
 
     {
 
@@ -1344,40 +1060,28 @@ function accessFailure(auth){
 
     auth.status || 403
 
+);
 
-  );
-
-
-}
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
+} export default { async fetch(request, env, ctx) { const url = new
+URL(request.url);
 
     if (url.pathname === "/api/access/session") {
-      const auth = await registeredAccessUser(env, ctx);
+      const auth = await registeredAccessUser(request, env);
       if (!auth.ok) return accessFailure(auth);
 
       return json({
         ok:true,
         email:auth.identity.email,
         identity:auth.identity,
-        user:auth.user,
-        landing_route:auth.user.role === "Pelaksana Lapangan" ? "/lapangan" : "/"
+        user:auth.identity,
+        landing_route:auth.identity.role === "Pelaksana Lapangan" ? "/lapangan" : "/"
       });
     }
 
-   if(
-  request.method === "OPTIONS"
-){
+if( request.method === “OPTIONS” ){
 
-  return new Response(
-    null,
-    {
-      status:204,
-      headers:
-      corsHeaders(request)
-    }
-  );
+return new Response( null, { status:204, headers: corsHeaders(request) }
+);
 
 }
 
@@ -1550,8 +1254,8 @@ export default {
 
       const auth =
         await registeredAccessUser(
-          env,
-          ctx
+          request,
+          env
         );
 
       if (!auth.ok) {
@@ -1641,7 +1345,7 @@ export default {
     if (url.pathname.startsWith("/rest/v1/")) {
 
       const auth =
-        await registeredAccessUser(env, ctx);
+        await registeredAccessUser(request, env);
 
       if (!auth.ok) {
         return accessFailure(auth);
@@ -1723,8 +1427,8 @@ export default {
 
       const auth =
         await registeredAccessUser(
-          env,
-          ctx
+          request,
+          env
         );
 
       if (!auth.ok) {
@@ -1836,5 +1540,4 @@ export default {
       500
     );
 
-  }
-};
+} };
