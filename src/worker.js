@@ -1587,11 +1587,21 @@ return json(
 
 
 // ===========================
-// FRONTEND FALLBACK
+// FRONTEND STATIC ROUTER
 // ===========================
 
 if (env.ASSETS) {
-  return env.ASSETS.fetch(request);
+
+  const assetUrl = new URL(request.url);
+
+  if (assetUrl.pathname === "/") {
+    assetUrl.pathname = "/index.html";
+  }
+
+  return env.ASSETS.fetch(
+    new Request(assetUrl, request)
+  );
+
 }
 
 return json(
