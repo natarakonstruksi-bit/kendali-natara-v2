@@ -1084,7 +1084,21 @@ return new Response( null, { status:204, headers: corsHeaders(request) }
 );
 
 }
+// STATIC FRONTEND FALLBACK
+if (
+  request.method === "GET" &&
+  env.ASSETS
+) {
+  return env.ASSETS.fetch(request);
+}
 
+
+return json(
+{
+ message:"Method not allowed"
+},
+405
+);
     if (url.pathname === "/app-build.json") {
       return json({
         ok: true,
