@@ -1540,4 +1540,4 @@ return new Response( null, { status:204, headers: corsHeaders(request) }
       500
     );
 
-} };
+} }; 
