@@ -1,15 +1,22 @@
+/**
+ * Preflight KENDALI App V2.6 — dijalankan sebelum build/deploy.
+ * Memastikan file wajib ada dan bundle frontend memang versi Cloudflare (bukan Supabase lama).
+ */
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 const root = process.cwd();
+const BUNDLE = "app/assets/index-HRmtcOom.js";
+
 const required = [
   "app/index.html",
-  "app/assets/index-HRmtcOom.js",
+  BUNDLE,
+  "migrations/0001_cf01_foundation.sql",
   "migrations/0005_full_ui_cloudflare_adapter.sql",
   "migrations/0006_import_46_projects.sql",
-  "migrations/0007_import_23_karyawan.sql",
   "migrations/0008_link_project_assignment_usernames.sql",
+  "migrations/0009_cloudflare_access_sso.sql",
   "src/worker.js",
   "src/app-config.js",
   "src/app-overrides.js",
@@ -23,27 +30,35 @@ for (const rel of required) {
   }
 }
 
-const bundle = await readFile(path.join(root, "app/assets/index-HRmtcOom.js"), "utf8");
-if (!bundle.includes("window.location.origin")) throw new Error("Adapter Cloudflare same-origin belum aktif");
-if (bundle.includes("disabled:!!r")) throw new Error("Username karyawan masih terkunci");
-if (!bundle.includes("pmUsername:z.pmUsername===O?C:z.pmUsername")) {
-  throw new Error("Cascade username ke proyek belum aktif");
+const bundle = await readFile(path.join(root, BUNDLE), "utf8");
+
+const mustInclude = [
+  ["window.location.origin", "Adapter Cloudflare same-origin belum aktif"],
+  ["pmUsername:z.pmUsername===O?C:z.pmUsername", "Cascade username ke proyek belum aktif"],
+  ["Penugasan Karyawan ke Proyek", "UI Penugasan Proyek V2.5 belum aktif"],
+  ["Superintendent / PM", "Kolom assignment pada Master Proyek belum aktif"],
+  ['typeof x!=="object"', "Matcher assignment aman V2.5.1 belum aktif"],
+  ["/api/access/session", "SSO Cloudflare Access session belum aktif"],
+  ["Login otomatis", "UI single login belum aktif"],
+  ["Tidak ada password KENDALI.", "Form karyawan masih memakai password lama"]
+];
+const mustExclude = [
+  ["disabled:!!r", "Username karyawan masih terkunci pada mode edit"],
+  ["https://fsymvtwwpkzmrizaxblg.supabase.co", "Koneksi Supabase lama masih ada di bundle"]
+];
+
+for (const [token, message] of mustInclude) {
+  if (!bundle.includes(token)) throw new Error(`Preflight gagal: ${message}`);
 }
-if (!bundle.includes("Penugasan Karyawan ke Proyek")) {
-  throw new Error("UI Penugasan Proyek V2.5 belum aktif");
-}
-if (!bundle.includes("Superintendent / PM")) {
-  throw new Error("Kolom assignment pada Master Proyek belum aktif");
+for (const [token, message] of mustExclude) {
+  if (bundle.includes(token)) throw new Error(`Preflight gagal: ${message}`);
 }
 
-console.log("KENDALI APP-V2.3 preflight OK");
-
-if (!bundle.includes('typeof x!=="object"')) {
-  throw new Error("matcher assignment aman V2.5.1 belum aktif");
+// Worker harus bisa di-parse sebagai ES module.
+try {
+  await import(path.join(root, "src", "worker.js"));
+} catch (e) {
+  throw new Error(`src/worker.js gagal dimuat: ${e.message}`);
 }
 
-if (!bundle.includes("/api/access/session")) throw new Error("SSO Access session belum aktif");
-
-if (!bundle.includes("Login otomatis")) throw new Error("UI single login belum aktif");
-
-if (!bundle.includes("Tidak ada password KENDALI.")) throw new Error("Form karyawan masih memakai password lama");
+console.log("KENDALI APP-V2.6 preflight OK");

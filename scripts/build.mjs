@@ -1,40 +1,21 @@
+/**
+ * Build KENDALI App V2.6:
+ *   app/ (bundle UI hasil Vite) + src/app-config.js + src/app-overrides.js  ->  public/
+ * Folder public/ kemudian diunggah wrangler sebagai Static Assets.
+ * Jangan mengedit public/ secara manual — selalu lewat `npm run build`.
+ */
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
+const APP_VERSION = "APP-V2.6";
 const root = process.cwd();
 const appDir = path.join(root, "app");
 const publicDir = path.join(root, "public");
-const bundle = path.join(appDir, "assets", "index-HRmtcOom.js");
+const bundleName = "index-HRmtcOom.js";
 
-if (!existsSync(path.join(appDir, "index.html"))) {
-  throw new Error("app/index.html tidak ditemukan");
-}
-if (!existsSync(bundle)) {
-  throw new Error("Bundle KENDALI tidak ditemukan");
-}
-
-const bundleText = await readFile(bundle, "utf8");
-const forbidden = [
-  "https://fsymvtwwpkzmrizaxblg.supabase.co"
-];
-for (const token of forbidden) {
-  if (bundleText.includes(token)) {
-    throw new Error(`Build dibatalkan: koneksi lama masih ditemukan: ${token}`);
-  }
-}
-if (!bundleText.includes("window.location.origin")) {
-  throw new Error("Build dibatalkan: adapter same-origin Cloudflare belum aktif");
-}
-if (bundleText.includes("disabled:!!r")) {
-  throw new Error("Build dibatalkan: username karyawan masih terkunci pada mode edit");
-}
-if (!bundleText.includes("pmUsername:z.pmUsername===O?C:z.pmUsername")) {
-  throw new Error("Build dibatalkan: cascade perubahan username ke assignment proyek belum aktif");
-}
-if (!bundleText.includes("Penugasan Karyawan ke Proyek")) {
-  throw new Error("Build dibatalkan: UI Penugasan Proyek V2.5 belum aktif");
-}
+if (!existsSync(path.join(appDir, "index.html"))) throw new Error("app/index.html tidak ditemukan");
+if (!existsSync(path.join(appDir, "assets", bundleName))) throw new Error("Bundle KENDALI tidak ditemukan");
 
 await rm(publicDir, { recursive: true, force: true });
 await mkdir(publicDir, { recursive: true });
@@ -45,30 +26,23 @@ await cp(path.join(root, "src", "app-overrides.js"), path.join(publicDir, "asset
 
 const indexPath = path.join(publicDir, "index.html");
 let html = await readFile(indexPath, "utf8");
+const original = `<script type="module" crossorigin src="./assets/${bundleName}"></script>`;
+if (!html.includes(original)) throw new Error("Tag script bundle tidak ditemukan di app/index.html");
 html = html.replace(
-  '<script type="module" crossorigin src="./assets/index-HRmtcOom.js"></script>',
-  '<script src="./assets/app-config.js"></script>\n    <script type="module" crossorigin src="./assets/index-HRmtcOom.js"></script>\n    <script type="module" src="./assets/app-overrides.js"></script>'
+  original,
+  `<script src="./assets/app-config.js"></script>\n    ${original}\n    <script type="module" src="./assets/app-overrides.js"></script>`
 );
 await writeFile(indexPath, html, "utf8");
 
 const manifest = {
   builtAt: new Date().toISOString(),
-  appVersion: "APP-V2.6",
+  appVersion: APP_VERSION,
   frontend: "KENDALI existing UI + source extension layer",
   backend: "Cloudflare Worker",
   database: "D1",
   files: "R2",
+  auth: "Cloudflare Access (single login)",
   singleDeploy: true
 };
 await writeFile(path.join(publicDir, "app-build.json"), JSON.stringify(manifest, null, 2));
 console.log("KENDALI App build selesai:", manifest.appVersion);
-
-// runtime guard V2.5.1
-if (!bundleText.includes('typeof x!=="object"')) {
-  throw new Error("Build dibatalkan: hotfix /users V2.5.1 belum aktif");
-}
-
-// single-login Cloudflare Access V2.6
-if (!bundleText.includes("/api/access/session")) {
-  throw new Error("Build dibatalkan: SSO Cloudflare Access V2.6 belum aktif");
-}

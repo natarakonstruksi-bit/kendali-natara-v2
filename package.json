@@ -1,10 +1,17 @@
 {
   "name": "kendali-natara-app-v2",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "check": "node scripts/check.mjs",
     "build": "node scripts/check.mjs && node scripts/build.mjs",
+    "dev": "npm run build && wrangler d1 migrations apply DB --local && wrangler dev",
+    "migrate": "wrangler d1 migrations apply DB --remote",
+    "migrate:local": "wrangler d1 migrations apply DB --local",
     "deploy": "npm run build && wrangler d1 migrations apply DB --remote && wrangler deploy"
   },
   "devDependencies": {
