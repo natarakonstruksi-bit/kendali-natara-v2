@@ -1,5 +1,14 @@
-const COLLECTIONS = new Set([ "projects", "users", "rabs", "surat",
-"tukang", "pelatihan", "aset", "proyeksi", "vendor", "po"]);
+const COLLECTIONS = new Set([ 
+    "projects", 
+    "users", 
+    "rabs", 
+    "surat",
+    "tukang", 
+    "pelatihan", 
+    "aset", 
+    "proyeksi", 
+    "vendor", 
+    "po"]);
 
 function json(data, status = 200, extra = {}) {
 
