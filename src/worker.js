@@ -22,7 +22,7 @@
 
 import { loginPage, changePasswordPage } from "./pages.js";
 
-const APP_VERSION = "APP-V2.7";
+const APP_VERSION = "APP-V2.8";
 const SERVICE_NAME = "KENDALI Natara App V2";
 const SCHEMA_VERSION = "FULL-UI-01";
 const STORAGE_BUCKET = "kendali-files";
@@ -30,7 +30,7 @@ const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 const COLLECTIONS = new Set([
   "projects", "users", "rabs", "surat", "tukang",
-  "pelatihan", "aset", "proyeksi", "vendor", "po"
+  "pelatihan", "aset", "proyeksi", "vendor", "po", "operational_requests"
 ]);
 
 const DIAGNOSTIC_ROLES = new Set(["admin", "direktur"]);
