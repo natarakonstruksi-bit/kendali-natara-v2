@@ -1,6 +1,6 @@
 {
-  "builtAt": "2026-09-18T01:36:12.030Z",
-  "appVersion": "APP-V2.8",
+  "builtAt": "2026-09-18T02:10:33.540Z",
+  "appVersion": "APP-V2.9",
   "frontend": "KENDALI existing UI + source extension layer",
   "backend": "Cloudflare Worker",
   "database": "D1",

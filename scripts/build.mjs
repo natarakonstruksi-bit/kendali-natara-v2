@@ -8,7 +8,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-const APP_VERSION = "APP-V2.8";
+const APP_VERSION = "APP-V2.9";
 const root = process.cwd();
 const appDir = path.join(root, "app");
 const publicDir = path.join(root, "public");

@@ -22,7 +22,7 @@
 
 import { loginPage, changePasswordPage } from "./pages.js";
 
-const APP_VERSION = "APP-V2.8";
+const APP_VERSION = "APP-V2.9";
 const SERVICE_NAME = "KENDALI Natara App V2";
 const SCHEMA_VERSION = "FULL-UI-01";
 const STORAGE_BUCKET = "kendali-files";
