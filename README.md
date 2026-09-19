@@ -1,4 +1,4 @@
-# KENDALI Natara V2.8 — End-to-End Project Control
+# KENDALI Natara V2.8.1 — End-to-End Project Control
 
 Versi ini menambahkan kontrol proyek dari pembukaan proyek sampai `CLOSED`, termasuk pemasukan/pengeluaran seluruh proyek, progress, schedule, opname, QC/defect, CCO, procurement, approval, dokumen proyek, retensi, FHO, financial close-out, dan audit log.
 
@@ -37,29 +37,28 @@ Proyek hanya menjadi `CLOSED` ketika seluruh gate terpenuhi. Sistem memblokir pe
 
 - Cloudflare Worker: `src/worker.js`
 - Cloudflare D1: binding `DB`
-- Cloudflare R2: binding `FILES`, bucket `kendali-files`
+- Cloudflare R2: binding `FILES`, bucket produksi `kendali-natara-files-v2`
 - Static assets: `public/`
 - Migration: `migrations/0011_project_control_end_to_end.sql`
 - Konfigurasi: `wrangler.jsonc`
 
 Migration bersifat additive: data `app_records` lama tidak dihapus.
 
-## Sebelum deploy ke KENDALI lama
+## Binding produksi yang digunakan
 
-Isi dua nilai berikut pada `wrangler.jsonc` menggunakan **D1 database lama yang sekarang dipakai KENDALI**:
+Paket V2.8.1 ini sudah memakai resource KENDALI lama agar data proyek/karyawan tetap tersambung:
 
-- `database_name`
-- `database_id`
+- D1 binding `DB`: `kendali-natara-db-v2`
+- D1 database ID: `04849d77-cb23-4d50-9cfc-4e0d9c542d6b`
+- R2 binding `FILES`: `kendali-natara-files-v2`
 
-Jangan membuat D1 baru bila tujuannya mempertahankan seluruh data proyek/karyawan lama.
-
-R2 menggunakan bucket `kendali-files`. Jika bucket produksi Anda memiliki nama berbeda, ubah `bucket_name` saja tanpa memindahkan data secara sembarang.
+Tidak perlu mengganti nilai tersebut untuk redeploy KENDALI yang sama. Tetap lakukan backup D1 sebelum migration produksi.
 
 ## Deploy
 
 ```bash
 npm install
-npm run check
+npm run build
 npm run deploy
 ```
 
@@ -109,8 +108,8 @@ Sebelum deploy produksi:
 
 1. Backup D1 produksi.
 2. Pastikan `database_id` di `wrangler.jsonc` sama dengan D1 KENDALI lama.
-3. Pastikan R2 `kendali-files` benar.
-4. Jalankan `npm run check`.
+3. Pastikan R2 `kendali-natara-files-v2` benar.
+4. Jalankan `npm run build`.
 5. Jalankan migration.
 6. Deploy.
 7. Uji login, dashboard, CRUD, upload/edit/delete dokumen, dan sinkronisasi status satu proyek uji.

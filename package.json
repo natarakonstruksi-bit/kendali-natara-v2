@@ -1,13 +1,15 @@
 {
   "name": "kendali-natara-project-control",
-  "version": "2.8.0",
+  "version": "2.8.1",
   "private": true,
   "type": "module",
   "scripts": {
     "check": "node scripts/check.mjs",
+    "build": "node scripts/check.mjs",
     "dev": "wrangler dev",
+    "migrate:local": "wrangler d1 migrations apply DB --local",
     "migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "deploy": "npm run check && npm run migrate:remote && wrangler deploy"
+    "deploy": "npm run build && npm run migrate:remote && wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

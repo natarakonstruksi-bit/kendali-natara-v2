@@ -1,14 +1,14 @@
-# Deploy Checklist — KENDALI V2.8
+# Deploy Checklist — KENDALI V2.8.1
 
 - [ ] Backup D1 produksi KENDALI.
-- [ ] Isi `database_name` D1 lama di `wrangler.jsonc`.
-- [ ] Isi `database_id` D1 lama di `wrangler.jsonc`.
-- [ ] Konfirmasi bucket R2 `kendali-files` benar.
+- [x] D1 lama terpasang: `kendali-natara-db-v2`.
+- [x] D1 ID lama terpasang: `04849d77-cb23-4d50-9cfc-4e0d9c542d6b`.
+- [x] R2 lama terpasang: `kendali-natara-files-v2`.
 - [ ] `npm install` selesai.
-- [ ] `npm run check` = `KENDALI V2.8 preflight OK`.
+- [ ] `npm run build` = `KENDALI V2.8.1 preflight OK`.
 - [ ] `npm run migrate:remote` berhasil.
 - [ ] `npm run deploy` berhasil.
-- [ ] `/app-build.json` menunjukkan `APP-V2.8`.
+- [ ] `/app-build.json` menunjukkan `APP-V2.8.1`.
 - [ ] `/api/health` menunjukkan D1/R2 binding aktif.
 - [ ] Login user lama berhasil.
 - [ ] Seluruh proyek lama tampil.

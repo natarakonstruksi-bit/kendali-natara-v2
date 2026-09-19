@@ -3,7 +3,7 @@
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V2.8";
+const APP_VERSION = "APP-V2.8.1";
 const SERVICE_NAME = "KENDALI Natara Project Control";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -12,6 +12,9 @@ const PASSWORD_SALT_PREFIX = "kendali-natara-v1:";
 const PASSWORD_HASH_PREFIX = "h1$";
 const PASSWORD_MIN_LEN = 6;
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const STORAGE_BUCKET = "kendali-natara-files-v2";
+const LOGIN_MAX_FAILS = 8;
+const LOGIN_WINDOW_SEC = 15 * 60;
 
 const COLLECTIONS = new Set([
   "projects", "users", "rabs", "surat", "tukang", "pelatihan", "aset", "proyeksi", "vendor", "po",
@@ -204,17 +207,47 @@ async function audit(env, user, action, collection, recordId, projectId = "", de
   } catch (_) {}
 }
 
+async function loginBlocked(env, username) {
+  const row = await env.DB.prepare(`SELECT fails,last_fail_at FROM app_login_attempts WHERE username=?`).bind(username).first();
+  if (!row) return false;
+  const age = (Date.now() - new Date(row.last_fail_at).getTime()) / 1000;
+  return Number(row.fails || 0) >= LOGIN_MAX_FAILS && age < LOGIN_WINDOW_SEC;
+}
+
+async function recordLoginFail(env, username) {
+  const now = new Date().toISOString();
+  await env.DB.prepare(`
+    INSERT INTO app_login_attempts(username,fails,last_fail_at) VALUES(?,1,?)
+    ON CONFLICT(username) DO UPDATE SET
+      fails=CASE WHEN (julianday(?) - julianday(last_fail_at))*86400 > ? THEN 1 ELSE fails+1 END,
+      last_fail_at=excluded.last_fail_at
+  `).bind(username,now,now,LOGIN_WINDOW_SEC).run();
+}
+
+async function clearLoginFails(env, username) {
+  await env.DB.prepare(`DELETE FROM app_login_attempts WHERE username=?`).bind(username).run();
+}
+
 async function loginHandler(request, env) {
   const body = await parseJson(request) || {};
   const username = String(body.username || "").trim();
   const password = String(body.password || "");
   const remember = Boolean(body.remember);
   if (!username || !password) return json({ok:false,message:"Username dan password wajib diisi."},400);
+  const loginKey = username.toLowerCase();
+  if (await loginBlocked(env, loginKey)) return json({ok:false,message:"Terlalu banyak percobaan gagal. Coba lagi 15 menit lagi."},429);
   const user = await findUserByUsername(env, username);
-  if (!user) return json({ok:false,message:"Username atau password salah."},401);
+  if (!user) {
+    await recordLoginFail(env, loginKey);
+    return json({ok:false,message:"Username atau password salah."},401);
+  }
   if (String(user.status || "").toLowerCase() === "nonaktif") return json({ok:false,message:"Akun nonaktif."},403);
   const check = await verifyPassword(password, user.password);
-  if (!check.ok) return json({ok:false,message:"Username atau password salah."},401);
+  if (!check.ok) {
+    await recordLoginFail(env, loginKey);
+    return json({ok:false,message:"Username atau password salah."},401);
+  }
+  await clearLoginFails(env, loginKey);
   if (check.upgrade) await setUserPassword(env, user.id, await hashPassword(password));
   const { token, ttl } = await createSession(env, request, user, remember);
   await audit(env, publicUser(user), "LOGIN", "users", user.id, "", {});
@@ -625,6 +658,56 @@ async function projectFlow(env,projectId) {
   return json({ok:true,evaluation:evaluateProject(projectRow,all)});
 }
 
+
+function storageParts(pathname) {
+  const prefix = "/storage/v1/object/";
+  if (!pathname.startsWith(prefix)) return null;
+  let rest = pathname.slice(prefix.length);
+  let isPublic = false;
+  if (rest.startsWith("public/")) { isPublic = true; rest = rest.slice(7); }
+  const slash = rest.indexOf("/");
+  if (slash < 1) return null;
+  const bucket = rest.slice(0, slash);
+  let key;
+  try { key = decodeURIComponent(rest.slice(slash + 1)); } catch { return null; }
+  key = key.replace(/^\/+/, "");
+  if (!key || key.includes("..") || key.includes("\\")) return null;
+  return { isPublic, bucket, key };
+}
+
+async function legacyStorageHandler(request, env, url) {
+  if (!env.FILES) return json({statusCode:"503",error:"StorageUnavailable",message:"R2 binding FILES belum tersedia."},503);
+  const parts = storageParts(url.pathname);
+  if (!parts) return json({statusCode:"400",error:"InvalidRequest",message:"Invalid storage path"},400);
+  if (parts.bucket !== STORAGE_BUCKET && parts.bucket !== "kendali-files") return json({statusCode:"404",error:"BucketNotFound",message:"Bucket not found"},404);
+  if (request.method === "GET" || request.method === "HEAD") {
+    const obj = await env.FILES.get(parts.key);
+    if (!obj) return json({statusCode:"404",error:"not_found",message:"Object not found"},404);
+    const headers = new Headers(); obj.writeHttpMetadata(headers);
+    headers.set("etag",obj.httpEtag); headers.set("cache-control",parts.isPublic?"private, max-age=3600":"private, no-store");
+    const download = url.searchParams.get("download");
+    if (download !== null) headers.set("content-disposition",`attachment; filename="${safeFilename(download || parts.key.split("/").pop())}"`);
+    return new Response(request.method === "HEAD" ? null : obj.body,{headers});
+  }
+  if (request.method === "POST" || request.method === "PUT") {
+    const len = Number(request.headers.get("content-length") || 0);
+    if (len > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
+    const existing = request.method === "POST" && String(request.headers.get("x-upsert") || "false").toLowerCase() !== "true" ? await env.FILES.head(parts.key) : null;
+    if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
+    const buf = await request.arrayBuffer();
+    if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"KENDALI-V2.8"}});
+    return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
+  }
+  if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
+  return json({statusCode:"405",error:"MethodNotAllowed",message:"Method not allowed"},405);
+}
+
+function isAdminRole(user) {
+  const role = String(user?.role || "").trim().toLowerCase();
+  return role === "admin" || role === "administrator" || role === "direktur";
+}
+
 async function diagnostics(env) {
   const counts = await env.DB.prepare(`SELECT collection,COUNT(*) AS count FROM app_records GROUP BY collection ORDER BY collection`).all();
   const meta = await env.DB.prepare(`SELECT key,value,updated_at FROM schema_meta ORDER BY key`).all();
@@ -650,12 +733,12 @@ export default {
     if (path === "/api/auth/login" && request.method === "POST") return loginHandler(request,env);
 
     const auth = await authenticate(request,env);
-    if (path === "/api/auth/me") return auth.ok ? json({ok:true,user:auth.user}) : authFailure(auth);
-    if (path === "/api/auth/logout" && request.method === "POST") return logoutHandler(request,env,auth);
-    if (path.startsWith("/api/") && !auth.ok) return authFailure(auth);
+    if (path === "/api/auth/me" || path === "/api/access/session") return auth.ok ? json({ok:true,user:auth.user,username:auth.user.username,email:auth.user.email||"",landing_route:auth.user.role === "Pelaksana Lapangan" ? "/lapangan" : "/"}) : authFailure(auth);
+    if (path === "/api/auth/logout" && (request.method === "POST" || request.method === "GET")) return logoutHandler(request,env,auth);
+    if ((path.startsWith("/api/") || path.startsWith("/rest/") || path.startsWith("/storage/")) && !auth.ok) return authFailure(auth);
 
     if (path === "/api/auth/change-password" && request.method === "POST") return changePasswordHandler(request,env,auth);
-    if (path === "/api/diagnostics") return diagnostics(env);
+    if (path === "/api/diagnostics") return isAdminRole(auth.user) ? diagnostics(env) : json({ok:false,message:"Diagnostics hanya untuk Administrator/Direktur."},403);
     if (path === "/api/dashboard" && request.method === "GET") return dashboardHandler(env);
     if (path === "/api/audit" && request.method === "GET") return auditHandler(env,url);
 
@@ -726,6 +809,9 @@ export default {
         return new Response(null,{status:204});
       }
     }
+
+    if (path.startsWith("/storage/v1/object/")) return legacyStorageHandler(request,env,url);
+    if (path.startsWith("/auth/v1/")) return json({message:"Authentication is handled by KENDALI."},404);
 
     return serveAssets(request,env);
   }

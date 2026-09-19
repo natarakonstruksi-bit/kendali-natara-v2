@@ -1,3 +1,13 @@
+# V2.8.1 — Build & Deployment Fix
+
+- Menambahkan script `npm run build` yang diwajibkan Cloudflare build pipeline.
+- Mengembalikan binding D1 produksi `kendali-natara-db-v2` beserta database ID lama.
+- Mengembalikan R2 produksi `kendali-natara-files-v2`.
+- Menambahkan routing Worker untuk `/rest/*`, `/storage/*`, dan `/auth/*` agar kompatibilitas fitur lama tetap berjalan.
+- Menambahkan kompatibilitas `/api/access/session` dan storage R2 lama.
+- Memperketat autentikasi REST/storage, diagnostics khusus Administrator/Direktur, dan rate-limit login.
+- Menghapus audit LOGIN ganda.
+
 # Changelog
 
 ## 2.8.0
