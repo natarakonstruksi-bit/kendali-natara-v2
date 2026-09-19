@@ -1,69 +1,27 @@
-/**
- * Preflight KENDALI App V2.7 — dijalankan sebelum build/deploy.
- * Memastikan file wajib ada dan bundle frontend memang versi Cloudflare (bukan Supabase lama).
- */
-import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
-const root = process.cwd();
-const BUNDLE = "app/assets/index-KNDLv27a.js";
-
+const root = path.resolve(import.meta.dirname, '..');
 const required = [
-  "app/index.html",
-  BUNDLE,
-  "migrations/0001_cf01_foundation.sql",
-  "migrations/0005_full_ui_cloudflare_adapter.sql",
-  "migrations/0006_import_46_projects.sql",
-  "migrations/0008_link_project_assignment_usernames.sql",
-  "migrations/0009_cloudflare_access_sso.sql",
-  "migrations/0011_username_password_login.sql",
-  "src/pages.js",
-  "src/worker.js",
-  "src/app-config.js",
-  "src/app-overrides.js",
-  "scripts/build.mjs",
-  "wrangler.jsonc"
+  'src/worker.js', 'public/index.html', 'public/styles.css', 'public/app.js',
+  'migrations/0011_project_control_end_to_end.sql', 'wrangler.jsonc'
 ];
-
 for (const rel of required) {
-  if (!existsSync(path.join(root, rel))) {
-    throw new Error(`File wajib tidak ditemukan: ${rel}`);
-  }
+  if (!fs.existsSync(path.join(root, rel))) throw new Error(`File wajib tidak ditemukan: ${rel}`);
 }
+execFileSync(process.execPath, ['--check', path.join(root, 'src/worker.js')], {stdio:'inherit'});
+execFileSync(process.execPath, ['--check', path.join(root, 'public/app.js')], {stdio:'inherit'});
 
-const bundle = await readFile(path.join(root, BUNDLE), "utf8");
+const worker = fs.readFileSync(path.join(root,'src/worker.js'),'utf8');
+const app = fs.readFileSync(path.join(root,'public/app.js'),'utf8');
+const mustWorker = ['/api/dashboard','/api/documents','sync-status','project_documents','FINAL_RECONCILIATION'];
+const mustApp = ['Pemasukan / Cash In','Pengeluaran / Cash Out','Upload Dokumen','Edit / Ganti Dokumen','Close-Out Readiness','Schedule / Kurva-S'];
+for (const m of mustWorker) if (!worker.includes(m)) throw new Error(`Marker backend hilang: ${m}`);
+for (const m of mustApp) if (!app.includes(m)) throw new Error(`Marker frontend hilang: ${m}`);
 
-const mustInclude = [
-  ["window.location.origin", "Adapter Cloudflare same-origin belum aktif"],
-  ["pmUsername:z.pmUsername===O?C:z.pmUsername", "Cascade username ke proyek belum aktif"],
-  ["Penugasan Karyawan ke Proyek", "UI Penugasan Proyek V2.5 belum aktif"],
-  ["Superintendent / PM", "Kolom assignment pada Master Proyek belum aktif"],
-  ['typeof x!=="object"', "Matcher assignment aman V2.5.1 belum aktif"],
-  ["/api/access/session", "Pemeriksaan sesi login belum aktif"],
-  ['window.location.replace("/login")', "Redirect ke halaman login belum aktif"],
-  ['window.location.href="/api/auth/logout"', "Logout via Worker belum aktif"],
-  ['type:"password"', "Field password pada form karyawan belum aktif"]
-];
-const mustExclude = [
-  ["disabled:!!r", "Username karyawan masih terkunci pada mode edit"],
-  ["https://fsymvtwwpkzmrizaxblg.supabase.co", "Koneksi Supabase lama masih ada di bundle"],
-  ["Cloudflare Access", "Bundle masih memakai login Cloudflare Access"],
-  ["/cdn-cgi/access/logout", "Logout masih mengarah ke Cloudflare Access"]
-];
-
-for (const [token, message] of mustInclude) {
-  if (!bundle.includes(token)) throw new Error(`Preflight gagal: ${message}`);
+const cfg = fs.readFileSync(path.join(root,'wrangler.jsonc'),'utf8');
+if (cfg.includes('PASTE_EXISTING_KENDALI_D1')) {
+  console.warn('PERINGATAN: isi database_name dan database_id D1 KENDALI lama di wrangler.jsonc sebelum deploy.');
 }
-for (const [token, message] of mustExclude) {
-  if (bundle.includes(token)) throw new Error(`Preflight gagal: ${message}`);
-}
-
-// Worker harus bisa di-parse sebagai ES module.
-try {
-  await import(path.join(root, "src", "worker.js"));
-} catch (e) {
-  throw new Error(`src/worker.js gagal dimuat: ${e.message}`);
-}
-
-console.log("KENDALI APP-V2.7 preflight OK");
+console.log('KENDALI V2.8 preflight OK');

@@ -1,16 +1,76 @@
 <!doctype html>
 <html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>KENDALI — Project Control Dashboard</title>
-    <meta name="description" content="Dashboard kendali proyek Mizara Consortium — Rumsy Indonesia, Natara Konstruksi, DAARP Architect." />
-    <script src="./assets/app-config.js"></script>
-    <script type="module" crossorigin src="./assets/index-KNDLv27a.js"></script>
-    <script type="module" src="./assets/app-overrides.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-C05QfQjW.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KENDALI Natara — Project Control</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="loginScreen" class="login-screen hidden">
+    <form id="loginForm" class="login-card">
+      <div class="brand-mark">K</div>
+      <h1>KENDALI Natara</h1>
+      <p>End-to-End Project Control</p>
+      <label>Username / Email<input id="loginUsername" autocomplete="username" required /></label>
+      <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+      <label class="check"><input id="loginRemember" type="checkbox" /> Ingat saya</label>
+      <button class="btn primary wide" type="submit">Masuk</button>
+      <div id="loginError" class="form-error"></div>
+      <small>Jika instalasi baru: user sementara <b>admin</b>. Ganti password setelah login pertama.</small>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand"><div class="brand-mark sm">K</div><div><b>KENDALI</b><span>Natara Project Control</span></div></div>
+      <nav id="nav">
+        <button data-view="dashboard" class="nav-item active">▦ Dashboard</button>
+        <button data-view="projects" class="nav-item">▣ Proyek</button>
+        <button data-view="finance" class="nav-item">Rp Keuangan</button>
+        <button data-view="progress" class="nav-item">↗ Progress</button>
+        <button data-view="opname" class="nav-item">▤ Opname / QS</button>
+        <button data-view="qc" class="nav-item">✓ QC & Defect</button>
+        <button data-view="cco" class="nav-item">± CCO / Addendum</button>
+        <button data-view="procurement" class="nav-item">◫ Procurement</button>
+        <button data-view="documents" class="nav-item">⌑ Dokumen</button>
+        <button data-view="flow" class="nav-item">→ Alur Proyek</button>
+        <button data-view="closeout" class="nav-item">● Close-Out</button>
+        <button data-view="master" class="nav-item">⚙ Master Data</button>
+        <button data-view="audit" class="nav-item">☰ Audit Log</button>
+      </nav>
+      <div class="sidebar-foot">
+        <div id="userName" class="who"></div>
+        <div id="userRole" class="role"></div>
+        <button id="changePasswordBtn" class="btn ghost small">Ganti password</button>
+        <button id="logoutBtn" class="btn ghost small">Keluar</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="burger" class="icon-btn">☰</button>
+        <div><h2 id="pageTitle">Dashboard</h2><p id="pageSubtitle">Kontrol seluruh proyek, keuangan, progress, mutu, dan close-out.</p></div>
+        <div class="top-actions"><select id="globalProjectFilter"><option value="">Semua proyek</option></select><button id="refreshBtn" class="btn ghost">↻ Refresh</button></div>
+      </header>
+      <section id="content" class="content"><div class="loading"><div class="spinner"></div>Memuat KENDALI…</div></section>
+    </main>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-head"><div><h3 id="modalTitle">Form</h3><p id="modalHint"></p></div><button id="modalClose" class="icon-btn">✕</button></div>
+      <form id="modalForm" class="modal-body"></form>
+      <div class="modal-foot"><button id="modalCancel" class="btn ghost">Batal</button><button id="modalSave" class="btn primary">Simpan</button></div>
+    </div>
+  </div>
+
+  <div id="confirmBackdrop" class="modal-backdrop hidden">
+    <div class="confirm-box"><h3>Konfirmasi</h3><p id="confirmText"></p><div class="confirm-actions"><button id="confirmCancel" class="btn ghost">Batal</button><button id="confirmOk" class="btn danger">Hapus</button></div></div>
+  </div>
+
+  <div id="toastArea" class="toast-area"></div>
+  <input id="hiddenFileInput" type="file" class="hidden" />
+  <script src="/app.js" type="module"></script>
+</body>
 </html>

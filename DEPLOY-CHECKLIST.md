@@ -1,0 +1,23 @@
+# Deploy Checklist — KENDALI V2.8
+
+- [ ] Backup D1 produksi KENDALI.
+- [ ] Isi `database_name` D1 lama di `wrangler.jsonc`.
+- [ ] Isi `database_id` D1 lama di `wrangler.jsonc`.
+- [ ] Konfirmasi bucket R2 `kendali-files` benar.
+- [ ] `npm install` selesai.
+- [ ] `npm run check` = `KENDALI V2.8 preflight OK`.
+- [ ] `npm run migrate:remote` berhasil.
+- [ ] `npm run deploy` berhasil.
+- [ ] `/app-build.json` menunjukkan `APP-V2.8`.
+- [ ] `/api/health` menunjukkan D1/R2 binding aktif.
+- [ ] Login user lama berhasil.
+- [ ] Seluruh proyek lama tampil.
+- [ ] Dashboard menampilkan cash-in/cash-out per proyek.
+- [ ] Tambah/edit/hapus satu data uji berhasil.
+- [ ] Upload dokumen uji berhasil.
+- [ ] Edit metadata dokumen berhasil.
+- [ ] Ganti file dokumen menaikkan versi.
+- [ ] Hapus dokumen menghilangkan metadata dan file.
+- [ ] Flow proyek menampilkan blocker yang benar.
+- [ ] Evaluasi & Sync tidak mengizinkan CLOSED bila blocker masih ada.
+- [ ] Audit log merekam perubahan.
