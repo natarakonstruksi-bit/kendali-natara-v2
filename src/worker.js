@@ -1,9 +1,9 @@
 /**
- * KENDALI Natara V2.8 — End-to-End Project Control
+ * KENDALI Natara V3.0 — Full Workflow & Role Control
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V2.8.1";
+const APP_VERSION = "APP-V3.0.1";
 const SERVICE_NAME = "KENDALI Natara Project Control";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -20,7 +20,14 @@ const COLLECTIONS = new Set([
   "projects", "users", "rabs", "surat", "tukang", "pelatihan", "aset", "proyeksi", "vendor", "po",
   "project_budget", "cash_in", "cash_out", "receivables", "payables", "payment_requests",
   "daily_progress", "weekly_progress", "opname", "qc_inspections", "defects", "cco", "approvals",
-  "milestones", "retention", "closeout", "project_documents", "issues", "schedule", "procurement"
+  "milestones", "retention", "closeout", "project_documents", "issues", "schedule", "procurement",
+  "qc_work_items"
+]);
+
+const PROJECT_SCOPED_COLLECTIONS = new Set([
+  "projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests",
+  "daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones",
+  "retention","closeout","project_documents","issues","schedule","procurement","qc_work_items"
 ]);
 
 const DOC_CORE = ["CONTRACT", "RAB_BASELINE", "DED_FINAL", "TIME_SCHEDULE"];
@@ -28,6 +35,228 @@ const DOC_PRECON = ["PCM", "MC0"];
 const DOC_PHO = ["PHO_BAST", "AS_BUILT"];
 const DOC_FHO = ["FHO_BAST"];
 const DOC_FIN = ["FINAL_RECONCILIATION"];
+
+
+const ROLE_LABELS = {
+  administrator: "Administrator",
+  direktur: "Direktur",
+  head_unit_bisnis: "Head Unit Bisnis",
+  manager_operasional: "Manager Operasional",
+  admin_teknik: "Admin Teknik",
+  project_manager: "Project Manager",
+  pelaksana_lapangan: "Pelaksana Lapangan",
+  qs: "QS / Quantity Surveyor",
+  qc: "QC / Quality Control",
+  finance: "Finance",
+  procurement: "Logistik / Procurement",
+  viewer: "Viewer"
+};
+
+const ALL_VIEWS = ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","documents","flow","closeout","employees","master","audit"];
+const ROLE_VIEWS = {
+  administrator: ALL_VIEWS,
+  direktur: ALL_VIEWS,
+  head_unit_bisnis: ALL_VIEWS,
+  manager_operasional: ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","documents","flow","closeout","master","audit"],
+  admin_teknik: ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","documents","flow","closeout","master"],
+  project_manager: ["dashboard","projects","fund_requests","progress","opname","qc","cco","procurement","documents","flow","closeout"],
+  pelaksana_lapangan: ["dashboard","projects","fund_requests","progress","qc","cco","procurement","documents","flow"],
+  qs: ["dashboard","projects","fund_requests","progress","opname","cco","documents","flow"],
+  qc: ["dashboard","projects","fund_requests","progress","qc","documents","flow"],
+  finance: ["dashboard","projects","finance","fund_requests","procurement","documents","flow","closeout"],
+  procurement: ["dashboard","projects","fund_requests","procurement","documents","flow"],
+  viewer: ["dashboard","projects","documents","flow"]
+};
+
+function normalizeRole(input) {
+  const raw = typeof input === "string" ? input : (input?.role || input?.jabatan || "");
+  const s = String(raw || "").trim().toLowerCase().replace(/[._-]+/g," ").replace(/\s+/g," ");
+  const aliases = new Map([
+    ["admin","administrator"],["administrator","administrator"],["superadmin","administrator"],["super admin","administrator"],
+    ["direktur","direktur"],["director","direktur"],["ceo","direktur"],
+    ["head unit bisnis","head_unit_bisnis"],["head bu","head_unit_bisnis"],["head unit","head_unit_bisnis"],
+    ["manager operasional","manager_operasional"],["manajer operasional","manager_operasional"],
+    ["admin teknik","admin_teknik"],["administrasi teknik","admin_teknik"],["administrasi proyek","admin_teknik"],
+    ["project manager","project_manager"],["pm","project_manager"],
+    ["pelaksana lapangan","pelaksana_lapangan"],["pelaksana","pelaksana_lapangan"],["pengawas","pelaksana_lapangan"],["pengawas lapangan","pelaksana_lapangan"],
+    ["quantity surveyor","qs"],["qs / quantity surveyor","qs"],["qs","qs"],
+    ["quality control","qc"],["qc / quality control","qc"],["qc","qc"],["qc arsitektur","qc"],["qc interior","qc"],["qc mep","qc"],
+    ["finance","finance"],["keuangan","finance"],["finance officer","finance"],
+    ["logistik","procurement"],["logistik / procurement","procurement"],["procurement","procurement"],["purchasing","procurement"],["logistik procurement","procurement"],
+    ["viewer","viewer"]
+  ]);
+  return aliases.get(s) || (ROLE_LABELS[s] ? s : "viewer");
+}
+
+function roleIn(user, roles) { return roles.includes(normalizeRole(user)); }
+function isTopRole(user) { return roleIn(user,["administrator","direktur","head_unit_bisnis"]); }
+function isManagementRole(user) { return roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]); }
+function isAdminProjectRole(user) { return roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]); }
+
+function isProjectScopedRole(user) {
+  return roleIn(user,["project_manager","pelaksana_lapangan"]);
+}
+
+function sameUserRef(value,user) {
+  const v = String(value || "").trim().toLowerCase();
+  if (!v) return false;
+  const refs = [user?.id,user?.username].map(x=>String(x||"").trim().toLowerCase()).filter(Boolean);
+  return refs.includes(v);
+}
+
+function projectAssignedToUser(project,user) {
+  if (!isProjectScopedRole(user)) return true;
+  const d = project?.data || project || {};
+  const role = normalizeRole(user);
+  const fields = role === "project_manager"
+    ? ["pmUserId","projectManagerUserId","pmUsername","projectManagerUsername"]
+    : ["pelaksanaUserId","pengawasUserId","pelaksanaUsername","pengawasUsername"];
+  return fields.some(k=>sameUserRef(d[k],user));
+}
+
+function recordProjectId(collection,id,data={}) {
+  if (collection === "projects") return String(id || data.id || "").trim();
+  return String(data.projectId || data.project_id || "").trim();
+}
+
+async function accessibleProjectIds(env,user) {
+  if (!isProjectScopedRole(user)) return null;
+  const res = await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='projects'`).all();
+  const set = new Set();
+  for (const row of (res.results || [])) {
+    const data = safeJsonParse(row.data_json,{});
+    if (projectAssignedToUser(data,user)) set.add(String(row.id));
+  }
+  return set;
+}
+
+async function userCanAccessProject(env,user,projectId) {
+  if (!isProjectScopedRole(user)) return true;
+  const id = String(projectId || "").trim();
+  if (!id) return false;
+  const project = await getRecord(env,"projects",id);
+  return Boolean(project && projectAssignedToUser(project.data,user));
+}
+
+async function requireProjectAccess(env,user,projectId) {
+  const ok = await userCanAccessProject(env,user,projectId);
+  if (!ok) return json({ok:false,message:"Anda tidak ditugaskan pada proyek ini."},403);
+  return null;
+}
+
+async function recordAllowedByProjectScope(env,user,collection,id,data={}) {
+  if (!isProjectScopedRole(user)) return true;
+  const projectId = recordProjectId(collection,id,data);
+  if (!projectId) {
+    return !PROJECT_SCOPED_COLLECTIONS.has(collection);
+  }
+  return userCanAccessProject(env,user,projectId);
+}
+
+function storageProjectSegment(key) {
+  const m = String(key || "").match(/^projects\/([^/]+)\//i);
+  return m ? m[1] : "";
+}
+
+async function userCanAccessStorageKey(env,user,key) {
+  if (!isProjectScopedRole(user)) return true;
+  const segment = storageProjectSegment(key);
+  if (!segment) return false;
+  const ids = await accessibleProjectIds(env,user);
+  return [...ids].some(id => safeFilename(id) === segment);
+}
+
+function collectionPermission(user, collection) {
+  const role = normalizeRole(user);
+  const top = ["administrator","direktur","head_unit_bisnis"].includes(role);
+  if (top) return {read:true,create:true,update:true,delete:true};
+  const allow = (readRoles=[], writeRoles=[], deleteRoles=[]) => ({
+    read:readRoles.includes(role), create:writeRoles.includes(role), update:writeRoles.includes(role), delete:deleteRoles.includes(role)
+  });
+  const projectReaders=["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","finance","procurement","viewer"];
+  const projectOps=["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan"];
+  const fieldReaders=["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"];
+
+  if (collection === "users") return allow();
+  if (collection === "projects") return allow(projectReaders,["manager_operasional","admin_teknik"]);
+  if (["cash_in","cash_out","receivables","payables"].includes(collection)) return allow(["finance","manager_operasional","admin_teknik"],["finance"]);
+  if (collection === "project_budget") return allow(["finance","manager_operasional","admin_teknik","qs","project_manager"],["finance","qs","manager_operasional","admin_teknik"]);
+  if (collection === "payment_requests") return allow(["finance","manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","procurement"],["finance","manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","procurement"],["finance","manager_operasional"]);
+  if (["daily_progress","weekly_progress","schedule","milestones","issues"].includes(collection)) return allow(fieldReaders,projectOps);
+  if (collection === "opname") return allow(["manager_operasional","admin_teknik","project_manager","qs"],["manager_operasional","admin_teknik","qs"]);
+  if (collection === "qc_work_items") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"],["manager_operasional","qc"]);
+  if (collection === "qc_inspections") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"],[],["manager_operasional"]);
+  if (collection === "defects") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"],["manager_operasional","project_manager","pelaksana_lapangan","qc"]);
+  if (collection === "cco") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs"],["manager_operasional","admin_teknik","qs","project_manager","pelaksana_lapangan"],["manager_operasional"]);
+  if (collection === "approvals") return allow(["manager_operasional","admin_teknik","finance"],["manager_operasional","admin_teknik","finance"]);
+  if (collection === "procurement") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","procurement","finance"],["manager_operasional","project_manager","pelaksana_lapangan","procurement"]);
+  if (collection === "po") return allow(["manager_operasional","admin_teknik","project_manager","procurement","finance"],["manager_operasional","procurement","finance"]);
+  if (collection === "project_documents") return allow(projectReaders,["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","finance","procurement"],["manager_operasional"]);
+  if (["retention","closeout"].includes(collection)) return allow(["manager_operasional","admin_teknik","project_manager","finance"],["manager_operasional","admin_teknik","finance"]);
+  if (collection === "rabs") return allow(["manager_operasional","admin_teknik","project_manager","qs"],["manager_operasional","admin_teknik","qs"]);
+  if (collection === "surat") return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
+  if (collection === "vendor") return allow(["manager_operasional","admin_teknik","procurement","finance"],["manager_operasional","procurement","finance"]);
+  if (collection === "tukang") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan"],["manager_operasional","project_manager","pelaksana_lapangan"]);
+  if (collection === "aset") return allow(["manager_operasional","admin_teknik","procurement"],["manager_operasional","admin_teknik"]);
+  if (["pelatihan","proyeksi"].includes(collection)) return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
+  return allow();
+}
+
+function buildAccess(user) {
+  const roleKey = normalizeRole(user);
+  const views = ROLE_VIEWS[roleKey] || ROLE_VIEWS.viewer;
+  const collections = {};
+  for (const c of COLLECTIONS) collections[c] = collectionPermission(user,c);
+  return {
+    roleKey,
+    roleLabel: ROLE_LABELS[roleKey] || user?.role || "Viewer",
+    views,
+    collections,
+    capabilities: {
+      manageEmployees: isTopRole(user),
+      audit: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
+      ccoFieldSubmit: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","project_manager","pelaksana_lapangan"]),
+      ccoAdmin: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
+      ccoQs: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","qs"]),
+      ccoEscalation: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
+      financeApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","finance"]),
+      financePay: roleIn(user,["administrator","direktur","head_unit_bisnis","finance"]),
+      procurementApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
+      procurementOrder: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","procurement"]),
+      qcInspect: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","qc"]),
+      qcSyncRab: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","qc","qs"])
+    }
+  };
+}
+
+function canSeeFinanceModule(user) {
+  return (ROLE_VIEWS[normalizeRole(user)] || []).includes("finance");
+}
+
+function sanitizeMetricsForUser(metrics,user) {
+  const out = {...metrics};
+  if (!canSeeFinanceModule(user)) {
+    for (const key of ["income","expense","netCash","committed","remainingBudget","receivable","payable","forecastCost","marginForecast","marginPercent"]) delete out[key];
+  }
+  return out;
+}
+
+function sanitizeEvaluationForUser(evaluation,user) {
+  if (canSeeFinanceModule(user)) return evaluation;
+  const out = {...evaluation,metrics:sanitizeMetricsForUser(evaluation.metrics || {},user)};
+  out.blockers = (evaluation.blockers || []).map(x => {
+    const t = String(x || "");
+    if (/^Piutang tersisa/i.test(t)) return "Penyelesaian piutang masih menunggu Finance";
+    if (/^Hutang tersisa/i.test(t)) return "Penyelesaian hutang masih menunggu Finance";
+    return t;
+  });
+  return out;
+}
+
+function collectionDenied(user, collection, action) {
+  const p = collectionPermission(user,collection);
+  return !p?.[action];
+}
 
 function json(data, status = 200, extra = {}) {
   return new Response(data === null ? null : JSON.stringify(data), {
@@ -109,7 +338,8 @@ function publicUser(u) {
     unit: u.unit || "",
     departemen: u.departemen || "",
     email: u.email || "",
-    status: u.status || "Aktif"
+    status: u.status || "Aktif",
+    roleKey: normalizeRole(u)
   };
 }
 
@@ -291,16 +521,20 @@ function qsEq(url, name) {
   return v == null ? null : String(v);
 }
 
-async function listRecords(env, collection, url) {
+async function listRecords(env, collection, url, user=null) {
   const projectId = qsEq(url,"projectId");
   const relatedId = qsEq(url,"relatedId");
   const status = qsEq(url,"status");
   const id = qsEq(url,"id");
+  if (projectId && user && !(await userCanAccessProject(env,user,projectId))) return [];
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 1000),1),5000);
   const where = ["collection=?"];
   const bind = [collection];
   if (id) { where.push("id=?"); bind.push(id); }
-  if (projectId) { where.push("json_extract(data_json,'$.projectId')=?"); bind.push(projectId); }
+  if (projectId) {
+    where.push("(json_extract(data_json,'$.projectId')=? OR json_extract(data_json,'$.project_id')=?)");
+    bind.push(projectId,projectId);
+  }
   if (relatedId) { where.push("json_extract(data_json,'$.relatedId')=?"); bind.push(relatedId); }
   if (status) { where.push("lower(COALESCE(json_extract(data_json,'$.status'),''))=lower(?)"); bind.push(status); }
   bind.push(limit);
@@ -309,11 +543,20 @@ async function listRecords(env, collection, url) {
     WHERE ${where.join(" AND ")}
     ORDER BY updated_at DESC LIMIT ?
   `).bind(...bind).all();
-  return (res.results || []).map(r => {
+  let rows = (res.results || []).map(r => {
     const data = safeJsonParse(r.data_json, {});
     if (collection === "users") data.password = "";
     return {id:r.id,data,updated_at:r.updated_at};
   });
+  if (user && isProjectScopedRole(user)) {
+    const ids = await accessibleProjectIds(env,user);
+    rows = rows.filter(r => {
+      if (collection === "projects") return ids.has(String(r.id));
+      const pid = recordProjectId(collection,r.id,r.data);
+      return pid ? ids.has(pid) : !PROJECT_SCOPED_COLLECTIONS.has(collection);
+    });
+  }
+  return rows;
 }
 
 async function upsertRecord(env, collection, id, data, user) {
@@ -395,6 +638,47 @@ function latestProgress(projectId, all, project) {
   return Math.min(100, Math.max(0, pickNum(project,["progress","progressPercent","actualProgress","percent"])));
 }
 
+
+function progressSeriesFor(projectId, all) {
+  const byDate = new Map();
+  const rows = all.filter(r => (r.collection === "daily_progress" || r.collection === "weekly_progress") && String(r.data.projectId || "") === projectId);
+  rows.sort((a,b) => String(a.data.date || a.updated_at || "").localeCompare(String(b.data.date || b.updated_at || "")));
+  for (const r of rows) {
+    const date = String(r.data.date || r.updated_at || "").slice(0,10);
+    if (!date) continue;
+    const actual = Math.min(100,Math.max(0,pickNum(r.data,["progress","actualProgress","percent"])));
+    const plan = Math.min(100,Math.max(0,pickNum(r.data,["planProgress","plannedProgress","plan","rencana"])));
+    const prev = byDate.get(date);
+    // Daily input is the most granular source, so it wins if both exist on same date.
+    if (!prev || r.collection === "daily_progress") byDate.set(date,{date,actual,plan,source:r.collection});
+  }
+  return [...byDate.values()].slice(-60);
+}
+
+function qcStatusCounts(projectId, all) {
+  const inspections = all.filter(r => r.collection === "qc_inspections" && String(r.data.projectId || "") === projectId);
+  const workItems = all.filter(r => r.collection === "qc_work_items" && String(r.data.projectId || "") === projectId && String(r.data.status || "ACTIVE").toUpperCase() !== "CLOSED");
+  const latest = new Map();
+  for (const r of inspections) {
+    const key = String(r.data.workItemId || r.data.item || r.id);
+    const stamp = String(r.data.date || r.updated_at || "");
+    const cur = latest.get(key);
+    if (!cur || stamp > cur.stamp) latest.set(key,{stamp,result:String(r.data.result || "").toUpperCase()});
+  }
+  let nonPass=0,uninspected=0;
+  if (workItems.length) {
+    for (const w of workItems) {
+      if (w.data.required === false || String(w.data.required).toLowerCase()==="false") continue;
+      const v=latest.get(String(w.id));
+      if (!v) uninspected++;
+      else if (!["PASS","PASSED"].includes(v.result)) nonPass++;
+    }
+  } else {
+    for (const v of latest.values()) if (!["PASS","PASSED"].includes(v.result)) nonPass++;
+  }
+  return {open:nonPass+uninspected,nonPass,uninspected,total:workItems.length};
+}
+
 function docSetFor(projectId, all) {
   const set = new Set();
   for (const r of all) {
@@ -421,7 +705,10 @@ function computeProjectMetrics(projectRow, all) {
   const id = projectRow.id;
   const contract = pickNum(p,["contractValue","nilaiKontrak","contract_value","nilai_kontrak","value"]);
   const headerBudget = pickNum(p,["budget","hpp","rabHpp","rab_hpp","nilaiHpp","nilai_hpp"]);
-  const lineBudget = sumCollection(id,all,"project_budget",["budgetAmount","amount","nominal","value","total"],d => !d.status || ["APPROVED","REVISED","CLOSED"].includes(String(d.status||"").toUpperCase()));
+  const budgetRows = all.filter(r => r.collection === "project_budget" && String(r.data.projectId || "") === id && (!r.data.status || ["APPROVED","REVISED","CLOSED"].includes(String(r.data.status||"").toUpperCase())));
+  const detailedBudgetRows = budgetRows.filter(r => !truthy(r.data.systemGenerated));
+  const effectiveBudgetRows = detailedBudgetRows.length ? detailedBudgetRows : budgetRows;
+  const lineBudget = effectiveBudgetRows.reduce((sum,r)=>sum+pickNum(r.data,["budgetAmount","amount","nominal","value","total"]),0);
   const budget = lineBudget > 0 ? lineBudget : headerBudget;
   const income = sumCollection(id,all,"cash_in",["amount","nominal","value","total"],d => paidLike(d.status));
   const expense = sumCollection(id,all,"cash_out",["amount","nominal","value","total"],d => paidLike(d.status));
@@ -429,7 +716,8 @@ function computeProjectMetrics(projectRow, all) {
     .reduce((s,r) => s + Math.max(0,pickNum(r.data,["amount","nominal","value","total"]) - pickNum(r.data,["paidAmount","paid"])),0);
   const receivable = outstandingCollection(id,all,"receivables");
   const payable = outstandingCollection(id,all,"payables");
-  const openQc = all.filter(r => r.collection === "qc_inspections" && String(r.data.projectId || "") === id && activeLike(r.data.status) && !["PASS","PASSED"].includes(String(r.data.result || "").toUpperCase())).length;
+  const qcCounts = qcStatusCounts(id,all);
+  const openQc = qcCounts.open;
   const openDefects = all.filter(r => r.collection === "defects" && String(r.data.projectId || "") === id && activeLike(r.data.status)).length;
   const pendingCco = all.filter(r => r.collection === "cco" && String(r.data.projectId || "") === id && activeLike(r.data.status)).length;
   const pendingApprovals = all.filter(r => (r.collection === "approvals" || r.collection === "payment_requests") && String(r.data.projectId || "") === id && activeLike(r.data.status)).length;
@@ -452,7 +740,7 @@ function computeProjectMetrics(projectRow, all) {
   return {
     id, name:p.name || p.namaProject || p.projectName || p.nama || id,
     contract,budget,income,expense,netCash:income-expense,committed:poCommitted,
-    remainingBudget:budget-expense-poCommitted,receivable,payable,progress,openQc,openDefects,pendingCco,pendingApprovals,openCloseout,openIssues,
+    remainingBudget:budget-expense-poCommitted,receivable,payable,progress,openQc,qcUninspected:qcCounts.uninspected,qcTotalItems:qcCounts.total,openDefects,pendingCco,pendingApprovals,openCloseout,openIssues,
     forecastCost,marginForecast,marginPercent,scheduleStatus,currentStatus:p.status || ""
   };
 }
@@ -465,6 +753,8 @@ function evaluateProject(projectRow, all) {
   const coreMissing = missing(DOC_CORE);
   const preconMissing = missing(DOC_PRECON);
   const phoMissing = missing(DOC_PHO);
+  const qcRequired = p.qcRequired === undefined ? true : truthy(p.qcRequired);
+  const qcChecklistMissing = qcRequired && m.qcTotalItems === 0;
   const retentionRequired = truthy(p.retentionRequired ?? p.retensiRequired ?? p.retention_required);
   const fhoRequired = truthy(p.fhoRequired) || retentionRequired;
   const retentionRows = all.filter(r => r.collection === "retention" && String(r.data.projectId || "") === projectRow.id);
@@ -479,9 +769,9 @@ function evaluateProject(projectRow, all) {
   else if (preconMissing.length) { status="PRECON"; gate="Pre-Construction"; blockers=preconMissing.map(x=>`Dokumen ${x} belum ada`); }
   else if (m.progress <= 0) { status="MOBILIZATION"; gate="Mobilisasi"; blockers=["Progress pelaksanaan belum dimulai"]; }
   else if (m.progress < 100) { status="EXECUTION"; gate="Pelaksanaan"; blockers=[`Progress ${m.progress.toFixed(1)}%`]; }
-  else if (m.openQc > 0 || m.openDefects > 0 || m.openIssues > 0 || phoMissing.length) {
+  else if (qcChecklistMissing || m.openQc > 0 || m.openDefects > 0 || m.openIssues > 0 || phoMissing.length) {
     status="PHO"; gate="PHO & Final QC";
-    blockers=[...(m.openQc? [`${m.openQc} QC masih terbuka`]:[]),...(m.openDefects? [`${m.openDefects} defect masih terbuka`]:[]),...(m.openIssues? [`${m.openIssues} issue/corrective action masih terbuka`]:[]),...phoMissing.map(x=>`Dokumen ${x} belum ada`)];
+    blockers=[...(qcChecklistMissing?["Checklist item pekerjaan QC belum disiapkan/sinkron dari RAB"]:[]),...(m.qcUninspected? [`${m.qcUninspected} item QC wajib belum pernah diinspeksi`]:[]),...(m.openQc-m.qcUninspected>0? [`${m.openQc-m.qcUninspected} item QC latest result belum PASS`]:[]),...(m.openDefects? [`${m.openDefects} defect masih terbuka`]:[]),...(m.openIssues? [`${m.openIssues} issue/corrective action masih terbuka`]:[]),...phoMissing.map(x=>`Dokumen ${x} belum ada`)];
   }
   else if (retentionOpen) { status="RETENTION"; gate="Retensi / Masa Pemeliharaan"; blockers=["Retensi belum selesai/released"]; }
   else if (fhoMissing.length) { status="FHO"; gate="FHO"; blockers=fhoMissing.map(x=>`Dokumen ${x} belum ada`); }
@@ -495,7 +785,7 @@ function evaluateProject(projectRow, all) {
     {code:"PRECON",label:"Pre-Construction",done:!coreMissing.length && !preconMissing.length},
     {code:"MOBILIZATION",label:"Mobilisasi",done:m.progress>0},
     {code:"EXECUTION",label:"Pelaksanaan",done:m.progress>=100},
-    {code:"PHO",label:"PHO",done:m.progress>=100 && m.openQc===0 && m.openDefects===0 && m.openIssues===0 && phoMissing.length===0},
+    {code:"PHO",label:"PHO",done:m.progress>=100 && !qcChecklistMissing && m.openQc===0 && m.openDefects===0 && m.openIssues===0 && phoMissing.length===0},
     {code:"RETENTION",label:"Retensi",done:!retentionRequired || !retentionOpen},
     {code:"FHO",label:"FHO",done:!fhoRequired || fhoMissing.length===0},
     {code:"FINANCIAL_CLOSE",label:"Financial Close-Out",done:m.receivable===0 && m.payable===0 && m.pendingCco===0 && m.pendingApprovals===0 && m.openCloseout===0 && finMissing.length===0},
@@ -504,30 +794,41 @@ function evaluateProject(projectRow, all) {
   return {status,gate,blockers,flow,metrics:m,documents:[...docs].sort()};
 }
 
-async function loadControlRows(env) {
-  const cols = ["projects","project_budget","cash_in","cash_out","receivables","payables","payment_requests","approvals","po","daily_progress","weekly_progress","schedule","milestones","issues","qc_inspections","defects","cco","retention","closeout","project_documents"];
+async function loadControlRows(env,user=null) {
+  const cols = ["projects","project_budget","cash_in","cash_out","receivables","payables","payment_requests","approvals","po","daily_progress","weekly_progress","schedule","milestones","issues","qc_work_items","qc_inspections","defects","cco","retention","closeout","project_documents","rabs","procurement"];
   const marks = cols.map(()=>"?").join(",");
   const res = await env.DB.prepare(`SELECT collection,id,data_json,updated_at FROM app_records WHERE collection IN (${marks}) ORDER BY updated_at DESC`).bind(...cols).all();
-  return (res.results || []).map(r => ({collection:r.collection,id:r.id,data:safeJsonParse(r.data_json,{}),updated_at:r.updated_at}));
+  let rows = (res.results || []).map(r => ({collection:r.collection,id:r.id,data:safeJsonParse(r.data_json,{}),updated_at:r.updated_at}));
+  if (user && isProjectScopedRole(user)) {
+    const ids = await accessibleProjectIds(env,user);
+    rows = rows.filter(r => r.collection === "projects" ? ids.has(String(r.id)) : ids.has(recordProjectId(r.collection,r.id,r.data)));
+  }
+  return rows;
 }
 
-async function dashboardHandler(env) {
-  const all = await loadControlRows(env);
+async function dashboardHandler(env,user=null) {
+  const all = await loadControlRows(env,user);
   const projects = all.filter(r => r.collection === "projects");
-  const rows = projects.map(p => ({...computeProjectMetrics(p,all), evaluatedStatus:evaluateProject(p,all).status}));
+  const rows = projects.map(p => ({...computeProjectMetrics(p,all), evaluatedStatus:evaluateProject(p,all).status, progressSeries:progressSeriesFor(p.id,all)}));
   const sum = key => rows.reduce((s,r)=>s+num(r[key]),0);
+  const financeVisible = canSeeFinanceModule(user);
+  const totals = {
+    projects:rows.length,
+    active:rows.filter(r=>r.evaluatedStatus!=="CLOSED").length,
+    closed:rows.filter(r=>r.evaluatedStatus==="CLOSED").length,
+    contract:sum("contract"),budget:sum("budget"),
+    openQc:sum("openQc"),openDefects:sum("openDefects"),pendingCco:sum("pendingCco"),pendingApprovals:sum("pendingApprovals"),openIssues:sum("openIssues"),openCloseout:sum("openCloseout")
+  };
+  if (financeVisible) Object.assign(totals,{
+    income:sum("income"),expense:sum("expense"),netCash:sum("netCash"),committed:sum("committed"),
+    remainingBudget:sum("remainingBudget"),receivable:sum("receivable"),payable:sum("payable")
+  });
   return json({
     ok:true,
     generatedAt:new Date().toISOString(),
-    totals:{
-      projects:rows.length,
-      active:rows.filter(r=>r.evaluatedStatus!=="CLOSED").length,
-      closed:rows.filter(r=>r.evaluatedStatus==="CLOSED").length,
-      contract:sum("contract"),income:sum("income"),expense:sum("expense"),netCash:sum("netCash"),
-      budget:sum("budget"),committed:sum("committed"),remainingBudget:sum("remainingBudget"),
-      receivable:sum("receivable"),payable:sum("payable"),openQc:sum("openQc"),openDefects:sum("openDefects"),pendingCco:sum("pendingCco"),pendingApprovals:sum("pendingApprovals"),openIssues:sum("openIssues"),openCloseout:sum("openCloseout")
-    },
-    projects:rows
+    projectScope:isProjectScopedRole(user)?"assigned-only":"role-wide",
+    totals,
+    projects:rows.map(r=>sanitizeMetricsForUser(r,user))
   });
 }
 
@@ -542,6 +843,7 @@ async function uploadDocument(request, env, user) {
   const file = fd.get("file");
   const projectId = String(fd.get("projectId") || "").trim();
   if (!projectId) return json({ok:false,message:"Project wajib dipilih."},400);
+  const denied = await requireProjectAccess(env,user,projectId); if (denied) return denied;
   if (!(file instanceof File)) return json({ok:false,message:"File wajib dipilih."},400);
   if (file.size > MAX_UPLOAD_BYTES) return json({ok:false,message:"Ukuran file maksimal 25 MB."},413);
   const id = crypto.randomUUID();
@@ -565,6 +867,7 @@ async function uploadDocument(request, env, user) {
 async function updateDocument(request, env, user, id) {
   const old = await getRecord(env,"project_documents",id);
   if (!old) return json({ok:false,message:"Dokumen tidak ditemukan."},404);
+  const deniedOld = await requireProjectAccess(env,user,old.data.projectId); if (deniedOld) return deniedOld;
   const type = (request.headers.get("content-type") || "").toLowerCase();
   let patch = {};
   let newFile = null;
@@ -580,6 +883,7 @@ async function updateDocument(request, env, user, id) {
   }
   const merged = {...old.data,...patch};
   if (patch.category) merged.category = String(patch.category).toUpperCase();
+  const deniedNew = await requireProjectAccess(env,user,merged.projectId); if (deniedNew) return deniedNew;
   if (newFile) {
     if (!env.FILES) return json({ok:false,message:"R2 binding FILES belum tersedia."},503);
     if (newFile.size > MAX_UPLOAD_BYTES) return json({ok:false,message:"Ukuran file maksimal 25 MB."},413);
@@ -603,15 +907,17 @@ async function updateDocument(request, env, user, id) {
 async function deleteDocument(env,user,id) {
   const old = await getRecord(env,"project_documents",id);
   if (!old) return json({ok:false,message:"Dokumen tidak ditemukan."},404);
+  const denied = await requireProjectAccess(env,user,old.data.projectId); if (denied) return denied;
   if (env.FILES && old.data.objectKey) { try { await env.FILES.delete(old.data.objectKey); } catch (_) {} }
   await env.DB.prepare(`DELETE FROM app_records WHERE collection='project_documents' AND id=?`).bind(id).run();
   await audit(env,user,"DELETE_DOCUMENT","project_documents",id,old.data.projectId || "",{title:old.data.title || old.data.originalName || ""});
   return json({ok:true});
 }
 
-async function downloadDocument(env,id) {
+async function downloadDocument(env,user,id) {
   const old = await getRecord(env,"project_documents",id);
   if (!old) return json({ok:false,message:"Dokumen tidak ditemukan."},404);
+  const denied = await requireProjectAccess(env,user,old.data.projectId); if (denied) return denied;
   if (!env.FILES || !old.data.objectKey) return json({ok:false,message:"File tidak tersedia."},404);
   const obj = await env.FILES.get(old.data.objectKey);
   if (!obj) return json({ok:false,message:"File tidak ditemukan di R2."},404);
@@ -623,8 +929,8 @@ async function downloadDocument(env,id) {
   return new Response(obj.body,{headers});
 }
 
-async function listDocuments(env,url) {
-  const rows = await listRecords(env,"project_documents",url);
+async function listDocuments(env,url,user=null) {
+  const rows = await listRecords(env,"project_documents",url,user);
   return json({ok:true,documents:rows});
 }
 
@@ -641,7 +947,8 @@ async function auditHandler(env,url) {
 }
 
 async function syncProjectStatus(env,user,projectId) {
-  const all = await loadControlRows(env);
+  const denied = await requireProjectAccess(env,user,projectId); if (denied) return denied;
+  const all = await loadControlRows(env,user);
   const projectRow = all.find(r => r.collection === "projects" && r.id === projectId);
   if (!projectRow) return json({ok:false,message:"Project tidak ditemukan."},404);
   const evaluation = evaluateProject(projectRow,all);
@@ -651,11 +958,267 @@ async function syncProjectStatus(env,user,projectId) {
   return json({ok:true,evaluation});
 }
 
-async function projectFlow(env,projectId) {
-  const all = await loadControlRows(env);
+async function projectFlow(env,user,projectId) {
+  const denied = await requireProjectAccess(env,user,projectId); if (denied) return denied;
+  const all = await loadControlRows(env,user);
   const projectRow = all.find(r => r.collection === "projects" && r.id === projectId);
   if (!projectRow) return json({ok:false,message:"Project tidak ditemukan."},404);
-  return json({ok:true,evaluation:evaluateProject(projectRow,all)});
+  return json({ok:true,evaluation:sanitizeEvaluationForUser(evaluateProject(projectRow,all),user)});
+}
+
+
+async function listEmployees(env) {
+  const res = await env.DB.prepare(`SELECT id,data_json,updated_at FROM app_records WHERE collection='users' ORDER BY lower(COALESCE(json_extract(data_json,'$.name'),json_extract(data_json,'$.username'),id))`).all();
+  const employees = (res.results || []).map(r => {
+    const d = safeJsonParse(r.data_json,{});
+    return {
+      id:r.id,
+      name:d.name || d.username || d.email || r.id,
+      username:d.username || r.id,
+      role:d.role || "",
+      roleKey:normalizeRole(d),
+      jabatan:d.jabatan || d.role || "",
+      unit:d.unit || "",
+      departemen:d.departemen || "",
+      email:d.email || "",
+      phone:d.phone || d.telepon || "",
+      status:d.status || "Aktif"
+    };
+  });
+  return employees.filter(e => String(e.status || "").toLowerCase() !== "nonaktif");
+}
+
+async function getProjectBudgetValue(env, projectId) {
+  const project = await getRecord(env,"projects",projectId);
+  if (!project) return 0;
+  const rows = await env.DB.prepare(`SELECT data_json FROM app_records WHERE collection='project_budget' AND json_extract(data_json,'$.projectId')=?`).bind(projectId).all();
+  const parsed=(rows.results || []).map(r=>safeJsonParse(r.data_json,{})).filter(d=>!d.status || ["APPROVED","REVISED","CLOSED"].includes(String(d.status).toUpperCase()));
+  const detailed=parsed.filter(d=>!truthy(d.systemGenerated));
+  const effective=detailed.length?detailed:parsed;
+  const sum=effective.reduce((a,d)=>a+pickNum(d,["budgetAmount","amount","nominal","value","total"]),0);
+  return sum > 0 ? sum : pickNum(project.data,["budget","hpp","rabHpp","rab_hpp","nilaiHpp","nilai_hpp"]);
+}
+
+async function afterRecordUpsert(env, collection, record, user) {
+  const d = record?.data || {};
+  if (collection === "projects") {
+    const budget = pickNum(d,["budget","hpp","rabHpp","rab_hpp","nilaiHpp","nilai_hpp"]);
+    if (budget > 0) {
+      const id = `AUTO-BUDGET-${record.id}`;
+      const old = await getRecord(env,"project_budget",id);
+      await upsertRecord(env,"project_budget",id,{
+        ...(old?.data || {}),projectId:record.id,costCode:"BASELINE",category:"Baseline Proyek",
+        description:"Baseline HPP/RAB dari master proyek",budgetAmount:budget,status:"APPROVED",systemGenerated:true
+      },user);
+    }
+  }
+  if (collection === "po") {
+    const st = String(d.status || "").toUpperCase();
+    if (["APPROVED","ORDERED","PARTIAL","PAID","CLOSED"].includes(st) && d.projectId) {
+      const amount = pickNum(d,["amount","nominal","value","total"]);
+      const paidAmount = st === "PAID" ? amount : pickNum(d,["paidAmount","paid"]);
+      const id = `AUTO-PO-${record.id}`;
+      const old = await getRecord(env,"payables",id);
+      await upsertRecord(env,"payables",id,{
+        ...(old?.data || {}),projectId:d.projectId,description:`PO/SPK ${d.number || record.id} - ${d.description || ""}`.trim(),
+        vendor:d.vendor || "",amount,paidAmount,dueDate:d.deliveryDate || d.date || "",status:paidAmount >= amount && amount > 0 ? "PAID" : "OPEN",
+        poId:record.id,systemGenerated:true
+      },user);
+    }
+  }
+  if (collection === "cash_in" && d.receivableId) {
+    const rec = await getRecord(env,"receivables",String(d.receivableId));
+    if (rec && paidLike(d.status)) {
+      const totalReceipts = await env.DB.prepare(`SELECT data_json FROM app_records WHERE collection='cash_in' AND json_extract(data_json,'$.receivableId')=?`).bind(String(d.receivableId)).all();
+      let paid = 0;
+      for (const x of (totalReceipts.results || [])) { const xd=safeJsonParse(x.data_json,{}); if (paidLike(xd.status)) paid += pickNum(xd,["amount","nominal","value","total"]); }
+      const amount = pickNum(rec.data,["amount","nominal","value","total"]);
+      await upsertRecord(env,"receivables",rec.id,{...rec.data,paidAmount:paid,status:paid >= amount && amount > 0 ? "PAID" : "OPEN"},user);
+    }
+  }
+}
+
+function rabItemCandidates(data) {
+  const out = [];
+  const arrays = [data.items,data.rows,data.details,data.workItems,data.pekerjaan,data.uraianItems,data.rabItems].filter(Array.isArray);
+  const pushOne = (v, idx=0) => {
+    if (typeof v === "string") { if (v.trim()) out.push({item:v.trim(),code:"",category:""}); return; }
+    if (!v || typeof v !== "object") return;
+    const item = v.item || v.description || v.uraian || v.pekerjaan || v.name || v.nama || v.workItem || v.work || "";
+    if (!String(item).trim()) return;
+    out.push({item:String(item).trim(),code:String(v.code || v.kode || v.no || idx+1),category:String(v.category || v.kategori || v.group || "")});
+  };
+  arrays.forEach(arr => arr.forEach(pushOne));
+  for (const key of ["itemsText","workItemsText","uraianText","daftarPekerjaan"]) {
+    const text=String(data[key] || "").trim();
+    if (text) text.split(/\r?\n/).map(x=>x.replace(/^[-•*\d.\s]+/,"").trim()).filter(Boolean).forEach((x,i)=>pushOne({item:x,code:i+1},i));
+  }
+  if (!arrays.length && !out.length) pushOne(data,0);
+  return out;
+}
+
+async function syncQcFromRab(env,user,projectId) {
+  const denied = await requireProjectAccess(env,user,projectId); if (denied) throw new Error("Anda tidak ditugaskan pada proyek ini.");
+  const rabs = await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='rabs' AND (json_extract(data_json,'$.projectId')=? OR json_extract(data_json,'$.project_id')=?)`).bind(projectId,projectId).all();
+  const existing = await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='qc_work_items' AND json_extract(data_json,'$.projectId')=?`).bind(projectId).all();
+  const keys = new Set((existing.results || []).map(r => String(safeJsonParse(r.data_json,{}).item || "").trim().toLowerCase()).filter(Boolean));
+  let created=0, found=0;
+  for (const r of (rabs.results || [])) {
+    const d = safeJsonParse(r.data_json,{});
+    for (const it of rabItemCandidates(d)) {
+      found++;
+      const key = it.item.toLowerCase();
+      if (keys.has(key)) continue;
+      keys.add(key);
+      await upsertRecord(env,"qc_work_items",crypto.randomUUID(),{
+        projectId,item:it.item,code:it.code,category:it.category,sourceRabId:r.id,status:"ACTIVE",required:true
+      },user);
+      created++;
+    }
+  }
+  // Fallback: detailed project_budget/RAB lines are also valid QC work items.
+  const budgetRows=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='project_budget' AND json_extract(data_json,'$.projectId')=?`).bind(projectId).all();
+  for (const r of (budgetRows.results || [])) {
+    const d=safeJsonParse(r.data_json,{});
+    if (truthy(d.systemGenerated)) continue;
+    const item=String(d.description || d.item || d.uraian || "").trim();
+    if (!item) continue;
+    found++;
+    const key=item.toLowerCase(); if(keys.has(key)) continue; keys.add(key);
+    await upsertRecord(env,"qc_work_items",crypto.randomUUID(),{projectId,item,code:String(d.costCode||""),category:String(d.category||""),sourceRabId:`BUDGET:${r.id}`,status:"ACTIVE",required:true},user);
+    created++;
+  }
+  await audit(env,user,"QC_SYNC_RAB","qc_work_items","",projectId,{found,created});
+  return {found,created};
+}
+
+async function storeEvidenceDocument(env,user,file,meta) {
+  if (!env.FILES) throw new Error("R2 binding FILES belum tersedia.");
+  if (!(file instanceof File) || file.size <= 0) throw new Error("Bukti foto/dokumen wajib di-upload.");
+  if (file.size > MAX_UPLOAD_BYTES) throw new Error("Ukuran file maksimal 25 MB.");
+  const id = crypto.randomUUID();
+  const category = String(meta.category || "OTHER").toUpperCase();
+  const key = `projects/${safeFilename(meta.projectId)}/${safeFilename(category)}/${id}-${safeFilename(file.name)}`;
+  await env.FILES.put(key,file.stream(),{httpMetadata:{contentType:file.type || "application/octet-stream"}});
+  const data = {
+    projectId:meta.projectId,category,title:meta.title || file.name,notes:meta.notes || "",
+    relatedCollection:meta.relatedCollection || "",relatedId:meta.relatedId || "",originalName:file.name,
+    mimeType:file.type || "application/octet-stream",size:file.size,objectKey:key,version:1,status:"ACTIVE",
+    uploadedAt:new Date().toISOString(),uploadedBy:user.name || user.username
+  };
+  return upsertRecord(env,"project_documents",id,data,user);
+}
+
+async function qcInspectHandler(request,env,user) {
+  if (!buildAccess(user).capabilities.qcInspect) return json({ok:false,message:"Role ini tidak memiliki akses melakukan QC Inspection."},403);
+  let fd; try { fd=await request.formData(); } catch { return json({ok:false,message:"Form QC tidak valid."},400); }
+  const projectId=String(fd.get("projectId") || "").trim();
+  const workItemId=String(fd.get("workItemId") || "").trim();
+  const result=String(fd.get("result") || "").trim().toUpperCase();
+  const date=String(fd.get("date") || new Date().toISOString().slice(0,10));
+  const notes=String(fd.get("notes") || "");
+  const qcUserId=String(fd.get("qcUserId") || user.id || "");
+  const file=fd.get("file");
+  if (!projectId || !workItemId) return json({ok:false,message:"Proyek dan item pekerjaan QC wajib dipilih."},400);
+  const denied = await requireProjectAccess(env,user,projectId); if (denied) return denied;
+  if (!["PASS","NG","CONDITIONAL"].includes(result)) return json({ok:false,message:"Hasil QC harus PASS, NG, atau CONDITIONAL."},400);
+  if (!(file instanceof File) || file.size<=0) return json({ok:false,message:"Setiap QC Inspection wajib upload bukti."},400);
+  const workItem = await getRecord(env,"qc_work_items",workItemId);
+  if (!workItem || String(workItem.data.projectId || "") !== projectId) return json({ok:false,message:"Item pekerjaan QC tidak ditemukan pada proyek ini."},404);
+  const id=crypto.randomUUID();
+  const inspection=await upsertRecord(env,"qc_inspections",id,{
+    projectId,workItemId,item:workItem.data.item || workItemId,date,result,status:"RECORDED",qcUserId,qc:user.name || user.username,notes,
+    evidenceRequired:true
+  },user);
+  const doc=await storeEvidenceDocument(env,user,file,{projectId,category:"QC_EVIDENCE",title:`QC ${workItem.data.item || workItemId} - ${date}`,notes,relatedCollection:"qc_inspections",relatedId:id});
+  await upsertRecord(env,"qc_work_items",workItemId,{...workItem.data,lastInspectionId:id,lastInspectionDate:date,lastResult:result,lastEvidenceId:doc.id},user);
+  const openDefects = await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='defects' AND json_extract(data_json,'$.projectId')=? AND json_extract(data_json,'$.workItemId')=?`).bind(projectId,workItemId).all();
+  if (result === "PASS") {
+    for (const r of (openDefects.results || [])) {
+      const d=safeJsonParse(r.data_json,{}); if (activeLike(d.status)) await upsertRecord(env,"defects",r.id,{...d,status:"CLOSED",closedByInspectionId:id,closedAt:new Date().toISOString()},user);
+    }
+  } else {
+    const hasOpen=(openDefects.results || []).some(r=>activeLike(safeJsonParse(r.data_json,{}).status));
+    if (!hasOpen) await upsertRecord(env,"defects",crypto.randomUUID(),{
+      projectId,workItemId,qcInspectionId:id,date,item:workItem.data.item || "",severity:result==="NG"?"MAJOR":"MINOR",status:"OPEN",
+      picUserId:"",deadline:"",correctiveAction:"",notes:`Auto dari QC Inspection ${result}: ${notes}`
+    },user);
+  }
+  await audit(env,user,"QC_INSPECTION","qc_inspections",id,projectId,{workItemId,result,evidenceId:doc.id});
+  return json({ok:true,inspection,document:doc});
+}
+
+async function ccoActionHandler(request,env,user,id) {
+  const rec=await getRecord(env,"cco",id);
+  if (!rec) return json({ok:false,message:"CCO tidak ditemukan."},404);
+  const denied = await requireProjectAccess(env,user,rec.data.projectId); if (denied) return denied;
+  const body=await parseJson(request) || {};
+  const action=String(body.action || "").trim().toLowerCase();
+  const access=buildAccess(user).capabilities;
+  const oldStatus=String(rec.data.status || "DRAFT").toUpperCase();
+  let next=oldStatus;
+  const d={...rec.data};
+  const allowed=(cap)=>Boolean(access[cap]);
+  const need=(cond,msg)=>{ if(!cond) throw new Error(msg); };
+  try {
+    if (action==="submit-admin") { need(allowed("ccoFieldSubmit"),"Role ini tidak boleh mengajukan CCO."); need(isManagementRole(user) || !d.requestedByUserId || d.requestedByUserId===user.id,"Hanya pengaju atau Manajemen yang dapat submit CCO ini."); need(["DRAFT","RETURNED_TO_FIELD"].includes(oldStatus),"CCO hanya dapat diajukan dari DRAFT/RETURNED_TO_FIELD."); next="SUBMITTED_TO_ADMIN"; d.submittedByUserId=user.id; d.submittedAt=new Date().toISOString(); }
+    else if (action==="send-qs") { need(allowed("ccoAdmin"),"Hanya Admin/Manajemen yang dapat meneruskan CCO ke QS."); need(["SUBMITTED_TO_ADMIN","ADMIN_REVIEW"].includes(oldStatus),"CCO belum berada pada tahap review Admin."); next="SENT_TO_QS"; d.adminForwardedBy=user.id; d.adminForwardedAt=new Date().toISOString(); }
+    else if (action==="start-pricing") { need(allowed("ccoQs"),"Hanya QS/Manajemen yang dapat memulai RAB CCO."); need(oldStatus==="SENT_TO_QS","CCO belum dikirim ke QS."); next="QS_PRICING"; d.qsUserId=user.id; d.qsStartedAt=new Date().toISOString(); }
+    else if (action==="complete-pricing") {
+      need(allowed("ccoQs"),"Hanya QS/Manajemen yang dapat menyelesaikan RAB CCO."); need(["SENT_TO_QS","QS_PRICING"].includes(oldStatus),"Tahap CCO tidak sesuai untuk finalisasi RAB.");
+      const amount=num(body.amount ?? d.amount); need(amount>0,"Nilai RAB CCO wajib diisi."); d.amount=amount; d.rabNumber=String(body.rabNumber || d.rabNumber || ""); d.rabNotes=String(body.notes || d.rabNotes || "");
+      const base=await getProjectBudgetValue(env,String(d.projectId || "")); d.percentOfRab=base>0?amount/base*100:0;
+      d.escalationLevel=d.percentOfRab>10?"WAJIB ESKALASI SOP/SP":d.percentOfRab>8?"REVIEW KHUSUS":"NORMAL";
+      d.qsCompletedBy=user.id; d.qsCompletedAt=new Date().toISOString(); next="RAB_READY";
+    }
+    else if (action==="approve-escalation") { need(allowed("ccoEscalation"),"Eskalasi >10% hanya dapat disetujui Manajemen."); need(num(d.percentOfRab)>10,"CCO ini tidak memerlukan approval eskalasi >10%."); d.sopEscalationApproved=true; d.sopEscalationApprovedBy=user.id; d.sopEscalationApprovedAt=new Date().toISOString(); next=oldStatus; }
+    else if (action==="send-client") { need(allowed("ccoAdmin"),"Hanya Admin/Manajemen yang dapat mengirim CCO ke client."); need(["RAB_READY","READY_FOR_CLIENT"].includes(oldStatus),"RAB CCO belum siap dikirim ke client."); if(num(d.percentOfRab)>10) need(truthy(d.sopEscalationApproved),"CCO >10% harus melalui approval eskalasi SOP/SP sebelum dikirim ke client."); next="SENT_TO_CLIENT"; d.sentClientBy=user.id; d.sentClientAt=new Date().toISOString(); }
+    else if (action==="client-approve") { need(allowed("ccoAdmin"),"Hanya Admin/Manajemen yang mencatat keputusan client."); need(oldStatus==="SENT_TO_CLIENT","CCO belum dikirim ke client."); next="CLIENT_APPROVED"; d.clientDecisionAt=new Date().toISOString(); d.clientDecision="APPROVED"; }
+    else if (action==="client-reject") { need(allowed("ccoAdmin"),"Hanya Admin/Manajemen yang mencatat keputusan client."); need(oldStatus==="SENT_TO_CLIENT","CCO belum dikirim ke client."); next="CLIENT_REJECTED"; d.clientDecisionAt=new Date().toISOString(); d.clientDecision="REJECTED"; d.clientDecisionNote=String(body.notes || ""); }
+    else if (action==="start-addendum") { need(allowed("ccoAdmin"),"Hanya Admin/Manajemen yang memproses Addendum."); need(oldStatus==="CLIENT_APPROVED","Client belum menyetujui CCO."); next="ADDENDUM_PROCESS"; }
+    else if (action==="return-field") { need(allowed("ccoAdmin") || allowed("ccoQs"),"Tidak berhak mengembalikan CCO."); need(!["CLOSED","CLIENT_APPROVED","ADDENDUM_PROCESS"].includes(oldStatus),"CCO pada tahap ini tidak dapat dikembalikan ke lapangan."); next="RETURNED_TO_FIELD"; d.returnReason=String(body.notes || "Perlu perbaikan data pengajuan"); }
+    else if (action==="close") {
+      need(allowed("ccoAdmin"),"Hanya Admin/Manajemen yang dapat menutup CCO."); need(["CLIENT_APPROVED","ADDENDUM_PROCESS"].includes(oldStatus),"CCO belum berada pada tahap Addendum.");
+      const doc=await env.DB.prepare(`SELECT id FROM app_records WHERE collection='project_documents' AND json_extract(data_json,'$.projectId')=? AND json_extract(data_json,'$.relatedCollection')='cco' AND json_extract(data_json,'$.relatedId')=? AND upper(COALESCE(json_extract(data_json,'$.category'),''))='CCO_ADDENDUM' LIMIT 1`).bind(String(d.projectId||""),id).first();
+      need(Boolean(doc),"Upload dokumen Addendum final terlebih dahulu sebelum CCO ditutup."); next="CLOSED"; d.closedAt=new Date().toISOString(); d.closedBy=user.id;
+    }
+    else return json({ok:false,message:"Action CCO tidak dikenal."},400);
+  } catch (e) { return json({ok:false,message:e.message || "Action CCO ditolak."},409); }
+  d.status=next;
+  const hist=Array.isArray(d.history)?d.history.slice(-30):[]; hist.push({at:new Date().toISOString(),action,from:oldStatus,to:next,by:user.id,note:String(body.notes||"")}); d.history=hist;
+  const out=await upsertRecord(env,"cco",id,d,user);
+  await audit(env,user,"CCO_ACTION", "cco", id, d.projectId || "", {action,from:oldStatus,to:next});
+  return json({ok:true,row:out});
+}
+
+async function paymentRequestActionHandler(request,env,user,id) {
+  const rec=await getRecord(env,"payment_requests",id); if(!rec) return json({ok:false,message:"Payment Request tidak ditemukan."},404);
+  const denied = await requireProjectAccess(env,user,rec.data.projectId); if (denied) return denied;
+  const body=await parseJson(request) || {}; const action=String(body.action||"").toLowerCase(); const access=buildAccess(user).capabilities;
+  const d={...rec.data}; const old=String(d.status||"DRAFT").toUpperCase(); let next=old;
+  if(action==="submit") { if(!isManagementRole(user) && d.requesterUserId && d.requesterUserId!==user.id) return json({ok:false,message:"Hanya pengaju atau Manajemen yang dapat submit pengajuan ini."},403); if(!["DRAFT","REJECTED"].includes(old)) return json({ok:false,message:"Hanya DRAFT/REJECTED yang dapat diajukan."},409); next="PENDING"; d.submittedAt=new Date().toISOString(); d.requesterUserId=d.requesterUserId||user.id; }
+  else if(action==="approve") { if(!access.financeApprove) return json({ok:false,message:"Role ini tidak dapat approve pengajuan dana."},403); if(old!=="PENDING") return json({ok:false,message:"Pengajuan belum berstatus PENDING."},409); next="APPROVED"; d.approvedByUserId=user.id; d.approvedAt=new Date().toISOString(); }
+  else if(action==="reject") { if(!access.financeApprove) return json({ok:false,message:"Role ini tidak dapat reject pengajuan dana."},403); if(!["PENDING","APPROVED"].includes(old)) return json({ok:false,message:"Status pengajuan tidak dapat direject."},409); next="REJECTED"; d.rejectReason=String(body.notes||""); d.rejectedByUserId=user.id; d.rejectedAt=new Date().toISOString(); }
+  else if(action==="pay") {
+    if(!access.financePay) return json({ok:false,message:"Hanya Finance/Manajemen yang dapat mencatat pembayaran."},403); if(old!=="APPROVED") return json({ok:false,message:"Pengajuan harus APPROVED sebelum dibayar."},409);
+    next="PAID"; d.paidAt=String(body.paymentDate||new Date().toISOString().slice(0,10)); d.paidByUserId=user.id; d.paymentReference=String(body.reference||""); d.paymentAccount=String(body.account||"");
+    const cashId=`PAYREQ-${id}`; await upsertRecord(env,"cash_out",cashId,{projectId:d.projectId,date:d.paidAt,category:d.category||"Operasional",vendor:d.payee||d.vendor||"",amount:num(d.amount),status:"PAID",costCode:d.costCode||"",reference:d.paymentReference,account:d.paymentAccount,paymentRequestId:id,notes:`Otomatis dari Payment Request: ${d.description||""}`,systemGenerated:true},user);
+  }
+  else return json({ok:false,message:"Action Payment Request tidak dikenal."},400);
+  d.status=next; const out=await upsertRecord(env,"payment_requests",id,d,user); await audit(env,user,"PAYMENT_REQUEST_ACTION","payment_requests",id,d.projectId||"",{action,from:old,to:next}); return json({ok:true,row:out});
+}
+
+async function procurementActionHandler(request,env,user,id) {
+  const rec=await getRecord(env,"procurement",id); if(!rec) return json({ok:false,message:"PR tidak ditemukan."},404);
+  const denied = await requireProjectAccess(env,user,rec.data.projectId); if (denied) return denied;
+  const body=await parseJson(request)||{}; const action=String(body.action||"").toLowerCase(); const caps=buildAccess(user).capabilities; const d={...rec.data}; const old=String(d.status||"DRAFT").toUpperCase(); let next=old;
+  if(action==="submit") { if(!isManagementRole(user) && d.requesterUserId && d.requesterUserId!==user.id) return json({ok:false,message:"Hanya requester atau Manajemen yang dapat submit PR ini."},403); if(!["DRAFT","REJECTED","REQUESTED"].includes(old)) return json({ok:false,message:"PR tidak dapat diajukan dari status ini."},409); next="SUBMITTED"; d.submittedByUserId=user.id; d.submittedAt=new Date().toISOString(); }
+  else if(action==="approve") { if(!caps.procurementApprove) return json({ok:false,message:"Role ini tidak dapat approve PR."},403); if(old!=="SUBMITTED") return json({ok:false,message:"PR harus SUBMITTED."},409); next="APPROVED"; d.approvedByUserId=user.id; d.approvedAt=new Date().toISOString(); }
+  else if(action==="reject") { if(!caps.procurementApprove) return json({ok:false,message:"Role ini tidak dapat reject PR."},403); if(!["SUBMITTED","APPROVED"].includes(old)) return json({ok:false,message:"PR tidak dapat direject dari status ini."},409); next="REJECTED"; d.rejectReason=String(body.notes||""); }
+  else if(action==="order") { if(!caps.procurementOrder) return json({ok:false,message:"Role ini tidak dapat menandai PR sebagai dipesan."},403); if(old!=="APPROVED") return json({ok:false,message:"PR harus APPROVED sebelum ORDERED."},409); next="ORDERED"; d.orderedAt=new Date().toISOString(); }
+  else if(action==="receive") { if(!caps.procurementOrder) return json({ok:false,message:"Role ini tidak dapat menerima material."},403); if(old!=="ORDERED") return json({ok:false,message:"PR harus ORDERED sebelum RECEIVED."},409); next="RECEIVED"; d.receivedAt=new Date().toISOString(); }
+  else return json({ok:false,message:"Action PR tidak dikenal."},400);
+  d.status=next; const out=await upsertRecord(env,"procurement",id,d,user); await audit(env,user,"PROCUREMENT_ACTION","procurement",id,d.projectId||"",{action,from:old,to:next}); return json({ok:true,row:out});
 }
 
 
@@ -675,11 +1238,12 @@ function storageParts(pathname) {
   return { isPublic, bucket, key };
 }
 
-async function legacyStorageHandler(request, env, url) {
+async function legacyStorageHandler(request, env, url, user=null) {
   if (!env.FILES) return json({statusCode:"503",error:"StorageUnavailable",message:"R2 binding FILES belum tersedia."},503);
   const parts = storageParts(url.pathname);
   if (!parts) return json({statusCode:"400",error:"InvalidRequest",message:"Invalid storage path"},400);
   if (parts.bucket !== STORAGE_BUCKET && parts.bucket !== "kendali-files") return json({statusCode:"404",error:"BucketNotFound",message:"Bucket not found"},404);
+  if (user && !(await userCanAccessStorageKey(env,user,parts.key))) return json({statusCode:"403",error:"Forbidden",message:"Anda tidak ditugaskan pada proyek file ini."},403);
   if (request.method === "GET" || request.method === "HEAD") {
     const obj = await env.FILES.get(parts.key);
     if (!obj) return json({statusCode:"404",error:"not_found",message:"Object not found"},404);
@@ -696,17 +1260,14 @@ async function legacyStorageHandler(request, env, url) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"KENDALI-V2.8"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"KENDALI-V3.0"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
   return json({statusCode:"405",error:"MethodNotAllowed",message:"Method not allowed"},405);
 }
 
-function isAdminRole(user) {
-  const role = String(user?.role || "").trim().toLowerCase();
-  return role === "admin" || role === "administrator" || role === "direktur";
-}
+function isAdminRole(user) { return isTopRole(user); }
 
 async function diagnostics(env) {
   const counts = await env.DB.prepare(`SELECT collection,COUNT(*) AS count FROM app_records GROUP BY collection ORDER BY collection`).all();
@@ -728,42 +1289,93 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"full-v3.0.1-role-project-scope"});
     if (path === "/api/health") return diagnostics(env);
     if (path === "/api/auth/login" && request.method === "POST") return loginHandler(request,env);
 
     const auth = await authenticate(request,env);
-    if (path === "/api/auth/me" || path === "/api/access/session") return auth.ok ? json({ok:true,user:auth.user,username:auth.user.username,email:auth.user.email||"",landing_route:auth.user.role === "Pelaksana Lapangan" ? "/lapangan" : "/"}) : authFailure(auth);
+    if (path === "/api/auth/me" || path === "/api/access/session") {
+      if (!auth.ok) return authFailure(auth);
+      return json({ok:true,user:auth.user,username:auth.user.username,email:auth.user.email||"",access:buildAccess(auth.user),landing_route:"/"});
+    }
     if (path === "/api/auth/logout" && (request.method === "POST" || request.method === "GET")) return logoutHandler(request,env,auth);
     if ((path.startsWith("/api/") || path.startsWith("/rest/") || path.startsWith("/storage/")) && !auth.ok) return authFailure(auth);
 
     if (path === "/api/auth/change-password" && request.method === "POST") return changePasswordHandler(request,env,auth);
-    if (path === "/api/diagnostics") return isAdminRole(auth.user) ? diagnostics(env) : json({ok:false,message:"Diagnostics hanya untuk Administrator/Direktur."},403);
-    if (path === "/api/dashboard" && request.method === "GET") return dashboardHandler(env);
-    if (path === "/api/audit" && request.method === "GET") return auditHandler(env,url);
+    if (path === "/api/diagnostics") return isTopRole(auth.user) ? diagnostics(env) : json({ok:false,message:"Diagnostics hanya untuk Administrator/Direktur/Head Unit Bisnis."},403);
+    if (path === "/api/employees" && request.method === "GET") return json({ok:true,employees:await listEmployees(env)});
+    if (path === "/api/dashboard" && request.method === "GET") return dashboardHandler(env,auth.user);
+    if (path === "/api/audit" && request.method === "GET") return buildAccess(auth.user).capabilities.audit ? auditHandler(env,url) : json({ok:false,message:"Role ini tidak memiliki akses Audit Log."},403);
 
-    if (path === "/api/documents" && request.method === "GET") return listDocuments(env,url);
-    if (path === "/api/documents" && request.method === "POST") return uploadDocument(request,env,auth.user);
+    // Workflow endpoints: status changes are performed here so field users cannot skip gates.
+    if (path === "/api/qc/sync-rab" && request.method === "POST") {
+      if (!buildAccess(auth.user).capabilities.qcSyncRab) return json({ok:false,message:"Role ini tidak dapat sinkron item QC dari RAB."},403);
+      const body=await parseJson(request)||{}; const projectId=String(body.projectId||"").trim();
+      if(!projectId) return json({ok:false,message:"Project wajib dipilih."},400);
+      return json({ok:true,...await syncQcFromRab(env,auth.user,projectId)});
+    }
+    if (path === "/api/qc/inspect" && request.method === "POST") return qcInspectHandler(request,env,auth.user);
+
+    const ccoAction = path.match(/^\/api\/cco\/([^/]+)\/action$/);
+    if (ccoAction && request.method === "POST") return ccoActionHandler(request,env,auth.user,decodeURIComponent(ccoAction[1]));
+    const payAction = path.match(/^\/api\/payment-requests\/([^/]+)\/action$/);
+    if (payAction && request.method === "POST") return paymentRequestActionHandler(request,env,auth.user,decodeURIComponent(payAction[1]));
+    const prAction = path.match(/^\/api\/procurement\/([^/]+)\/action$/);
+    if (prAction && request.method === "POST") return procurementActionHandler(request,env,auth.user,decodeURIComponent(prAction[1]));
+
+    // Documents are project records too and obey role access.
+    if (path === "/api/documents" && request.method === "GET") {
+      if (collectionDenied(auth.user,"project_documents","read")) return json({ok:false,message:"Akses dokumen ditolak."},403);
+      return listDocuments(env,url,auth.user);
+    }
+    if (path === "/api/documents" && request.method === "POST") {
+      if (collectionDenied(auth.user,"project_documents","create")) return json({ok:false,message:"Role ini tidak dapat upload dokumen."},403);
+      return uploadDocument(request,env,auth.user);
+    }
     const docFileMatch = path.match(/^\/api\/documents\/([^/]+)\/file$/);
-    if (docFileMatch && request.method === "GET") return downloadDocument(env,decodeURIComponent(docFileMatch[1]));
+    if (docFileMatch && request.method === "GET") {
+      if (collectionDenied(auth.user,"project_documents","read")) return json({ok:false,message:"Akses dokumen ditolak."},403);
+      return downloadDocument(env,auth.user,decodeURIComponent(docFileMatch[1]));
+    }
     const docMatch = path.match(/^\/api\/documents\/([^/]+)$/);
-    if (docMatch && (request.method === "PUT" || request.method === "PATCH")) return updateDocument(request,env,auth.user,decodeURIComponent(docMatch[1]));
-    if (docMatch && request.method === "DELETE") return deleteDocument(env,auth.user,decodeURIComponent(docMatch[1]));
+    if (docMatch && (request.method === "PUT" || request.method === "PATCH")) {
+      if (collectionDenied(auth.user,"project_documents","update")) return json({ok:false,message:"Role ini tidak dapat edit dokumen."},403);
+      return updateDocument(request,env,auth.user,decodeURIComponent(docMatch[1]));
+    }
+    if (docMatch && request.method === "DELETE") {
+      if (collectionDenied(auth.user,"project_documents","delete")) return json({ok:false,message:"Role ini tidak dapat hapus dokumen."},403);
+      return deleteDocument(env,auth.user,decodeURIComponent(docMatch[1]));
+    }
 
     const flowMatch = path.match(/^\/api\/projects\/([^/]+)\/flow$/);
-    if (flowMatch && request.method === "GET") return projectFlow(env,decodeURIComponent(flowMatch[1]));
+    if (flowMatch && request.method === "GET") return projectFlow(env,auth.user,decodeURIComponent(flowMatch[1]));
     const syncMatch = path.match(/^\/api\/projects\/([^/]+)\/sync-status$/);
-    if (syncMatch && request.method === "POST") return syncProjectStatus(env,auth.user,decodeURIComponent(syncMatch[1]));
+    if (syncMatch && request.method === "POST") {
+      if (!isAdminProjectRole(auth.user)) return json({ok:false,message:"Sync status proyek hanya untuk Admin/Manajemen."},403);
+      return syncProjectStatus(env,auth.user,decodeURIComponent(syncMatch[1]));
+    }
 
     const recordsRoot = path.match(/^\/api\/records\/([^/]+)$/);
     if (recordsRoot) {
       const collection = safeCollection(decodeURIComponent(recordsRoot[1]));
       if (!collection) return json({ok:false,message:"Collection tidak dikenal."},404);
-      if (request.method === "GET") return json({ok:true,rows:await listRecords(env,collection,url)});
+      if (request.method === "GET") {
+        if (collectionDenied(auth.user,collection,"read")) return json({ok:false,message:`Role ${auth.user.role || ""} tidak memiliki akses membaca ${collection}.`},403);
+        return json({ok:true,rows:await listRecords(env,collection,url,auth.user)});
+      }
       if (request.method === "POST") {
+        if (collectionDenied(auth.user,collection,"create")) return json({ok:false,message:`Role ${auth.user.role || ""} tidak dapat menambah ${collection}.`},403);
+        if (collection === "qc_inspections") return json({ok:false,message:"QC Inspection wajib melalui form inspeksi dengan upload bukti."},409);
         const body = await parseJson(request);
         if (!body) return json({ok:false,message:"JSON tidak valid."},400);
-        const rec = await upsertRecord(env,collection,body.id || null,body.data || body,auth.user);
+        let data={...(body.data || body)};
+        const targetProjectId = recordProjectId(collection,body.id || "",data);
+        if (targetProjectId) { const denied = await requireProjectAccess(env,auth.user,targetProjectId); if (denied) return denied; }
+        if (collection === "cco") data.status="DRAFT";
+        if (collection === "payment_requests") { data.status="DRAFT"; data.requesterUserId=data.requesterUserId || auth.user.id; }
+        if (collection === "procurement") { data.status="DRAFT"; data.requesterUserId=data.requesterUserId || auth.user.id; }
+        const rec = await upsertRecord(env,collection,body.id || null,data,auth.user);
+        await afterRecordUpsert(env,collection,rec,auth.user);
         return json({ok:true,row:rec},201);
       }
     }
@@ -774,43 +1386,87 @@ export default {
       const id = decodeURIComponent(recordOne[2]);
       if (!collection) return json({ok:false,message:"Collection tidak dikenal."},404);
       if (request.method === "GET") {
+        if (collectionDenied(auth.user,collection,"read")) return json({ok:false,message:"Akses data ditolak."},403);
         const rec = await getRecord(env,collection,id);
-        return rec ? json({ok:true,row:rec}) : json({ok:false,message:"Data tidak ditemukan."},404);
+        if (!rec) return json({ok:false,message:"Data tidak ditemukan."},404);
+        if (!(await recordAllowedByProjectScope(env,auth.user,collection,id,rec.data))) return json({ok:false,message:"Anda tidak ditugaskan pada proyek data ini."},403);
+        return json({ok:true,row:rec});
       }
       if (request.method === "PUT" || request.method === "PATCH") {
+        if (collectionDenied(auth.user,collection,"update")) return json({ok:false,message:`Role ${auth.user.role || ""} tidak dapat mengubah ${collection}.`},403);
+        if (collection === "qc_inspections") return json({ok:false,message:"QC Inspection merupakan log inspeksi. Buat inspeksi ulang, jangan mengubah bukti lama."},409);
         const body = await parseJson(request);
         if (!body) return json({ok:false,message:"JSON tidak valid."},400);
-        const rec = await upsertRecord(env,collection,id,body.data || body,auth.user);
+        let data={...(body.data || body)};
+        const old=await getRecord(env,collection,id);
+        if (!old) return json({ok:false,message:"Data tidak ditemukan."},404);
+        if (!(await recordAllowedByProjectScope(env,auth.user,collection,id,old.data))) return json({ok:false,message:"Anda tidak ditugaskan pada proyek data ini."},403);
+        const mergedProjectId = recordProjectId(collection,id,{...old.data,...data});
+        if (mergedProjectId) { const denied = await requireProjectAccess(env,auth.user,mergedProjectId); if (denied) return denied; }
+        const roleKey=normalizeRole(auth.user);
+        if (collection === "payment_requests" && !["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","finance"].includes(roleKey)) {
+          if (old.data.requesterUserId && old.data.requesterUserId !== auth.user.id) return json({ok:false,message:"Anda hanya dapat mengedit pengajuan dana milik Anda sendiri."},403);
+          if (!["DRAFT","REJECTED"].includes(String(old.data.status||"DRAFT").toUpperCase())) return json({ok:false,message:"Pengajuan yang sudah diproses tidak dapat diedit oleh pengaju."},409);
+        }
+        if (collection === "cco" && ["project_manager","pelaksana_lapangan"].includes(roleKey)) {
+          if (old.data.requestedByUserId && old.data.requestedByUserId !== auth.user.id) return json({ok:false,message:"Anda hanya dapat mengedit CCO yang Anda ajukan."},403);
+          if (!["DRAFT","RETURNED_TO_FIELD"].includes(String(old.data.status||"DRAFT").toUpperCase())) return json({ok:false,message:"CCO yang sudah masuk proses Admin/QS tidak dapat diedit oleh lapangan."},409);
+        }
+        // Critical workflow statuses cannot be edited manually; use the action endpoints above.
+        if (["cco","payment_requests","procurement"].includes(collection)) data.status=old.data.status || data.status || "DRAFT";
+        const rec = await upsertRecord(env,collection,id,{...old.data,...data},auth.user);
+        await afterRecordUpsert(env,collection,rec,auth.user);
         return json({ok:true,row:rec});
       }
       if (request.method === "DELETE") {
+        if (collectionDenied(auth.user,collection,"delete")) return json({ok:false,message:`Role ${auth.user.role || ""} tidak dapat menghapus ${collection}.`},403);
+        const old = await getRecord(env,collection,id);
+        if (old && !(await recordAllowedByProjectScope(env,auth.user,collection,id,old.data))) return json({ok:false,message:"Anda tidak ditugaskan pada proyek data ini."},403);
         const ok = await deleteRecord(env,collection,id,auth.user);
         return ok ? json({ok:true}) : json({ok:false,message:"Data tidak ditemukan."},404);
       }
     }
 
-    // Backward compatibility with older KENDALI /rest/v1/<collection> adapter.
+    // Backward compatibility. Still protected by the same RBAC rules.
     const legacy = path.match(/^\/rest\/v1\/([^/]+)$/);
     if (legacy) {
       const collection = safeCollection(decodeURIComponent(legacy[1]));
       if (!collection) return json({message:"Unknown table"},404);
-      if (request.method === "GET") return json(await listRecords(env,collection,url),200,{"content-range":"0-*/ *"});
+      if (request.method === "GET") {
+        if (collectionDenied(auth.user,collection,"read")) return json({message:"Forbidden"},403);
+        return json(await listRecords(env,collection,url,auth.user),200,{"content-range":"0-*/ *"});
+      }
       if (request.method === "POST" || request.method === "PUT" || request.method === "PATCH") {
-        const body = await parseJson(request);
-        if (!body) return json({message:"Invalid JSON"},400);
+        const action=request.method==="POST"?"create":"update";
+        if (collectionDenied(auth.user,collection,action)) return json({message:"Forbidden"},403);
+        const body = await parseJson(request); if (!body) return json({message:"Invalid JSON"},400);
         const list = Array.isArray(body) ? body : [body];
-        for (const row of list) await upsertRecord(env,collection,row.id,row.data ?? row,auth.user);
+        for (const row of list) {
+          const payload = row.data ?? row;
+          const pid = recordProjectId(collection,row.id,payload);
+          if (pid && !(await userCanAccessProject(env,auth.user,pid))) return json({message:"Forbidden: project scope"},403);
+          const rec=await upsertRecord(env,collection,row.id,payload,auth.user); await afterRecordUpsert(env,collection,rec,auth.user);
+        }
         return json(null,201);
       }
       if (request.method === "DELETE") {
-        const raw = url.searchParams.get("id") || "";
-        const m = raw.match(/^eq\.(.+)$/);
-        if (m) await deleteRecord(env,collection,m[1],auth.user);
+        if (collectionDenied(auth.user,collection,"delete")) return json({message:"Forbidden"},403);
+        const raw = url.searchParams.get("id") || ""; const m = raw.match(/^eq\.(.+)$/);
+        if (m) {
+          const old = await getRecord(env,collection,m[1]);
+          if (old && !(await recordAllowedByProjectScope(env,auth.user,collection,m[1],old.data))) return json({message:"Forbidden: project scope"},403);
+          await deleteRecord(env,collection,m[1],auth.user);
+        }
         return new Response(null,{status:204});
       }
     }
 
-    if (path.startsWith("/storage/v1/object/")) return legacyStorageHandler(request,env,url);
+    if (path.startsWith("/storage/v1/object/")) {
+      if (request.method === "GET" || request.method === "HEAD") {
+        if (collectionDenied(auth.user,"project_documents","read")) return json({message:"Forbidden"},403);
+      } else if (collectionDenied(auth.user,"project_documents","create")) return json({message:"Forbidden"},403);
+      return legacyStorageHandler(request,env,url,auth.user);
+    }
     if (path.startsWith("/auth/v1/")) return json({message:"Authentication is handled by KENDALI."},404);
 
     return serveAssets(request,env);

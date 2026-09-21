@@ -1,22 +1,26 @@
-# V2.8.1 — Build & Deployment Fix
+# CHANGELOG
 
-- Menambahkan script `npm run build` yang diwajibkan Cloudflare build pipeline.
-- Mengembalikan binding D1 produksi `kendali-natara-db-v2` beserta database ID lama.
-- Mengembalikan R2 produksi `kendali-natara-files-v2`.
-- Menambahkan routing Worker untuk `/rest/*`, `/storage/*`, dan `/auth/*` agar kompatibilitas fitur lama tetap berjalan.
-- Menambahkan kompatibilitas `/api/access/session` dan storage R2 lama.
-- Memperketat autentikasi REST/storage, diagnostics khusus Administrator/Direktur, dan rate-limit login.
-- Menghapus audit LOGIN ganda.
+## 3.0.1 — Role + Project Scope
 
-# Changelog
+- PM hanya dapat melihat dan mengakses proyek yang ditugaskan kepadanya.
+- Pelaksana hanya dapat melihat dan mengakses proyek yang ditugaskan kepadanya.
+- Scope berlaku pada dashboard, project list, record CRUD, progress, CCO, PR, payment request, dokumen, flow, dan storage legacy.
+- Direct API access ke proyek di luar assignment ditolak backend.
+- Dashboard menyembunyikan payload detail finance dari role tanpa akses Finance.
+- UI memberi label “Proyek ditugaskan saja” dan filter “Semua proyek yang saya tangani” untuk PM/Pelaksana.
+- Kompatibilitas field assignment lama dipertahankan.
 
-## 2.8.0
-- Portfolio dashboard seluruh proyek dengan cash-in/cash-out dan budget control.
-- End-to-end project lifecycle sampai CLOSED.
-- Finance: budget, cash-in, cash-out, AR/AP, payment request, approval.
-- Progress: schedule/Kurva-S, milestone, daily, weekly, issue/corrective action.
-- QS/opname, QC/defect, CCO/addendum, procurement/PO.
-- Document management R2: upload/open/edit/replace/delete/versioning.
-- PHO, retention, FHO, financial close-out, standard close-out checklist.
-- Audit log.
-- Preserves existing app_records collections and adds Master Data UI for legacy collections.
+
+## 3.0.0 — Full Workflow
+
+- Dashboard grafik Rencana vs Aktual per proyek.
+- Dropdown karyawan pada proyek dan seluruh PIC utama.
+- Finance flow + Payment Request automation.
+- Opname/QS diperjelas.
+- QC work-item dashboard, sync RAB, evidence-required inspection, defect/re-inspection.
+- CCO staged workflow Pelaksana → Admin → QS → Admin → Client → Addendum.
+- CCO escalation gate >8% dan >10%.
+- Procurement PR vs PO/SPK diperjelas; PO/SPK sync payable.
+- Menu Karyawan & Akses.
+- Role-based navigation dan backend API authorization.
+- Migration 0012 dan preflight check V3.0.

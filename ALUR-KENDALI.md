@@ -1,37 +1,35 @@
-# Alur Operasional KENDALI V2.8
+# ALUR KENDALI NATARA V3.0
 
-## 1. Project Setup
-Input master proyek, nilai kontrak, HPP/budget, tanggal, PM/pengawas. Upload CONTRACT, RAB_BASELINE, DED_FINAL, dan TIME_SCHEDULE. Status tetap `SETUP` selama salah satu dokumen wajib belum lengkap.
+## 1. Proyek
 
-## 2. Pre-Construction
-Upload PCM dan MC0. Lengkapi schedule/Kurva-S, milestone, cost code/budget, procurement plan, dan PIC. Setelah gate lengkap, proyek masuk ke mobilisasi/pelaksanaan berdasarkan progress.
+Tambah proyek → pilih Project Manager, Pelaksana Lapangan, QS, QC, dan Admin Teknik dari master karyawan → isi nilai kontrak + HPP/RAB baseline → sistem membuat baseline budget otomatis → upload Kontrak, RAB, DED, Time Schedule → PCM → MC-0 → Pelaksanaan.
 
-## 3. Mobilisasi dan Pelaksanaan
-Input progress harian dan mingguan, tenaga kerja, pekerjaan, kendala, rencana berikutnya, schedule, milestone, dan issue. Skema issue mengikuti: Masalah → Dampak → Penyebab → Pilihan → Keputusan → PIC → Deadline.
+## 2. Progress & Dashboard
 
-## 4. Procurement & Finance
-PR/procurement → approval → PO/SPK → penerimaan → cash-out. Cash-in dicatat dari DP/termin/cicilan/pelunasan. Piutang, hutang, payment request, dan approval dipantau per proyek.
+Pelaksana/PM mengisi Progress Harian atau Mingguan dengan dua angka utama: Progress Rencana (%) dan Progress Aktual/Realisasi (%). Dashboard membaca data menurut tanggal dan menggambar grafik Rencana vs Aktual untuk setiap proyek. Grafik tidak menggunakan angka manual terpisah.
+
+## 3. Keuangan
+
+Nilai kontrak/HPP dari proyek adalah baseline monitoring, bukan transaksi kas. Tagihan client dibuat sebagai Piutang. Cash In dicatat ketika dana benar-benar diterima. Karyawan mengajukan kebutuhan di Pengajuan Dana: Draft → Pending → Approved/Rejected → Paid. Ketika Paid, Cash Out dibuat otomatis. PO/SPK Approved/Ordered membentuk Hutang/Outstanding otomatis.
+
+## 4. Opname / QS
+
+Pelaksana memberi data realisasi lapangan → QS (Quantity Surveyor) mengukur/verifikasi volume aktual terhadap RAB/gambar → input Volume Terverifikasi QS + nilai opname → upload BA/bukti → Verified/Approved → dapat menjadi dasar pembayaran/termin.
 
 ## 5. QC
-QC Inspection → PASS/NG → bila ada temuan buat Defect → corrective action → re-inspection → CLOSED. QC/defect/issue terbuka menghambat PHO.
 
-## 6. QS / Opname
-QS melakukan opname volume → nilai opname → verifikasi → approval → BA opname. Dokumen BA dapat di-upload langsung pada form opname dan otomatis masuk Dokumen Proyek.
+RAB → Sinkron Item QC → seluruh item pekerjaan masuk checklist → QC Inspection per item → upload bukti wajib pada setiap inspection → PASS atau NG/CONDITIONAL. NG/CONDITIONAL otomatis membuka defect. Setelah perbaikan dilakukan, QC melakukan re-inspection. PASS terbaru menutup defect untuk item tersebut.
 
-## 7. CCO / Addendum
-Catat perubahan → nilai/% RAB → submit/review → approved/closed → upload CCO/Addendum. CCO yang belum selesai menghambat financial close-out.
+## 6. CCO / Addendum
 
-## 8. PHO
-Syarat minimal: progress 100%, QC/defect/issue tertutup, PHO_BAST tersedia, AS_BUILT tersedia. Bila belum, status gate tetap `PHO`.
+Pelaksana/PM membuat Draft CCO → Ajukan ke Admin → Admin review dan Teruskan ke QS → QS Mulai RAB → QS Selesaikan RAB CCO → sistem menghitung % terhadap RAB → jika >10% wajib approval eskalasi SOP/SP → Admin Kirim ke Client → Client Approve/Reject → jika approve, proses Addendum → upload Addendum final → Closed.
 
-## 9. Retensi / FHO
-Bila proyek memakai retensi, catat tanggal mulai/akhir, nilai, dan status sampai RELEASED/CLOSED. Jika FHO diwajibkan, upload FHO_BAST.
+Kontrol nilai: ≤8% = Normal; >8%–10% = Review Khusus; >10% = Wajib Eskalasi SOP/SP sebelum dikirim ke client.
 
-## 10. Financial Close-Out
-Piutang = 0, hutang = 0, CCO selesai, approval/payment request selesai, checklist close-out selesai, dan FINAL_RECONCILIATION tersedia.
+## 7. Procurement
 
-## 11. CLOSED
-Klik **Evaluasi & Sync**. Backend menghitung ulang semua gate. Status hanya menjadi `CLOSED` bila tidak ada blocker.
+PR/Purchase Request = permintaan internal kebutuhan barang/jasa. Flow: Draft → Submit → Approved/Rejected → Ordered → Received. PO/SPK = dokumen komitmen resmi ke vendor/subkon setelah kebutuhan disetujui. PO/SPK Approved/Ordered memengaruhi committed cost dan membentuk hutang/outstanding, tetapi belum dianggap Cash Out sebelum pembayaran dilakukan.
 
-## Kontrol dokumen
-Setiap kebutuhan bukti dapat memakai lampiran di form. Lampiran otomatis masuk ke menu Dokumen dengan Project ID dan relasi record. Dokumen juga dapat di-upload manual, dibuka, diedit metadata, diganti file, dan dihapus.
+## 8. Close-Out
+
+Progress 100% → Final QC/defect/issue closed → PHO + BAST → As-Built → retensi/masa pemeliharaan bila berlaku → FHO bila diwajibkan → seluruh CCO closed → piutang/hutang selesai → final reconciliation → arsip lengkap → Project Closed.

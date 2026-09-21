@@ -1,117 +1,68 @@
-# KENDALI Natara V2.8.1 — End-to-End Project Control
+# KENDALI Natara V3.0.1 — Role + Project Scope
 
-Versi ini menambahkan kontrol proyek dari pembukaan proyek sampai `CLOSED`, termasuk pemasukan/pengeluaran seluruh proyek, progress, schedule, opname, QC/defect, CCO, procurement, approval, dokumen proyek, retensi, FHO, financial close-out, dan audit log.
+KENDALI V3.0.1 adalah penyempurnaan V3.0 dengan tetap memakai resource produksi yang sama:
 
-## Yang sudah tersedia
-
-- Dashboard portfolio seluruh proyek: nilai kontrak, cash-in, cash-out, net cash, budget/HPP, committed cost, sisa budget, piutang, hutang, QC/defect, issue, approval, CCO, jadwal, progress, dan status gate.
-- Finance per proyek: budget/cost code, pemasukan, pengeluaran, piutang, hutang, payment request, approval queue.
-- Progress: schedule/Kurva-S, milestone, laporan harian, laporan mingguan, issue/corrective action.
-- QS: opname dan BA opname.
-- QC: inspection, defect, PIC, deadline, corrective action, closure.
-- CCO/Addendum: nilai, % terhadap RAB, status, approval, lampiran.
-- Procurement: PR, PO/SPK, vendor, committed cost, pembayaran.
-- Dokumen proyek: upload, buka, edit metadata, ganti file, hapus file, version number, audit trail.
-- Alur proyek otomatis: Setup → Pre-Con → Mobilisasi → Pelaksanaan → PHO → Retensi → FHO → Financial Close → CLOSED.
-- Close-Out: checklist standar, dokumen PHO/as-built/FHO/final reconciliation, retensi, evaluasi otomatis.
-- Audit Log: UPSERT, DELETE, upload/edit/delete dokumen, login, sinkronisasi status.
-- Master Data: RAB, surat, vendor, tukang/crew, aset, pelatihan, proyeksi, dan user tetap memakai collection D1 lama.
-
-## Dokumen wajib per gate
-
-| Gate | Dokumen wajib |
-|---|---|
-| Project Setup | CONTRACT, RAB_BASELINE, DED_FINAL, TIME_SCHEDULE |
-| Pre-Construction | PCM, MC0 |
-| PHO | PHO_BAST, AS_BUILT |
-| FHO | FHO_BAST bila FHO/retensi diwajibkan |
-| Financial Close-Out | FINAL_RECONCILIATION |
-
-Dokumen lain seperti bukti pembayaran, BA opname, bukti QC, addendum/CCO, PO/SPK, delivery receipt, dan retensi dapat di-upload dari form terkait atau menu Dokumen.
-
-## Aturan CLOSED
-
-Proyek hanya menjadi `CLOSED` ketika seluruh gate terpenuhi. Sistem memblokir penutupan bila masih ada progress <100%, QC/defect/issue terbuka, dokumen PHO/as-built belum ada, retensi/FHO belum selesai jika berlaku, piutang/hutang masih tersisa, CCO/approval/payment request belum selesai, checklist close-out masih terbuka, atau final reconciliation belum di-upload.
-
-## Struktur teknis
-
-- Cloudflare Worker: `src/worker.js`
-- Cloudflare D1: binding `DB`
-- Cloudflare R2: binding `FILES`, bucket produksi `kendali-natara-files-v2`
+- Worker: `kendali-natara-v2`
+- D1: `kendali-natara-db-v2`
+- D1 ID: `04849d77-cb23-4d50-9cfc-4e0d9c542d6b`
+- R2: `kendali-natara-files-v2`
 - Static assets: `public/`
-- Migration: `migrations/0011_project_control_end_to_end.sql`
-- Konfigurasi: `wrangler.jsonc`
 
-Migration bersifat additive: data `app_records` lama tidak dihapus.
+Data lama tetap berada di `app_records`; migration baru bersifat additive.
 
-## Binding produksi yang digunakan
+## Perubahan utama
 
-Paket V2.8.1 ini sudah memakai resource KENDALI lama agar data proyek/karyawan tetap tersambung:
+1. Dashboard per proyek memiliki grafik **Rencana vs Aktual/Realisasi** berdasarkan Progress Harian/Mingguan yang diinput.
+2. Project Manager, Pelaksana, QS, QC, Admin Teknik dan field PIC lain memakai **dropdown master karyawan**.
+3. Keuangan dipisahkan jelas menjadi baseline/HPP, Piutang, Cash In, Hutang, Cash Out, dan Pengajuan Dana.
+4. **Pengajuan Dana Karyawan** memiliki workflow Draft → Pending → Approved/Rejected → Paid; Paid otomatis membuat Cash Out.
+5. Opname menjelaskan fungsi QS/Quantity Surveyor dan menyimpan volume kontrak, periode, serta volume terverifikasi.
+6. QC memiliki daftar semua item pekerjaan, sync dari RAB, inspeksi berulang, upload bukti wajib, defect otomatis, dan re-inspection.
+7. CCO dikunci sesuai alur Pelaksana/PM → Admin → QS → Admin → Client → Addendum → Closed, termasuk kontrol 8%/10%.
+8. Procurement menjelaskan dan memisahkan PR dari PO/SPK; PO/SPK aktif otomatis membentuk payable/outstanding.
+9. Menu **Karyawan & Akses** untuk membuat akun, role, jabatan, unit, departemen, status, dan password.
+10. RBAC berlaku di frontend dan backend API.
 
-- D1 binding `DB`: `kendali-natara-db-v2`
-- D1 database ID: `04849d77-cb23-4d50-9cfc-4e0d9c542d6b`
-- R2 binding `FILES`: `kendali-natara-files-v2`
 
-Tidak perlu mengganti nilai tersebut untuk redeploy KENDALI yang sama. Tetap lakukan backup D1 sebelum migration produksi.
+## Pembatasan proyek per user
+
+Role **Project Manager** dan **Pelaksana Lapangan** sekarang memakai pembatasan proyek sampai level data/API, bukan hanya filter tampilan.
+
+- Project Manager hanya melihat proyek yang field `pmUserId`-nya menunjuk ke akun tersebut.
+- Pelaksana Lapangan hanya melihat proyek yang field `pelaksanaUserId`-nya menunjuk ke akun tersebut.
+- Kompatibilitas data lama tetap didukung melalui `pmUsername`, `projectManagerUsername`, `pengawasUsername`, dan `pelaksanaUsername`.
+- Dashboard, daftar proyek, progress, issue, CCO, PR, pengajuan dana, dokumen, flow, QC-related data, dan endpoint legacy ikut tersaring berdasarkan proyek yang ditugaskan.
+- Akses file R2 melalui adapter legacy juga memeriksa scope proyek.
+- Angka Cash In/Cash Out/Piutang/Hutang tidak dikirim di response dashboard untuk role yang tidak mempunyai menu Finance.
+
+Penugasan dilakukan oleh role yang berwenang pada **Master Proyek** melalui dropdown Project Manager dan Pelaksana Lapangan. Jika akun PM/Pelaksana belum dipasang pada proyek, proyek tersebut tidak akan muncul pada akun itu.
 
 ## Deploy
 
+Build command:
+
 ```bash
-npm install
 npm run build
-npm run deploy
 ```
 
-`npm run deploy` menjalankan preflight, migration remote D1, kemudian deploy Worker + static assets.
-
-Untuk pengembangan lokal:
+Deploy command bila repository memakai Wrangler:
 
 ```bash
-npm install
-npm run dev
+npx wrangler d1 migrations apply DB --remote && npx wrangler deploy
 ```
 
-## Login
+`package.json` tetap memakai dependency Wrangler yang sama seperti versi sebelumnya. Jika repository Git saat ini sudah memiliki `package-lock.json`, pertahankan file lock tersebut agar `npm clean-install`/`npm ci` tetap berjalan.
 
-Untuk **upgrade database lama**, user lama tetap dipertahankan. Migration tidak membuat admin baru bila collection `users` sudah berisi data.
+## Migration
 
-Untuk **database benar-benar baru dan kosong**, migration membuat akun sementara:
+Migration baru: `migrations/0012_full_workflow_roles_qc_cco.sql`.
 
-- Username: `admin`
-- Password: `Kendali#2026!`
+Migration hanya menambah indeks dan metadata versi. Collection baru seperti `qc_work_items` tetap menggunakan arsitektur JSON `app_records`, sehingga tidak memerlukan tabel per modul.
 
-Segera ubah password lewat menu **Ganti password** setelah login pertama.
+## Catatan QC sync dari RAB
 
-## Dokumen: upload, edit, ganti, hapus
+Tombol **Sinkron dari RAB** membaca bentuk data RAB yang umum: `items`, `rows`, `details`, `workItems`, `pekerjaan`, `rabItems`, atau field item/description/uraian pada record. Jika RAB lama tidak menyimpan detail item sebagai struktur data, item QC dapat ditambah manual tanpa menghapus data lama.
 
-Menu **Dokumen** menyediakan empat fungsi:
+## Catatan keamanan workflow
 
-1. **Upload** — simpan file di R2 dan metadata di D1.
-2. **Buka** — file dibaca melalui endpoint KENDALI yang membutuhkan sesi login.
-3. **Edit / Ganti File** — metadata dapat diperbarui tanpa ganti file; bila file baru dipilih, file lama di R2 dihapus, file baru disimpan, dan versi naik.
-4. **Hapus** — menghapus file R2 sekaligus metadata D1 dan mencatat audit log.
-
-Maksimal upload default: 25 MB/file.
-
-## Kontrol keuangan dashboard
-
-- `Pemasukan` = transaksi cash-in berstatus PAID/VERIFIED/RECEIVED/TERBAYAR/DITERIMA/LUNAS, atau data legacy tanpa status.
-- `Pengeluaran` = transaksi cash-out dengan kriteria realisasi yang sama.
-- `Committed Cost` = sisa PO/SPK yang belum selesai/lunas.
-- `Sisa Budget` = Budget − Actual Expense − Committed Cost.
-- `Piutang/Hutang` = nilai outstanding dikurangi nilai yang sudah diterima/dibayar.
-- Budget menggunakan line `project_budget` approved/revised/closed bila tersedia; bila belum ada, fallback ke budget/HPP pada master proyek.
-
-## Upgrade aman
-
-Sebelum deploy produksi:
-
-1. Backup D1 produksi.
-2. Pastikan `database_id` di `wrangler.jsonc` sama dengan D1 KENDALI lama.
-3. Pastikan R2 `kendali-natara-files-v2` benar.
-4. Jalankan `npm run build`.
-5. Jalankan migration.
-6. Deploy.
-7. Uji login, dashboard, CRUD, upload/edit/delete dokumen, dan sinkronisasi status satu proyek uji.
-
-Lihat juga `ALUR-KENDALI.md` dan `DEPLOY-CHECKLIST.md`.
+CCO, Payment Request, PR, dan QC Inspection menggunakan action endpoint khusus. Pengguna tidak dapat mengubah status kritis langsung lewat form biasa untuk melewati gate workflow.
