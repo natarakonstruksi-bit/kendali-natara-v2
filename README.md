@@ -1,46 +1,24 @@
-# KENDALI Natara V3.1.5 — Continuous QC Inspection
+# KENDALI Natara V3.1.6 — Branding & Greeting UI
 
-Versi ini meneruskan V3.1.3 dan mengembalikan pola **Inspeksi QC berkelanjutan** seperti dashboard QC Natara sebelumnya.
+V3.1.6 melanjutkan seluruh fungsi V3.1.5 dan menambahkan identitas visual Natara Konstruksi serta sapaan personal untuk user yang login.
 
-## Perubahan QC utama
+## Perubahan V3.1.6
 
-- Satu proyek mempunyai satu **catatan pemeriksaan yang masih Berjalan**.
-- Catatan menampilkan kartu **Sub-pekerjaan, Sesuai, Tidak sesuai, Kesesuaian**.
-- Identitas catatan: Nama Proyek, tanggal mulai, dan pemeriksa.
-- Tujuh kelompok pekerjaan bawaan:
-  1. Pekerjaan Persiapan
-  2. Pekerjaan Struktur Bawah
-  3. Pekerjaan Struktur Atas
-  4. Pekerjaan Arsitektur
-  5. Pekerjaan Sanitasi
-  6. Pekerjaan Elektrikal
-  7. Pekerjaan Landscaping
-- Di setiap kelompok, QC dapat menambah sub-pekerjaan tanpa batas, memilih **Sesuai / Tidak sesuai**, menulis keterangan, dan mengambil/upload foto.
-- Sub-pekerjaan Tidak sesuai dapat diterbitkan secara batch menjadi Temuan QC.
-- PIC Temuan QC otomatis **Pelaksana Lapangan proyek** sesuai penugasan KENDALI.
-- Catatan pemeriksaan dapat dilanjutkan setiap kunjungan; tidak perlu membuat inspeksi baru setiap kali.
-- Catatan yang sudah ditutup menjadi read-only.
-- Hapus catatan dibatasi untuk Administrator/Direktur/Head Unit Bisnis dan ditolak bila sudah mempunyai temuan.
+- Logo Natara Konstruksi dipasang pada halaman login, sidebar, dashboard, dan favicon.
+- Halaman login didesain ulang menjadi tampilan corporate dua panel.
+- Warna UI memakai aksen terracotta dari logo Natara dengan sidebar dark.
+- Topbar menampilkan `Halo, [nama user]` dan role akun yang sedang login.
+- Dashboard menampilkan welcome banner `Halo, [nama lengkap user]` beserta tanggal dan scope akses proyek.
+- Nama yang ditampilkan selalu berasal dari session user aktif, bukan teks statis.
+- Seluruh fungsi QC Inspection V3.1.5 tetap dipertahankan.
 
-## Data lama
+## Deploy
 
-D1 dan R2 tetap menggunakan resource produksi yang sama. Migration `0014_qc_continuous_inspection.sql` hanya menambahkan index, master tujuh kelompok pekerjaan QC, dan metadata versi. Data proyek, user, PR, progress, ATI, dan dokumen lama tidak dihapus.
-
-## Build & deploy
+Tidak ada migration database baru pada V3.1.6 apabila migration 0014 sudah pernah dijalankan.
 
 ```bash
-npm clean-install --progress=false
 npm run build
-npx wrangler d1 migrations apply DB --remote
 npx wrangler deploy
 ```
 
-Setelah deploy, buka QC Dashboard → **+ Inspeksi Baru** → pilih proyek. Bila proyek sudah mempunyai catatan Berjalan, sistem otomatis membuka catatan yang sama.
-
-## V3.1.5 — Fix fungsi QC Inspection
-
-- Memperbaiki selector scope pada frontend yang membuat event tombol QC tidak pernah terikat.
-- Tombol **Ambil / pilih foto** sekarang membuka file picker dengan benar di desktop/mobile.
-- Tombol **Tambahkan** sekarang menyimpan sub-pekerjaan setelah hasil Sesuai/Tidak sesuai dipilih.
-- Perbaikan helper selector juga memperbaiki potensi masalah serupa pada form PR dan daftar tukang.
-- Tidak ada perubahan schema database; migration baru tidak diperlukan.
+Jika deployment environment belum pernah menjalankan migration 0014, jalankan migration terlebih dahulu.

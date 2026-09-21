@@ -135,9 +135,25 @@ function bindShell(){
   $$('#nav [data-view]').forEach(btn=>btn.onclick=()=>setView(btn.dataset.view));
 }
 function showLogin(){$('#loginScreen').classList.remove('hidden');$('#app').classList.add('hidden');}
+function currentUserName(){return String(state.user?.name||state.user?.fullName||state.user?.username||'User').trim()||'User';}
+function currentUserFirstName(){return currentUserName().split(/\s+/)[0]||'User';}
+function currentRoleLabel(){return state.access?.roleLabel||state.user?.role||'User';}
+function greetingDate(){try{return new Intl.DateTimeFormat('id-ID',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}).format(new Date());}catch{return '';}}
+function updateUserGreeting(){
+  const full=currentUserName(), first=currentUserFirstName(), role=currentRoleLabel();
+  const g=$('#topbarGreeting'), r=$('#topbarRole'), a=$('#topbarAvatar');
+  if(g)g.textContent=`Halo, ${first}`;
+  if(r)r.textContent=role+(assignedProjectScope()?' • Proyek ditugaskan':'');
+  if(a)a.textContent=(full.charAt(0)||'N').toUpperCase();
+}
+function dashboardWelcome(){
+  const full=currentUserName(), role=currentRoleLabel(), scope=assignedProjectScope()?'Proyek yang Anda tangani':'Seluruh proyek sesuai hak akses';
+  return `<section class="dashboard-welcome"><div class="welcome-copy"><span class="eyebrow">KENDALI NATARA KONSTRUKSI</span><h1>Halo, ${esc(full)}</h1><p>${esc(greetingDate())} • ${esc(scope)} • Data dashboard mengikuti input aktual tim.</p></div><div class="welcome-badge"><img src="/assets/natara-mark.png" alt="Natara"><div><b>${esc(role)}</b><span>${esc(full)}</span></div></div></section>`;
+}
 async function enterApp(me){
   state.user=me.user;state.access=me.access;$('#loginScreen').classList.add('hidden');$('#app').classList.remove('hidden');
-  $('#userName').textContent=state.user.name||state.user.username;$('#userRole').textContent=(state.access.roleLabel||state.user.role)+(assignedProjectScope()?' • Proyek ditugaskan saja':'');
+  $('#userName').textContent=currentUserName();$('#userRole').textContent=currentRoleLabel()+(assignedProjectScope()?' • Proyek ditugaskan saja':'');
+  updateUserGreeting();
   applyRoleNavigation();await fullRefresh();
   const preferred=canView('dashboard')?'dashboard':(state.access.views?.[0]||'projects');setView(preferred);
 }
@@ -167,7 +183,7 @@ async function renderDashboard(){
   state.dashboard=await api('/api/dashboard');const all=state.dashboard.projects||[];const rows=state.selectedProjectId?all.filter(x=>x.id===state.selectedProjectId):all;const t=state.dashboard.totals||{};const financeVisible=canView('finance');
   const baseKpis=`<div class="kpis">${kpi('Proyek Aktif',fmtNum(rows.filter(x=>x.evaluatedStatus!=='CLOSED').length,0),'blue')}${kpi('Rata-rata Progress',`${fmtNum(rows.length?rows.reduce((s,x)=>s+num(x.progress),0)/rows.length:0)}%`,'purple')}${kpi('Proyek Delay',fmtNum(rows.filter(x=>String(x.scheduleStatus).toUpperCase()==='DELAY').length,0),'red')}${kpi('QC/Defect Open',fmtNum(rows.reduce((s,x)=>s+num(x.openQc)+num(x.openDefects),0),0),'orange')}${kpi('CCO Pending',fmtNum(rows.reduce((s,x)=>s+num(x.pendingCco),0),0),'orange')}${financeVisible?kpi('Cash In',fmtRp(rows.reduce((s,x)=>s+num(x.income),0)),'green')+kpi('Cash Out',fmtRp(rows.reduce((s,x)=>s+num(x.expense),0)),'red')+kpi('Net Cash',fmtRp(rows.reduce((s,x)=>s+num(x.netCash),0)),'blue'):''}</div>`;
   const cards=rows.map(r=>{const p=state.projects.find(x=>x.id===r.id)?.data||{};return `<div class="project-card"><div class="project-card-head"><div><h3>${esc(r.name)}</h3><div class="project-meta">PM: ${esc(employeeName(p.pmUserId))}<br>Pelaksana: ${esc(employeeName(p.pelaksanaUserId))}</div></div><div>${statusPill(r.evaluatedStatus)}<div class="tiny muted" style="margin-top:5px">${fmtNum(r.progress)}%</div></div></div>${progressChart(r.progressSeries||[])}${financeVisible?`<div class="project-meta">Kontrak ${fmtRp(r.contract)} • HPP ${fmtRp(r.budget)} • Cash In ${fmtRp(r.income)} • Cash Out ${fmtRp(r.expense)}</div>`:`<div class="project-meta">Schedule: ${esc(r.scheduleStatus)} • QC open: ${fmtNum(r.openQc,0)} • Defect open: ${fmtNum(r.openDefects,0)}</div>`}</div>`;}).join('')||'<div class="card"><div class="empty">Belum ada proyek.</div></div>';
-  $('#content').innerHTML=baseKpis+`<div class="project-grid">${cards}</div>`+dashboardTable(rows,financeVisible);
+  $('#content').innerHTML=dashboardWelcome()+baseKpis+`<div class="project-grid">${cards}</div>`+dashboardTable(rows,financeVisible);
 }
 function dashboardTable(rows,financeVisible){return `<div class="card"><div class="card-head"><div><h3>Kontrol Semua Proyek</h3><p>Progress berasal dari input terbaru. Status proyek dievaluasi melalui gate.</p></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Proyek</th><th>Progress</th><th>Schedule</th><th>QC</th><th>CCO</th>${financeVisible?'<th>Kontrak</th><th>Cash In</th><th>Cash Out</th><th>Net Cash</th>':''}<th>Status</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${fmtNum(r.progress)}%</td><td>${statusPill(r.scheduleStatus)}</td><td>${fmtNum(num(r.openQc)+num(r.openDefects),0)}</td><td>${fmtNum(r.pendingCco,0)}</td>${financeVisible?`<td class="num">${fmtRp(r.contract)}</td><td class="num">${fmtRp(r.income)}</td><td class="num">${fmtRp(r.expense)}</td><td class="num">${fmtRp(r.netCash)}</td>`:''}<td>${statusPill(r.evaluatedStatus)}</td></tr>`).join('')||'<tr><td colspan="10" class="empty">Belum ada data.</td></tr>'}</tbody></table></div></div>`;}
 

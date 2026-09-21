@@ -3,27 +3,44 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#101828" />
-  <title>KENDALI Natara — Full Project Workflow</title>
+  <meta name="theme-color" content="#111111" />
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <title>KENDALI — Natara Konstruksi</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <div id="loginScreen" class="login-screen hidden">
-    <form id="loginForm" class="login-card">
-      <div class="brand-mark">K</div>
-      <h1>KENDALI Natara</h1>
-      <p>Project Control • Finance • QC • CCO • Procurement</p>
-      <label>Username / Email<input id="loginUsername" autocomplete="username" required /></label>
-      <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
-      <label class="check"><input id="loginRemember" type="checkbox" /> Ingat saya</label>
-      <button class="btn primary wide" type="submit">Masuk</button>
-      <div id="loginError" class="form-error"></div>
-    </form>
+    <div class="login-shell">
+      <section class="login-brand-panel">
+        <div class="login-brand-inner">
+          <img class="login-logo" src="/assets/natara-logo.jpeg" alt="Natara Konstruksi" />
+          <div class="login-brand-copy">
+            <span class="eyebrow">PROJECT CONTROL SYSTEM</span>
+            <h1>KENDALI</h1>
+            <p>Satu pusat kendali operasional Natara Konstruksi untuk proyek, progres, QC, procurement, keuangan, dan close-out.</p>
+          </div>
+          <div class="login-brand-foot">Natara Konstruksi • CV. Syarikah Konstruksi Indonesia</div>
+        </div>
+      </section>
+      <form id="loginForm" class="login-card">
+        <div class="login-form-head">
+          <img class="login-form-mark" src="/assets/natara-mark.png" alt="Natara" />
+          <div><span class="eyebrow dark">KENDALI NATARA</span><h2>Selamat datang</h2></div>
+        </div>
+        <p class="login-lead">Masuk menggunakan akun KENDALI yang telah diberikan sesuai role Anda.</p>
+        <label>Username / Email<input id="loginUsername" autocomplete="username" placeholder="Masukkan username atau email" required /></label>
+        <label>Password<input id="loginPassword" type="password" autocomplete="current-password" placeholder="Masukkan password" required /></label>
+        <label class="check"><input id="loginRemember" type="checkbox" /> Ingat saya di perangkat ini</label>
+        <button class="btn primary wide login-submit" type="submit">Masuk ke KENDALI</button>
+        <div id="loginError" class="form-error"></div>
+        <div class="login-security">Akses, menu, dan proyek otomatis mengikuti role serta penugasan akun.</div>
+      </form>
+    </div>
   </div>
 
   <div id="app" class="app hidden">
     <aside id="sidebar" class="sidebar">
-      <div class="brand"><div class="brand-mark sm">K</div><div><b>KENDALI</b><span>Natara V3.1.5 QC Function Fix</span></div></div>
+      <div class="brand"><div class="brand-logo-wrap"><img src="/assets/natara-mark.png" alt="Natara Konstruksi" /></div><div><b>KENDALI</b><span>Natara Konstruksi • V3.1.6</span></div></div>
       <nav id="nav">
         <button data-view="dashboard" class="nav-item active">▦ Dashboard</button>
         <button data-view="projects" class="nav-item">▣ Proyek</button>
@@ -52,7 +69,11 @@
     <main class="main">
       <header class="topbar">
         <button id="burger" class="icon-btn" aria-label="Menu">☰</button>
-        <div><h2 id="pageTitle">Dashboard</h2><p id="pageSubtitle">Kontrol proyek berdasarkan data aktual yang diinput tim.</p></div>
+        <div class="page-heading"><h2 id="pageTitle">Dashboard</h2><p id="pageSubtitle">Kontrol proyek berdasarkan data aktual yang diinput tim.</p></div>
+        <div class="topbar-user" id="topbarUser">
+          <div class="user-avatar" id="topbarAvatar">N</div>
+          <div><b id="topbarGreeting">Halo</b><span id="topbarRole">Natara Konstruksi</span></div>
+        </div>
         <div class="top-actions"><select id="globalProjectFilter"><option value="">Semua proyek</option></select><button id="refreshBtn" class="btn ghost">↻ Refresh</button></div>
       </header>
       <section id="content" class="content"><div class="loading"><div class="spinner"></div>Memuat KENDALI…</div></section>
@@ -79,7 +100,7 @@
       if (login && app && login.classList.contains('hidden') && app.classList.contains('hidden')) {
         login.classList.remove('hidden');
         var card = login.querySelector('.login-card');
-        if (card) card.innerHTML = '<div class="brand-mark">K</div><h1>KENDALI Natara</h1><p>Aplikasi gagal dimuat.</p><div class="form-error" style="display:block">Frontend tidak berhasil dijalankan. Muat ulang halaman. Jika tetap muncul, gunakan build V3.1.5 atau periksa Console browser.</div><button class="btn primary wide" type="button" onclick="location.reload()">Muat Ulang</button>';
+        if (card) card.innerHTML = '<img src="/assets/natara-mark.png" alt="Natara" style="width:64px;height:64px;border-radius:16px;margin-bottom:14px"><h1>KENDALI Natara</h1><p>Aplikasi gagal dimuat.</p><div class="form-error" style="display:block">Frontend tidak berhasil dijalankan. Muat ulang halaman. Jika tetap muncul, gunakan build V3.1.6 atau periksa Console browser.</div><button class="btn primary wide" type="button" onclick="location.reload()">Muat Ulang</button>';
       }
     }, 3500);
   </script>

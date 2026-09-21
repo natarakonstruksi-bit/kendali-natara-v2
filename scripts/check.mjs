@@ -6,7 +6,8 @@ const root = path.resolve(import.meta.dirname, '..');
 const required = [
   'src/worker.js','public/index.html','public/styles.css','public/app.js',
   'migrations/0011_project_control_end_to_end.sql','migrations/0012_full_workflow_roles_qc_cco.sql','migrations/0013_field_pr_qc_ati.sql','migrations/0014_qc_continuous_inspection.sql',
-  'wrangler.jsonc','package.json','README.md','ROLE-MATRIX.md','ALUR-KENDALI.md'
+  'wrangler.jsonc','package.json','README.md','ROLE-MATRIX.md','ALUR-KENDALI.md',
+  'public/assets/natara-logo.jpeg','public/assets/natara-mark.png','public/assets/favicon.png'
 ];
 for (const rel of required) if (!fs.existsSync(path.join(root,rel))) throw new Error(`File wajib tidak ditemukan: ${rel}`);
 execFileSync(process.execPath,['--check',path.join(root,'src/worker.js')],{stdio:'inherit'});
@@ -61,4 +62,7 @@ if(!app.includes('function resolveDomRoot(root=document)')) throw new Error('Sco
 if(!app.includes('globalThis.__kendaliDom={resolveDomRoot,$,$$}')) throw new Error('Runtime DOM helper test hook hilang.');
 if(!app.includes('Ambil / pilih foto')) throw new Error('Tombol file picker QC hilang.');
 
-console.log('KENDALI V3.1.5 QC Function Fix preflight OK');
+for(const marker of ['dashboardWelcome','Halo, ${esc(full)}','topbarGreeting','/assets/natara-mark.png']) if(!app.includes(marker)) throw new Error(`Branding/greeting marker hilang: ${marker}`);
+for(const marker of ['/assets/natara-logo.jpeg','Natara Konstruksi • V3.1.6','topbarGreeting']) if(!html.includes(marker)) throw new Error(`Branding HTML marker hilang: ${marker}`);
+
+console.log('KENDALI V3.1.6 Branding & Greeting UI preflight OK');
