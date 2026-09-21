@@ -1,31 +1,33 @@
-# ROLE MATRIX — KENDALI NATARA V3.0.1
+# Role Matrix KENDALI V3.1
 
-Role di bawah mengontrol dua lapis sekaligus: menu frontend dan API backend. Menyembunyikan menu saja tidak dianggap cukup; request API yang tidak sesuai role juga ditolak.
-
-| Role | Akses Utama | Hak Kunci |
+| Role | Akses Utama | Scope Proyek |
 |---|---|---|
-| Administrator | Semua modul | Full CRUD, user/role, audit, seluruh workflow |
-| Direktur | Semua modul | Full control dan keputusan manajemen |
-| Head Unit Bisnis | Semua modul | Full control unit bisnis |
-| Manager Operasional | Operasional lintas proyek + monitoring finance | Proyek, progress, opname, QC, CCO, PR, closeout, approval tertentu |
-| Admin Teknik | Administrasi proyek | Project admin, dokumen, routing CCO, monitoring progress/QC/finance |
-| Project Manager | **Hanya proyek yang ditugaskan sebagai PM** | Progress, issue, QC monitoring, CCO, PR, pengajuan dana pada proyek tersebut |
-| Pelaksana Lapangan | **Hanya proyek yang ditugaskan sebagai Pelaksana** | Progress, QC/defect lapangan, CCO request, PR, pengajuan dana pada proyek tersebut |
-| QS / Quantity Surveyor | Komersial/QS | Opname, RAB, pricing CCO, dokumen terkait |
-| QC / Quality Control | Mutu | Item QC, inspection + upload wajib, defect, re-inspection |
-| Finance | Keuangan | Piutang, Cash In, hutang, Cash Out, approval/bayar pengajuan dana |
-| Logistik / Procurement | Pengadaan | PR, PO/SPK, vendor, delivery |
-| Viewer | Baca terbatas | Dashboard, proyek, dokumen, alur |
+| Administrator | Administrasi sistem, seluruh menu/data, karyawan, audit; **tidak mengambil keputusan vendor PR** | Semua |
+| Direktur | Monitoring seluruh menu/data; **tidak mengambil keputusan vendor PR** | Semua |
+| Head Unit Bisnis | Kontrol bisnis dan **pemilihan vendor PR** | Semua |
+| Manager Operasional / Head Operational | Operasional, QC, CCO, PR dan **pemilihan vendor PR** | Semua |
+| Admin Teknik | Administrasi proyek, dokumen, routing, PR/vendor data | Semua |
+| Project Manager | Proyek, progress, QC monitoring, CCO, PR | Hanya proyek yang ditangani |
+| Pelaksana Lapangan | Laporan harian, progress, QC corrective action, CCO/PR | Hanya proyek yang ditangani |
+| QS | Opname, RAB/CCO pricing | Sesuai akses role |
+| QC | Temuan, verifikasi QC, bukti | Sesuai akses role |
+| Finance | Finance, pengajuan dana, payroll view | Semua sesuai role |
+| Logistik / Procurement | PR vendor comparison, PO/SPK, vendor | Semua sesuai role |
+| Kepala ATI | Talent pool, upah/kehadiran, asesmen, pelatihan | ATI |
+| Instruktur ATI | Asesmen, pelatihan, monitoring talent | ATI |
+| Viewer | Read-only | Sesuai data yang diizinkan |
 
-## Prinsip keamanan
+## PIC yang dikunci
 
-1. Status workflow kritis CCO, Payment Request, dan PR tidak dapat dilompati dengan edit biasa. Perubahan status harus melalui endpoint action.
-2. Pelaksana/PM hanya dapat mengedit CCO draft/returned yang diajukan sendiri.
-3. Karyawan non-Finance hanya dapat mengedit Payment Request miliknya saat masih Draft/Rejected.
-4. QC Inspection dibuat sebagai log baru dan bukti file wajib. Log inspeksi lama tidak diedit untuk mengganti histori.
-5. Hanya Administrator/Direktur/Head Unit Bisnis yang dapat menambah atau mengubah akun karyawan dan role.
-6. Project Manager dan Pelaksana Lapangan menggunakan **row-level project scope**. Daftar proyek, dashboard, record proyek, workflow action, dokumen, dan file storage untuk proyek lain ditolak oleh backend.
-7. Scope Project Manager membaca `pmUserId` (plus field legacy PM), sedangkan scope Pelaksana membaca `pelaksanaUserId` (plus field legacy pengawas/pelaksana).
-8. Pembatasan project scope tidak hanya menyembunyikan dropdown/menu; request API langsung ke ID proyek lain menghasilkan 403 atau daftar kosong.
-9. Data finansial detail pada dashboard tidak dikirim ke role yang tidak memiliki akses modul Finance.
+- Laporan Harian/Mingguan: **Pelaksana Lapangan**.
+- Schedule/Milestone/Issue lapangan: **Pelaksana Lapangan**.
+- Temuan/perbaikan QC: **Pelaksana Lapangan** sebagai PIC perbaikan; verifikasi oleh **QC**.
+- Opname: **QS / Quantity Surveyor**.
+- CCO pengaju lapangan: **Project Manager atau Pelaksana Lapangan**.
+- PO/SPK: **Logistik / Procurement**.
+- Surat: **Admin Teknik**.
+- Retensi: **Finance/Admin Teknik/Manager Operasional**.
+- Close-Out: **Admin Teknik/Manager Operasional/Project Manager**.
 
+- Pengajuan Dana: **Pengaju = user yang sedang login**; tidak tersedia dropdown untuk memilih orang lain.
+- Purchase Request: pemilik/pengaju = **Project Manager yang ditugaskan pada proyek**; vendor dipilih hanya oleh **Head Operational atau Head Unit Bisnis**.

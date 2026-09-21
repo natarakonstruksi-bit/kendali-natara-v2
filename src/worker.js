@@ -1,9 +1,9 @@
 /**
- * KENDALI Natara V3.0 — Full Workflow & Role Control
+ * KENDALI Natara V3.1 — Field, Procurement, QC & ATI
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.0.1";
+const APP_VERSION = "APP-V3.1";
 const SERVICE_NAME = "KENDALI Natara Project Control";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -21,13 +21,13 @@ const COLLECTIONS = new Set([
   "project_budget", "cash_in", "cash_out", "receivables", "payables", "payment_requests",
   "daily_progress", "weekly_progress", "opname", "qc_inspections", "defects", "cco", "approvals",
   "milestones", "retention", "closeout", "project_documents", "issues", "schedule", "procurement",
-  "qc_work_items"
+  "qc_work_items", "daily_workers", "qc_actions", "qc_verifications", "ati_assessments", "ati_work_requests", "ati_field_issues", "ati_issue_evaluations"
 ]);
 
 const PROJECT_SCOPED_COLLECTIONS = new Set([
   "projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests",
   "daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones",
-  "retention","closeout","project_documents","issues","schedule","procurement","qc_work_items"
+  "retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations"
 ]);
 
 const DOC_CORE = ["CONTRACT", "RAB_BASELINE", "DED_FINAL", "TIME_SCHEDULE"];
@@ -49,22 +49,26 @@ const ROLE_LABELS = {
   qc: "QC / Quality Control",
   finance: "Finance",
   procurement: "Logistik / Procurement",
+  kepala_ati: "Kepala ATI",
+  instruktur_ati: "Instruktur ATI",
   viewer: "Viewer"
 };
 
-const ALL_VIEWS = ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","documents","flow","closeout","employees","master","audit"];
+const ALL_VIEWS = ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","employees","master","audit"];
 const ROLE_VIEWS = {
   administrator: ALL_VIEWS,
   direktur: ALL_VIEWS,
   head_unit_bisnis: ALL_VIEWS,
-  manager_operasional: ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","documents","flow","closeout","master","audit"],
-  admin_teknik: ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","documents","flow","closeout","master"],
+  manager_operasional: ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","master","audit"],
+  admin_teknik: ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","master"],
   project_manager: ["dashboard","projects","fund_requests","progress","opname","qc","cco","procurement","documents","flow","closeout"],
   pelaksana_lapangan: ["dashboard","projects","fund_requests","progress","qc","cco","procurement","documents","flow"],
   qs: ["dashboard","projects","fund_requests","progress","opname","cco","documents","flow"],
   qc: ["dashboard","projects","fund_requests","progress","qc","documents","flow"],
   finance: ["dashboard","projects","finance","fund_requests","procurement","documents","flow","closeout"],
   procurement: ["dashboard","projects","fund_requests","procurement","documents","flow"],
+  kepala_ati: ["dashboard","ati","progress","documents","master"],
+  instruktur_ati: ["dashboard","ati","documents","master"],
   viewer: ["dashboard","projects","documents","flow"]
 };
 
@@ -75,7 +79,7 @@ function normalizeRole(input) {
     ["admin","administrator"],["administrator","administrator"],["superadmin","administrator"],["super admin","administrator"],
     ["direktur","direktur"],["director","direktur"],["ceo","direktur"],
     ["head unit bisnis","head_unit_bisnis"],["head bu","head_unit_bisnis"],["head unit","head_unit_bisnis"],
-    ["manager operasional","manager_operasional"],["manajer operasional","manager_operasional"],
+    ["manager operasional","manager_operasional"],["manajer operasional","manager_operasional"],["head operational","manager_operasional"],["head operasional","manager_operasional"],["spv operasional","manager_operasional"],
     ["admin teknik","admin_teknik"],["administrasi teknik","admin_teknik"],["administrasi proyek","admin_teknik"],
     ["project manager","project_manager"],["pm","project_manager"],
     ["pelaksana lapangan","pelaksana_lapangan"],["pelaksana","pelaksana_lapangan"],["pengawas","pelaksana_lapangan"],["pengawas lapangan","pelaksana_lapangan"],
@@ -83,6 +87,8 @@ function normalizeRole(input) {
     ["quality control","qc"],["qc / quality control","qc"],["qc","qc"],["qc arsitektur","qc"],["qc interior","qc"],["qc mep","qc"],
     ["finance","finance"],["keuangan","finance"],["finance officer","finance"],
     ["logistik","procurement"],["logistik / procurement","procurement"],["procurement","procurement"],["purchasing","procurement"],["logistik procurement","procurement"],
+    ["kepala ati","kepala_ati"],["head ati","kepala_ati"],["manager ati","kepala_ati"],
+    ["instruktur ati","instruktur_ati"],["instruktur","instruktur_ati"],["trainer ati","instruktur_ati"],
     ["viewer","viewer"]
   ]);
   return aliases.get(s) || (ROLE_LABELS[s] ? s : "viewer");
@@ -183,22 +189,29 @@ function collectionPermission(user, collection) {
   if (collection === "project_budget") return allow(["finance","manager_operasional","admin_teknik","qs","project_manager"],["finance","qs","manager_operasional","admin_teknik"]);
   if (collection === "payment_requests") return allow(["finance","manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","procurement"],["finance","manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","procurement"],["finance","manager_operasional"]);
   if (["daily_progress","weekly_progress","schedule","milestones","issues"].includes(collection)) return allow(fieldReaders,projectOps);
+  if (collection === "daily_workers") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","finance","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan"],["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan"]);
+  if (["qc_actions","qc_verifications"].includes(collection)) return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qc"],[],[]);
+  if (collection === "ati_assessments") return allow(["manager_operasional","admin_teknik","project_manager","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
+  if (collection === "ati_work_requests") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","project_manager","kepala_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
+  if (collection === "ati_field_issues") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
+  if (collection === "ati_issue_evaluations") return allow(["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
   if (collection === "opname") return allow(["manager_operasional","admin_teknik","project_manager","qs"],["manager_operasional","admin_teknik","qs"]);
   if (collection === "qc_work_items") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"],["manager_operasional","qc"]);
   if (collection === "qc_inspections") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"],[],["manager_operasional"]);
   if (collection === "defects") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"],["manager_operasional","project_manager","pelaksana_lapangan","qc"]);
   if (collection === "cco") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs"],["manager_operasional","admin_teknik","qs","project_manager","pelaksana_lapangan"],["manager_operasional"]);
   if (collection === "approvals") return allow(["manager_operasional","admin_teknik","finance"],["manager_operasional","admin_teknik","finance"]);
-  if (collection === "procurement") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","procurement","finance"],["manager_operasional","project_manager","pelaksana_lapangan","procurement"]);
+  if (collection === "procurement") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","procurement","finance"],["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","procurement"]);
   if (collection === "po") return allow(["manager_operasional","admin_teknik","project_manager","procurement","finance"],["manager_operasional","procurement","finance"]);
   if (collection === "project_documents") return allow(projectReaders,["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","finance","procurement"],["manager_operasional"]);
   if (["retention","closeout"].includes(collection)) return allow(["manager_operasional","admin_teknik","project_manager","finance"],["manager_operasional","admin_teknik","finance"]);
   if (collection === "rabs") return allow(["manager_operasional","admin_teknik","project_manager","qs"],["manager_operasional","admin_teknik","qs"]);
   if (collection === "surat") return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
   if (collection === "vendor") return allow(["manager_operasional","admin_teknik","procurement","finance"],["manager_operasional","procurement","finance"]);
-  if (collection === "tukang") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan"],["manager_operasional","project_manager","pelaksana_lapangan"]);
+  if (collection === "tukang") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","finance","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
   if (collection === "aset") return allow(["manager_operasional","admin_teknik","procurement"],["manager_operasional","admin_teknik"]);
-  if (["pelatihan","proyeksi"].includes(collection)) return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
+  if (collection === "pelatihan") return allow(["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"]);
+  if (collection === "proyeksi") return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
   return allow();
 }
 
@@ -221,9 +234,12 @@ function buildAccess(user) {
       ccoEscalation: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       financeApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","finance"]),
       financePay: roleIn(user,["administrator","direktur","head_unit_bisnis","finance"]),
-      procurementApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
+      procurementApprove: roleIn(user,["head_unit_bisnis","manager_operasional"]),
+      procurementVendorSelect: roleIn(user,["head_unit_bisnis","manager_operasional"]),
       procurementOrder: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","procurement"]),
       qcInspect: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","qc"]),
+      qcVerify: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","qc"]),
+      atiManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","kepala_ati","instruktur_ati"]),
       qcSyncRab: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","qc","qs"])
     }
   };
@@ -1208,17 +1224,107 @@ async function paymentRequestActionHandler(request,env,user,id) {
   d.status=next; const out=await upsertRecord(env,"payment_requests",id,d,user); await audit(env,user,"PAYMENT_REQUEST_ACTION","payment_requests",id,d.projectId||"",{action,from:old,to:next}); return json({ok:true,row:out});
 }
 
+
+async function employeeRoleKey(env,id) {
+  if (!id) return "";
+  const rec=await getRecord(env,"users",String(id));
+  return rec ? normalizeRole(rec.data) : "";
+}
+
+async function projectAssignment(env,projectId,key) {
+  const p=await getRecord(env,"projects",String(projectId || ""));
+  if (!p) return "";
+  const fields = key === "pelaksana" ? ["pelaksanaUserId","pengawasUserId"] : key === "pm" ? ["pmUserId","projectManagerUserId"] : [];
+  for (const f of fields) if (p.data[f]) return String(p.data[f]);
+  return "";
+}
+
+async function normalizeOperationalResponsibility(env,collection,data) {
+  const d={...data};
+  if (["daily_progress","weekly_progress"].includes(collection)) {
+    const assigned=await projectAssignment(env,d.projectId,"pelaksana");
+    if (assigned) d.picUserId=assigned;
+    if (!d.picUserId) throw new Error("Proyek belum memiliki Pelaksana Lapangan. Tetapkan Pelaksana pada master proyek terlebih dahulu.");
+    if ((await employeeRoleKey(env,d.picUserId)) !== "pelaksana_lapangan") throw new Error("PIC laporan progress wajib Pelaksana Lapangan.");
+  }
+  if (["schedule","milestones","issues"].includes(collection) && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "pelaksana_lapangan") throw new Error("PIC pelaksanaan wajib Pelaksana Lapangan.");
+  if (collection === "defects" && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "pelaksana_lapangan") throw new Error("PIC perbaikan QC wajib Pelaksana Lapangan.");
+  if (collection === "opname" && d.qsUserId && (await employeeRoleKey(env,d.qsUserId)) !== "qs") throw new Error("PIC Opname wajib QS / Quantity Surveyor.");
+  if (collection === "po" && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "procurement") throw new Error("PIC PO/SPK wajib Logistik / Procurement.");
+  if (collection === "cco" && d.requestedByUserId) { const rk=await employeeRoleKey(env,d.requestedByUserId); if(!["project_manager","pelaksana_lapangan"].includes(rk)) throw new Error("Pengaju lapangan CCO wajib Project Manager atau Pelaksana Lapangan."); }
+  if (collection === "surat" && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "admin_teknik") throw new Error("PIC administrasi surat wajib Admin Teknik.");
+  if (collection === "aset" && d.picUserId) { const rk=await employeeRoleKey(env,d.picUserId); if(!["procurement","admin_teknik"].includes(rk)) throw new Error("PIC aset wajib Logistik/Procurement atau Admin Teknik."); }
+  if (collection === "retention" && d.picUserId) { const rk=await employeeRoleKey(env,d.picUserId); if(!["finance","admin_teknik","manager_operasional"].includes(rk)) throw new Error("PIC retensi wajib Finance/Admin Teknik/Manager Operasional."); }
+  if (collection === "closeout" && d.ownerUserId) { const rk=await employeeRoleKey(env,d.ownerUserId); if(!["admin_teknik","manager_operasional","project_manager"].includes(rk)) throw new Error("PIC close-out wajib Admin Teknik/Manager Operasional/Project Manager."); }
+  return d;
+}
+
+function normalizePrArrays(d) {
+  const out={...d};
+  out.items=Array.isArray(out.items)?out.items:[];
+  out.vendorOffers=Array.isArray(out.vendorOffers)?out.vendorOffers:[];
+  out.items=out.items.map((x,i)=>({id:String(x.id||crypto.randomUUID()),description:String(x.description||x.item||"").trim(),qty:num(x.qty),unit:String(x.unit||""),hppUnit:num(x.hppUnit),totalHpp:num(x.totalHpp)||num(x.qty)*num(x.hppUnit),notes:String(x.notes||"")})).filter(x=>x.description);
+  out.vendorOffers=out.vendorOffers.map(x=>({id:String(x.id||crypto.randomUUID()),vendorId:String(x.vendorId||""),vendorName:String(x.vendorName||""),vendorVmlId:String(x.vendorVmlId||""),amount:num(x.amount),term:String(x.term||""),leadTime:String(x.leadTime||""),notes:String(x.notes||""),quoteDocumentId:String(x.quoteDocumentId||"")})).filter(x=>x.vendorId||x.vendorName);
+  out.totalHpp=out.items.reduce((a,x)=>a+num(x.totalHpp),0);
+  return out;
+}
+
+async function qcFindingActionHandler(request,env,user,id) {
+  const rec=await getRecord(env,"defects",id); if(!rec) return json({ok:false,message:"Temuan QC tidak ditemukan."},404);
+  const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
+  let action="", note="", file=null, result="";
+  const ct=request.headers.get("content-type")||"";
+  if(ct.includes("multipart/form-data")) { const fd=await request.formData(); action=String(fd.get("action")||"").toLowerCase(); note=String(fd.get("note")||fd.get("description")||""); result=String(fd.get("result")||"").toUpperCase(); file=fd.get("file"); }
+  else { const b=await parseJson(request)||{}; action=String(b.action||"").toLowerCase(); note=String(b.note||b.description||""); result=String(b.result||"").toUpperCase(); }
+  const d={...rec.data}; const old=String(d.status||"OPEN").toUpperCase();
+  const role=normalizeRole(user); const isPic=d.picUserId && String(d.picUserId)===String(user.id);
+  if(action==="start") {
+    if(!isPic && !roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","project_manager"])) return json({ok:false,message:"Hanya PIC Pelaksana atau manajemen proyek yang dapat memulai perbaikan."},403);
+    if(!["OPEN","REVISION REQUIRED"].includes(old)) return json({ok:false,message:"Temuan tidak berada pada status yang dapat mulai dikerjakan."},409);
+    d.status="ON PROGRESS"; d.startedAt=new Date().toISOString(); d.startedByUserId=user.id;
+  } else if(action==="submit-fix") {
+    if(!isPic && !roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","project_manager"])) return json({ok:false,message:"Hanya PIC Pelaksana atau manajemen proyek yang dapat mengirim hasil perbaikan."},403);
+    if(old!=="ON PROGRESS") return json({ok:false,message:"Temuan harus ON PROGRESS sebelum dikirim ke QC."},409);
+    if(!(file instanceof File) || file.size<=0) return json({ok:false,message:"Foto hasil perbaikan wajib di-upload."},400);
+    const aid=crypto.randomUUID(); const doc=await storeEvidenceDocument(env,user,file,{projectId:d.projectId,category:"QC_EVIDENCE",title:`Hasil Perbaikan QC - ${d.item||d.area||id}`,notes:note,relatedCollection:"qc_actions",relatedId:aid});
+    await upsertRecord(env,"qc_actions",aid,{projectId:d.projectId,findingId:id,date:new Date().toISOString().slice(0,10),action:"SUBMIT_FIX",description:note,afterDocumentId:doc.id,byUserId:user.id},user);
+    d.status="WAITING QC CHECK"; d.lastFixDocumentId=doc.id; d.lastFixNote=note; d.submittedFixAt=new Date().toISOString();
+  } else if(action==="verify") {
+    if(!buildAccess(user).capabilities.qcVerify) return json({ok:false,message:"Hanya QC/Manajemen yang dapat memverifikasi perbaikan."},403);
+    if(old!=="WAITING QC CHECK") return json({ok:false,message:"Temuan belum menunggu verifikasi QC."},409);
+    if(!["SESUAI","TIDAK SESUAI"].includes(result)) return json({ok:false,message:"Hasil verifikasi wajib SESUAI atau TIDAK SESUAI."},400);
+    if(result==="TIDAK SESUAI" && !note.trim()) return json({ok:false,message:"Catatan QC wajib diisi jika hasil tidak sesuai."},400);
+    const vid=crypto.randomUUID(); await upsertRecord(env,"qc_verifications",vid,{projectId:d.projectId,findingId:id,date:new Date().toISOString().slice(0,10),result,note,qcUserId:user.id},user);
+    d.status=result==="SESUAI"?"CLOSED":"REVISION REQUIRED"; d.lastVerificationId=vid; d.verifiedAt=new Date().toISOString(); d.qcNote=note;
+    if(result==="SESUAI") d.closedAt=new Date().toISOString();
+  } else return json({ok:false,message:"Action QC tidak dikenal."},400);
+  const out=await upsertRecord(env,"defects",id,d,user); await audit(env,user,"QC_FINDING_ACTION","defects",id,d.projectId||"",{action,from:old,to:d.status,result}); return json({ok:true,row:out});
+}
+
 async function procurementActionHandler(request,env,user,id) {
   const rec=await getRecord(env,"procurement",id); if(!rec) return json({ok:false,message:"PR tidak ditemukan."},404);
   const denied = await requireProjectAccess(env,user,rec.data.projectId); if (denied) return denied;
-  const body=await parseJson(request)||{}; const action=String(body.action||"").toLowerCase(); const caps=buildAccess(user).capabilities; const d={...rec.data}; const old=String(d.status||"DRAFT").toUpperCase(); let next=old;
-  if(action==="submit") { if(!isManagementRole(user) && d.requesterUserId && d.requesterUserId!==user.id) return json({ok:false,message:"Hanya requester atau Manajemen yang dapat submit PR ini."},403); if(!["DRAFT","REJECTED","REQUESTED"].includes(old)) return json({ok:false,message:"PR tidak dapat diajukan dari status ini."},409); next="SUBMITTED"; d.submittedByUserId=user.id; d.submittedAt=new Date().toISOString(); }
-  else if(action==="approve") { if(!caps.procurementApprove) return json({ok:false,message:"Role ini tidak dapat approve PR."},403); if(old!=="SUBMITTED") return json({ok:false,message:"PR harus SUBMITTED."},409); next="APPROVED"; d.approvedByUserId=user.id; d.approvedAt=new Date().toISOString(); }
+  const body=await parseJson(request)||{}; const action=String(body.action||"").toLowerCase(); const caps=buildAccess(user).capabilities; let d=normalizePrArrays(rec.data); const old=String(d.status||"DRAFT").toUpperCase(); let next=old;
+  if(action==="submit") {
+    if(d.requesterUserId && d.requesterUserId!==user.id && !roleIn(user,["head_unit_bisnis","manager_operasional"])) return json({ok:false,message:"PR hanya dapat disubmit oleh Project Manager proyek, Head Operational, atau Head Unit Bisnis."},403);
+    if(!["DRAFT","REJECTED","REQUESTED"].includes(old)) return json({ok:false,message:"PR tidak dapat diajukan dari status ini."},409);
+    if(!d.items.length) return json({ok:false,message:"PR wajib memiliki minimal 1 item pekerjaan/material/jasa."},400);
+    if(!truthy(d.coiDeclaration)) return json({ok:false,message:"Deklarasi Conflict of Interest wajib disetujui oleh pengaju sebelum PR diajukan."},400);
+    next="SUBMITTED"; d.submittedByUserId=user.id; d.submittedAt=new Date().toISOString();
+  }
+  else if(action==="select-vendor" || action==="approve") {
+    if(!caps.procurementVendorSelect) return json({ok:false,message:"Hanya Head Operational atau Head Unit Bisnis yang dapat memilih vendor PR."},403);
+    if(old!=="SUBMITTED") return json({ok:false,message:"PR harus SUBMITTED sebelum pemilihan vendor."},409);
+    const offerId=String(body.vendorOfferId||body.offerId||"");
+    const offer=d.vendorOffers.find(x=>x.id===offerId);
+    if(!offer) return json({ok:false,message:"Pilih salah satu penawaran vendor yang tersedia."},400);
+    next="APPROVED"; d.selectedVendorOfferId=offer.id; d.selectedVendorId=offer.vendorId; d.selectedVendorName=offer.vendorName; d.selectedVendorVmlId=offer.vendorVmlId; d.selectedOfferAmount=num(offer.amount); d.approvedByUserId=user.id; d.approvedAt=new Date().toISOString();
+  }
   else if(action==="reject") { if(!caps.procurementApprove) return json({ok:false,message:"Role ini tidak dapat reject PR."},403); if(!["SUBMITTED","APPROVED"].includes(old)) return json({ok:false,message:"PR tidak dapat direject dari status ini."},409); next="REJECTED"; d.rejectReason=String(body.notes||""); }
-  else if(action==="order") { if(!caps.procurementOrder) return json({ok:false,message:"Role ini tidak dapat menandai PR sebagai dipesan."},403); if(old!=="APPROVED") return json({ok:false,message:"PR harus APPROVED sebelum ORDERED."},409); next="ORDERED"; d.orderedAt=new Date().toISOString(); }
+  else if(action==="order") { if(!caps.procurementOrder) return json({ok:false,message:"Role ini tidak dapat menandai PR sebagai dipesan."},403); if(old!=="APPROVED") return json({ok:false,message:"PR harus APPROVED sebelum ORDERED."},409); if(!d.selectedVendorId && !d.selectedVendorName) return json({ok:false,message:"Vendor terpilih belum ditetapkan."},409); next="ORDERED"; d.orderedAt=new Date().toISOString(); }
   else if(action==="receive") { if(!caps.procurementOrder) return json({ok:false,message:"Role ini tidak dapat menerima material."},403); if(old!=="ORDERED") return json({ok:false,message:"PR harus ORDERED sebelum RECEIVED."},409); next="RECEIVED"; d.receivedAt=new Date().toISOString(); }
   else return json({ok:false,message:"Action PR tidak dikenal."},400);
-  d.status=next; const out=await upsertRecord(env,"procurement",id,d,user); await audit(env,user,"PROCUREMENT_ACTION","procurement",id,d.projectId||"",{action,from:old,to:next}); return json({ok:true,row:out});
+  d.status=next; const out=await upsertRecord(env,"procurement",id,d,user); await audit(env,user,"PROCUREMENT_ACTION","procurement",id,d.projectId||"",{action,from:old,to:next,selectedVendor:d.selectedVendorName||""}); return json({ok:true,row:out});
 }
 
 
@@ -1289,7 +1395,7 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"full-v3.0.1-role-project-scope"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.1-field-pr-qc-ati"});
     if (path === "/api/health") return diagnostics(env);
     if (path === "/api/auth/login" && request.method === "POST") return loginHandler(request,env);
 
@@ -1315,6 +1421,8 @@ export default {
       return json({ok:true,...await syncQcFromRab(env,auth.user,projectId)});
     }
     if (path === "/api/qc/inspect" && request.method === "POST") return qcInspectHandler(request,env,auth.user);
+    const qcFindingAction = path.match(/^\/api\/qc\/findings\/([^/]+)\/action$/);
+    if (qcFindingAction && request.method === "POST") return qcFindingActionHandler(request,env,auth.user,decodeURIComponent(qcFindingAction[1]));
 
     const ccoAction = path.match(/^\/api\/cco\/([^/]+)\/action$/);
     if (ccoAction && request.method === "POST") return ccoActionHandler(request,env,auth.user,decodeURIComponent(ccoAction[1]));
@@ -1369,11 +1477,14 @@ export default {
         const body = await parseJson(request);
         if (!body) return json({ok:false,message:"JSON tidak valid."},400);
         let data={...(body.data || body)};
+        try { data=await normalizeOperationalResponsibility(env,collection,data); } catch(e) { return json({ok:false,message:e.message},400); }
+        if (collection === "procurement") data=normalizePrArrays(data);
         const targetProjectId = recordProjectId(collection,body.id || "",data);
         if (targetProjectId) { const denied = await requireProjectAccess(env,auth.user,targetProjectId); if (denied) return denied; }
         if (collection === "cco") data.status="DRAFT";
-        if (collection === "payment_requests") { data.status="DRAFT"; data.requesterUserId=data.requesterUserId || auth.user.id; }
-        if (collection === "procurement") { data.status="DRAFT"; data.requesterUserId=data.requesterUserId || auth.user.id; }
+        if (collection === "payment_requests") { data.status="DRAFT"; data.requesterUserId=auth.user.id; }
+        if (collection === "procurement") { const assignedPm=await projectAssignment(env,data.projectId,"pm"); if(!assignedPm) return json({ok:false,message:"Proyek belum memiliki Project Manager. Tetapkan PM sebelum membuat PR."},400); data.status="DRAFT"; data.requesterUserId=assignedPm; data.projectManagerUserId=assignedPm; data.totalHpp=(data.items||[]).reduce((a,x)=>a+num(x.totalHpp),0); }
+        if (collection === "defects") { data.status="OPEN"; data.picUserId=data.picUserId || await projectAssignment(env,data.projectId,"pelaksana"); }
         const rec = await upsertRecord(env,collection,body.id || null,data,auth.user);
         await afterRecordUpsert(env,collection,rec,auth.user);
         return json({ok:true,row:rec},201);
@@ -1403,14 +1514,30 @@ export default {
         if (!(await recordAllowedByProjectScope(env,auth.user,collection,id,old.data))) return json({ok:false,message:"Anda tidak ditugaskan pada proyek data ini."},403);
         const mergedProjectId = recordProjectId(collection,id,{...old.data,...data});
         if (mergedProjectId) { const denied = await requireProjectAccess(env,auth.user,mergedProjectId); if (denied) return denied; }
+        try { data=await normalizeOperationalResponsibility(env,collection,{...old.data,...data}); } catch(e) { return json({ok:false,message:e.message},400); }
+        if (collection === "procurement") data=normalizePrArrays({...old.data,...data});
         const roleKey=normalizeRole(auth.user);
-        if (collection === "payment_requests" && !["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","finance"].includes(roleKey)) {
-          if (old.data.requesterUserId && old.data.requesterUserId !== auth.user.id) return json({ok:false,message:"Anda hanya dapat mengedit pengajuan dana milik Anda sendiri."},403);
-          if (!["DRAFT","REJECTED"].includes(String(old.data.status||"DRAFT").toUpperCase())) return json({ok:false,message:"Pengajuan yang sudah diproses tidak dapat diedit oleh pengaju."},409);
+        if (collection === "payment_requests") {
+          if (!["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","finance"].includes(roleKey)) {
+            if (old.data.requesterUserId && old.data.requesterUserId !== auth.user.id) return json({ok:false,message:"Anda hanya dapat mengedit pengajuan dana milik Anda sendiri."},403);
+            if (!["DRAFT","REJECTED"].includes(String(old.data.status||"DRAFT").toUpperCase())) return json({ok:false,message:"Pengajuan yang sudah diproses tidak dapat diedit oleh pengaju."},409);
+          }
+          // Identitas pengaju tidak boleh dipindahkan ke karyawan lain saat edit.
+          data.requesterUserId=old.data.requesterUserId || auth.user.id;
         }
         if (collection === "cco" && ["project_manager","pelaksana_lapangan"].includes(roleKey)) {
           if (old.data.requestedByUserId && old.data.requestedByUserId !== auth.user.id) return json({ok:false,message:"Anda hanya dapat mengedit CCO yang Anda ajukan."},403);
           if (!["DRAFT","RETURNED_TO_FIELD"].includes(String(old.data.status||"DRAFT").toUpperCase())) return json({ok:false,message:"CCO yang sudah masuk proses Admin/QS tidak dapat diedit oleh lapangan."},409);
+        }
+        if (collection === "procurement") {
+          const st=String(old.data.status||"DRAFT").toUpperCase();
+          const fieldRole=["project_manager","pelaksana_lapangan"].includes(roleKey);
+          if (fieldRole && old.data.requesterUserId && old.data.requesterUserId !== auth.user.id) return json({ok:false,message:"PR ini menjadi tanggung jawab Project Manager proyek."},403);
+          if (fieldRole && !["DRAFT","REJECTED"].includes(st)) return json({ok:false,message:"PR yang sudah diajukan hanya dapat dilengkapi Procurement/Manajemen."},409);
+          if (!["DRAFT","REJECTED","SUBMITTED"].includes(st) && !isManagementRole(auth.user)) return json({ok:false,message:"PR yang sudah dipilih vendornya tidak dapat diedit pada tahap ini."},409);
+          const assignedPm=await projectAssignment(env,data.projectId || old.data.projectId,"pm");
+          if(!assignedPm) return json({ok:false,message:"Proyek belum memiliki Project Manager. Tetapkan PM sebelum mengubah PR."},400);
+          data.requesterUserId=assignedPm; data.projectManagerUserId=assignedPm;
         }
         // Critical workflow statuses cannot be edited manually; use the action endpoints above.
         if (["cco","payment_requests","procurement"].includes(collection)) data.status=old.data.status || data.status || "DRAFT";
@@ -1442,9 +1569,17 @@ export default {
         const body = await parseJson(request); if (!body) return json({message:"Invalid JSON"},400);
         const list = Array.isArray(body) ? body : [body];
         for (const row of list) {
-          const payload = row.data ?? row;
+          let payload = {...(row.data ?? row)};
           const pid = recordProjectId(collection,row.id,payload);
           if (pid && !(await userCanAccessProject(env,auth.user,pid))) return json({message:"Forbidden: project scope"},403);
+          try { payload=await normalizeOperationalResponsibility(env,collection,payload); } catch(e) { return json({message:e.message},400); }
+          if (collection === "procurement") {
+            payload=normalizePrArrays(payload);
+            const assignedPm=await projectAssignment(env,payload.projectId,"pm");
+            if(!assignedPm) return json({message:"Proyek belum memiliki Project Manager. Tetapkan PM sebelum membuat PR."},400);
+            payload.requesterUserId=assignedPm; payload.projectManagerUserId=assignedPm;
+          }
+          if (collection === "payment_requests") payload.requesterUserId=auth.user.id;
           const rec=await upsertRecord(env,collection,row.id,payload,auth.user); await afterRecordUpsert(env,collection,rec,auth.user);
         }
         return json(null,201);

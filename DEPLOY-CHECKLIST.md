@@ -1,24 +1,16 @@
-# DEPLOY CHECKLIST — KENDALI V3.0
+# Deploy Checklist V3.1
 
-1. Backup/commit repository saat ini.
-2. Replace `src/`, `public/`, `scripts/check.mjs`, `package.json`, dan tambahkan migration `0012_full_workflow_roles_qc_cco.sql`.
-3. Pertahankan `package-lock.json` repository yang sekarang bila sudah ada.
-4. Pastikan `wrangler.jsonc` tetap menunjuk D1 `kendali-natara-db-v2` ID `04849d77-cb23-4d50-9cfc-4e0d9c542d6b` dan R2 `kendali-natara-files-v2`.
-5. Jalankan `npm run build`.
-6. Jalankan migration remote: `npx wrangler d1 migrations apply DB --remote`.
-7. Deploy: `npx wrangler deploy` atau jalankan pipeline Cloudflare Git.
-8. Login Administrator dan buka Karyawan & Akses; sesuaikan role semua akun lama.
-9. Uji satu proyek: pilih PM/Pelaksana/QS/QC melalui dropdown.
-10. Input dua Progress Harian dengan tanggal berbeda; pastikan grafik Rencana vs Aktual muncul.
-11. Uji Payment Request sampai Paid; pastikan Cash Out otomatis terbentuk.
-12. Uji QC: sync RAB → inspect dengan bukti → NG membuat defect → re-inspect PASS menutup defect.
-13. Uji CCO lengkap sampai Addendum dan Closed.
-14. Login dengan akun Pelaksana, QS, QC, Finance, dan Procurement untuk memastikan menu/API hanya sesuai role.
+1. Backup repository dan D1 sebelum deploy.
+2. Pastikan `wrangler.jsonc` tetap mengarah ke D1 `kendali-natara-db-v2` dan R2 `kendali-natara-files-v2`.
+3. Jalankan `npm run build`.
+4. Jalankan `npx wrangler d1 migrations apply DB --remote`.
+5. Jalankan `npx wrangler deploy`.
+6. Login Administrator dan cek Master Karyawan serta assignment PM/Pelaksana pada proyek.
+7. Uji Laporan Harian: PIC harus otomatis Pelaksana dan tukang harus masuk Rekap Gaji.
+8. Uji PR: buat minimal 2 item HPP, 2 vendor, submit, lalu login Head Operational/Head Unit Bisnis dan pilih vendor.
+9. Uji PO/SPK: buat dari PR Approved dan pastikan vendor/nilai terpilih terisi.
+10. Uji QC: QC buat temuan + before; Pelaksana submit perbaikan + after; QC verifikasi sesuai/tidak sesuai.
+11. Uji ATI: data tukang muncul, attendance/upah mengikuti laporan harian, asesmen/pelatihan dapat disimpan.
+12. Uji project scope menggunakan akun PM dan Pelaksana pada dua proyek berbeda.
 
-## Uji role & project scope setelah deploy
-
-1. Login sebagai Project Manager yang ditugaskan pada satu proyek. Pastikan hanya proyek itu yang muncul.
-2. Login sebagai Pelaksana Lapangan yang ditugaskan pada satu proyek. Pastikan hanya proyek itu yang muncul.
-3. Coba akses URL/API record proyek lain dari akun PM/Pelaksana; sistem harus menolak.
-4. Pastikan dropdown project di Progress, CCO, PR, Pengajuan Dana, Dokumen, dan Flow hanya memuat proyek yang ditugaskan.
-5. Pastikan role tanpa Finance tidak menerima angka Cash In/Cash Out/Piutang/Hutang pada dashboard.
+Tidak membuat D1/R2 baru.

@@ -1,26 +1,19 @@
-# CHANGELOG
+# Changelog
 
-## 3.0.1 — Role + Project Scope
+## V3.1.0
 
-- PM hanya dapat melihat dan mengakses proyek yang ditugaskan kepadanya.
-- Pelaksana hanya dapat melihat dan mengakses proyek yang ditugaskan kepadanya.
-- Scope berlaku pada dashboard, project list, record CRUD, progress, CCO, PR, payment request, dokumen, flow, dan storage legacy.
-- Direct API access ke proyek di luar assignment ditolak backend.
-- Dashboard menyembunyikan payload detail finance dari role tanpa akses Finance.
-- UI memberi label “Proyek ditugaskan saja” dan filter “Semua proyek yang saya tangani” untuk PM/Pelaksana.
-- Kompatibilitas field assignment lama dipertahankan.
+- Role-specific PIC pada semua form operasional utama.
+- Daily Progress hanya Pelaksana Lapangan dan terhubung ke daftar tukang.
+- `daily_workers` sebagai sumber rekap kehadiran, upah harian dan lembur.
+- PR multi-item dengan HPP detail.
+- Perbandingan multi-vendor dengan VML, harga, term, lead time dan lampiran.
+- Vendor selection dikunci hanya untuk Head Operational atau Head Unit Bisnis.
+- PO/SPK dapat diprefill dari vendor PR terpilih.
+- Project code dihilangkan dari UI operasional.
+- QC dashboard dikembalikan ke model Temuan QC / Tugas / Verifikasi dan bukti before-after.
+- ATI dashboard: Pengajuan Pekerjaan, Database Tukang, Attendance & Productivity/Upah, Masalah Lapangan, Evaluasi, Assessment/Grading, Pelatihan, Log, talent pool dan leveling.
+- Tambah koleksi `daily_workers`, `qc_actions`, `qc_verifications`, `ati_assessments`.
+- Migration additive `0013_field_pr_qc_ati.sql`.
 
-
-## 3.0.0 — Full Workflow
-
-- Dashboard grafik Rencana vs Aktual per proyek.
-- Dropdown karyawan pada proyek dan seluruh PIC utama.
-- Finance flow + Payment Request automation.
-- Opname/QS diperjelas.
-- QC work-item dashboard, sync RAB, evidence-required inspection, defect/re-inspection.
-- CCO staged workflow Pelaksana → Admin → QS → Admin → Client → Addendum.
-- CCO escalation gate >8% dan >10%.
-- Procurement PR vs PO/SPK diperjelas; PO/SPK sync payable.
-- Menu Karyawan & Akses.
-- Role-based navigation dan backend API authorization.
-- Migration 0012 dan preflight check V3.0.
+- Pengaju dana dikunci ke user login dan identitas requester tidak dapat dialihkan saat edit.
+- PR selalu memakai Project Manager yang ditugaskan sebagai pemilik/pengaju; vendor decision bukan kewenangan Admin/Direktur.
