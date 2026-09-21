@@ -1,4 +1,4 @@
-# KENDALI Natara V3.1.4 — Continuous QC Inspection
+# KENDALI Natara V3.1.5 — Continuous QC Inspection
 
 Versi ini meneruskan V3.1.3 dan mengembalikan pola **Inspeksi QC berkelanjutan** seperti dashboard QC Natara sebelumnya.
 
@@ -36,3 +36,11 @@ npx wrangler deploy
 ```
 
 Setelah deploy, buka QC Dashboard → **+ Inspeksi Baru** → pilih proyek. Bila proyek sudah mempunyai catatan Berjalan, sistem otomatis membuka catatan yang sama.
+
+## V3.1.5 — Fix fungsi QC Inspection
+
+- Memperbaiki selector scope pada frontend yang membuat event tombol QC tidak pernah terikat.
+- Tombol **Ambil / pilih foto** sekarang membuka file picker dengan benar di desktop/mobile.
+- Tombol **Tambahkan** sekarang menyimpan sub-pekerjaan setelah hasil Sesuai/Tidak sesuai dipilih.
+- Perbaikan helper selector juga memperbaiki potensi masalah serupa pada form PR dan daftar tukang.
+- Tidak ada perubahan schema database; migration baru tidak diperlukan.

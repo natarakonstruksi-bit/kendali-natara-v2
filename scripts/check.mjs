@@ -57,5 +57,8 @@ for (const marker of [
   'QC Management System','Inspeksi QC berkelanjutan','Catatan ini <b>berkelanjutan</b>','qcGroupHtml','Terbitkan ${unpublished} temuan'
 ]) if(!app.includes(marker)) throw new Error(`Workflow marker frontend hilang: ${marker}`);
 for (const forbidden of ["f('code','Kode Proyek'",'>Kode Proyek<','<label>Kode Proyek']) if(app.includes(forbidden)) throw new Error(`Kode proyek kembali muncul pada form proyek operasional: ${forbidden}`);
+if(!app.includes('function resolveDomRoot(root=document)')) throw new Error('Scoped DOM root resolver hilang.');
+if(!app.includes('globalThis.__kendaliDom={resolveDomRoot,$,$$}')) throw new Error('Runtime DOM helper test hook hilang.');
+if(!app.includes('Ambil / pilih foto')) throw new Error('Tombol file picker QC hilang.');
 
-console.log('KENDALI V3.1.4 Continuous QC Inspection preflight OK');
+console.log('KENDALI V3.1.5 QC Function Fix preflight OK');

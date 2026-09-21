@@ -12,10 +12,19 @@ globalThis.document={
 };
 globalThis.location={reload(){}};
 globalThis.window=globalThis;
+globalThis.KENDALI_TEST_MODE=true;
 try {
   await import(new URL('../public/app.js?runtime-smoke=1',import.meta.url));
   await new Promise(r=>setTimeout(r,50));
-  console.log('Frontend runtime smoke OK');
+  const scoped=make();
+  const child=make();
+  scoped.querySelector=(sel)=>child;
+  scoped.querySelectorAll=(sel)=>[child];
+  map.set('#modalForm',scoped);
+  if(!globalThis.__kendaliDom) throw new Error('DOM helper test hook tidak tersedia.');
+  if(globalThis.__kendaliDom.$('.x','#modalForm')!==child) throw new Error('Scoped $ selector gagal untuk root string.');
+  if(globalThis.__kendaliDom.$$('.x','#modalForm').length!==1) throw new Error('Scoped $$ selector gagal untuk root string.');
+  console.log('Frontend runtime smoke OK — scoped selectors OK');
 } catch (e) {
   console.error(e?.stack||e);
   process.exit(1);

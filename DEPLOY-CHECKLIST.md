@@ -1,8 +1,8 @@
-# Deploy Checklist V3.1.4
+# Deploy Checklist V3.1.5
 
 1. Pertahankan D1 `kendali-natara-db-v2` dan R2 `kendali-natara-files-v2`.
 2. Jalankan `npm clean-install --progress=false`.
-3. Jalankan `npm run build` dan pastikan muncul `KENDALI V3.1.4 Continuous QC Inspection preflight OK`.
+3. Jalankan `npm run build` dan pastikan muncul `KENDALI V3.1.5 QC Function Fix preflight OK`.
 4. Jalankan `npx wrangler d1 migrations apply DB --remote` agar migration 0014 terpasang.
 5. Jalankan `npx wrangler deploy`.
 6. Login role QC, buka QC Dashboard, klik **+ Inspeksi Baru**, pilih proyek.

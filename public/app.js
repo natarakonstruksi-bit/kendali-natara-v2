@@ -1,5 +1,10 @@
-const $ = (s, root=document) => root.querySelector(s);
-const $$ = (s, root=document) => [...root.querySelectorAll(s)];
+function resolveDomRoot(root=document){
+  if(typeof root==='string') return document.querySelector(root);
+  return root || document;
+}
+const $ = (s, root=document) => { const r=resolveDomRoot(root); return r ? r.querySelector(s) : null; };
+const $$ = (s, root=document) => { const r=resolveDomRoot(root); return r ? [...r.querySelectorAll(s)] : []; };
+if(globalThis.KENDALI_TEST_MODE) globalThis.__kendaliDom={resolveDomRoot,$,$$};
 
 const state = {
   user:null, access:null, view:'dashboard', projects:[], employees:[], dashboard:null,
@@ -447,7 +452,7 @@ function qcSubItemHtml(x,canEdit){
   const d=x.data||{};const bad=String(d.result||'').toUpperCase()==='TIDAK SESUAI';
   const photo=d.evidenceDocumentId?`<a class="qc-photo-link" target="_blank" href="/api/documents/${encodeURIComponent(d.evidenceDocumentId)}/file"><img src="/api/documents/${encodeURIComponent(d.evidenceDocumentId)}/file" alt="Foto inspeksi"></a>`:'<div class="qc-no-photo">Belum ada foto</div>';
   const editButtons=canEdit?`<div class="qc-result-buttons"><button type="button" class="qc-result-btn ok ${!bad?'selected':''}" data-qc-item-result="${esc(x.id)}" data-result="SESUAI" ${d.findingId?'disabled title="Sudah menjadi temuan QC"':''}>Sesuai</button><button type="button" class="qc-result-btn bad ${bad?'selected':''}" data-qc-item-result="${esc(x.id)}" data-result="TIDAK SESUAI">Tidak sesuai</button></div>`:`<span class="qc-result-read ${bad?'bad':'ok'}">${qcResultLabel(d.result)}</span>`;
-  return `<div class="qc-subitem ${bad?'bad':''}"><div class="qc-sub-head"><div class="qc-sub-number">•</div><div class="qc-sub-title"><b>${esc(d.item||'-')}</b><span>Diperiksa ${fmtDate(d.date)}</span>${d.findingId?`<span class="finding-link">Diterbitkan sebagai temuan</span>`:''}</div>${canEdit&&!d.findingId?`<button type="button" class="btn small danger" data-qc-item-delete="${esc(x.id)}">Hapus</button>`:''}</div>${editButtons}<div class="qc-sub-body">${photo}<div class="qc-sub-detail">${canEdit?`<button type="button" class="btn small" data-qc-item-photo="${esc(x.id)}">${d.evidenceDocumentId?'Ganti foto':'Ambil foto'}</button><input type="file" class="qc-existing-photo hidden" data-item-id="${esc(x.id)}" accept="image/*" capture="environment"><textarea data-qc-item-note="${esc(x.id)}" placeholder="Keterangan (opsional)">${esc(d.note||'')}</textarea>`:`<p>${esc(d.note||'Tanpa keterangan')}</p>`}</div></div></div>`;
+  return `<div class="qc-subitem ${bad?'bad':''}"><div class="qc-sub-head"><div class="qc-sub-number">•</div><div class="qc-sub-title"><b>${esc(d.item||'-')}</b><span>Diperiksa ${fmtDate(d.date)}</span>${d.findingId?`<span class="finding-link">Diterbitkan sebagai temuan</span>`:''}</div>${canEdit&&!d.findingId?`<button type="button" class="btn small danger" data-qc-item-delete="${esc(x.id)}">Hapus</button>`:''}</div>${editButtons}<div class="qc-sub-body">${photo}<div class="qc-sub-detail">${canEdit?`<button type="button" class="btn small" data-qc-item-photo="${esc(x.id)}">${d.evidenceDocumentId?'Ganti foto':'Ambil / pilih foto'}</button><input type="file" class="qc-existing-photo hidden" data-item-id="${esc(x.id)}" accept="image/*"><textarea data-qc-item-note="${esc(x.id)}" placeholder="Keterangan (opsional)">${esc(d.note||'')}</textarea>`:`<p>${esc(d.note||'Tanpa keterangan')}</p>`}</div></div></div>`;
 }
 
 function qcGroupHtml(group,items,canEdit,projectId){
@@ -457,7 +462,7 @@ function qcGroupHtml(group,items,canEdit,projectId){
   const score=arr.length?Math.round(sesuai/arr.length*100):null;
   const key=`qcg_${String(group.id||group.name).replace(/[^a-zA-Z0-9_-]/g,'_')}`;
   const existing=arr.length?arr.map(x=>qcSubItemHtml(x,canEdit)).join(''):'<div class="qc-empty-group">Belum ada sub-pekerjaan yang dicatat pada bagian ini.</div>';
-  const add=canEdit?`<div class="qc-add-box" data-qc-add-box="${esc(key)}"><input class="qc-new-item" placeholder="Uraian sub-pekerjaan, mis. Pembesian kolom K1 lantai 2"><div class="qc-result-buttons qc-new-results"><button type="button" class="qc-result-btn ok" data-qc-new-result="SESUAI">Sesuai</button><button type="button" class="qc-result-btn bad" data-qc-new-result="TIDAK SESUAI">Tidak sesuai</button></div><textarea class="qc-new-note" placeholder="Keterangan (opsional)"></textarea><div class="qc-add-actions"><button type="button" class="btn small" data-qc-new-photo>Ambil foto</button><input type="file" class="qc-new-file hidden" accept="image/*" capture="environment"><button type="button" class="btn small primary" data-qc-add-sub data-group="${esc(group.name)}">Tambahkan</button></div><div class="qc-photo-preview"></div></div>`:'';
+  const add=canEdit?`<div class="qc-add-box" data-qc-add-box="${esc(key)}"><input class="qc-new-item" placeholder="Uraian sub-pekerjaan, mis. Pembesian kolom K1 lantai 2"><div class="qc-result-buttons qc-new-results"><button type="button" class="qc-result-btn ok" data-qc-new-result="SESUAI">Sesuai</button><button type="button" class="qc-result-btn bad" data-qc-new-result="TIDAK SESUAI">Tidak sesuai</button></div><textarea class="qc-new-note" placeholder="Keterangan (opsional)"></textarea><div class="qc-add-actions"><button type="button" class="btn small" data-qc-new-photo>Ambil / pilih foto</button><input type="file" class="qc-new-file hidden" accept="image/*"><button type="button" class="btn small primary" data-qc-add-sub data-group="${esc(group.name)}">Tambahkan</button></div><div class="qc-photo-preview"></div></div>`:'';
   return `<section class="qc-work-group"><header><b>${esc(group.name)}</b><span>${arr.length} sub-pekerjaan${arr.length?` · ${sesuai} sesuai${tidak?` · <strong>${tidak} tidak sesuai</strong>`:''} · ${score}%`:''}</span></header><div class="qc-work-body">${existing}${add}</div></section>`;
 }
 

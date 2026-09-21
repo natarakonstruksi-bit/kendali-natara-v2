@@ -32,7 +32,7 @@
 - Pengajuan Dana: **Pengaju = user yang sedang login**; tidak tersedia dropdown untuk memilih orang lain.
 - Purchase Request: pemilik/pengaju = **Project Manager yang ditugaskan pada proyek**; vendor dipilih hanya oleh **Head Operational atau Head Unit Bisnis**.
 
-## QC Inspection V3.1.4
+## QC Inspection V3.1.5
 
 - **QC / Quality Control**: mulai/lanjut catatan inspeksi, tambah/edit sub-pekerjaan, foto, dan terbitkan temuan.
 - **Manager Operasional dan role manajemen atas**: dapat melihat serta menutup catatan pemeriksaan.

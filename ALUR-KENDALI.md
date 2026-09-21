@@ -1,4 +1,4 @@
-# Alur QC KENDALI V3.1.4
+# Alur QC KENDALI V3.1.5
 
 **QC membuka proyek → Mulai/Lanjutkan Catatan Pemeriksaan → pilih kelompok pekerjaan → tambah sub-pekerjaan → pilih Sesuai/Tidak sesuai → keterangan/foto → simpan.**
 
