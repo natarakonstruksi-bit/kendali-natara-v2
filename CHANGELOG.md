@@ -1,3 +1,19 @@
+# V3.1.3 — QC Inspection Fix
+
+- QC Inspection dipulihkan sebagai modul utama.
+- Checklist seluruh pekerjaan + Sinkron dari RAB/HPP.
+- Inspeksi berulang dengan bukti wajib dan histori terpisah.
+- NG/CONDITIONAL otomatis menjadi Temuan QC dengan PIC Pelaksana.
+- PASS re-inspection menutup defect terkait.
+
+# KENDALI V3.1.2 — Project Name Fix
+
+- Memperbaiki seluruh dropdown proyek yang sebelumnya menampilkan label generik `Proyek`.
+- Nama proyek sekarang dibaca kompatibel dari field modern maupun data legacy (`name`, `project_name`, `projectName`, `namaProyek`, `nama`, `title`).
+- Jika record legacy tidak memiliki field nama, frontend memakai nama proyek yang sudah dinormalisasi oleh `/api/dashboard`.
+- Berlaku pada filter global, semua form proyek, PR, CCO, Progress, QC, ATI, Finance, Dokumen, dan tampilan daftar proyek.
+- Tidak ada perubahan skema D1/R2.
+
 # KENDALI V3.1.1 — White Screen Fix
 
 - Memperbaiki error startup frontend `ReferenceError: renderAti is not defined` yang membuat `app.js` berhenti sebelum `init()` dan menyebabkan layar putih.

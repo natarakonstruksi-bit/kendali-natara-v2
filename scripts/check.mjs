@@ -54,8 +54,8 @@ for (const marker of [
   'Pengajuan Pekerjaan ATI',
   'Masalah Lapangan ATI',
   'Evaluasi Masalah ATI',
-  'QC Management System'
+  'QC Management System','QC Inspection — Checklist Semua Pekerjaan','Riwayat QC Inspection'
 ]) if(!app.includes(marker)) throw new Error(`Workflow marker frontend hilang: ${marker}`);
 for (const forbidden of ["f('code','Kode Proyek'",'>Kode Proyek<','<label>Kode Proyek']) if(app.includes(forbidden)) throw new Error(`Kode proyek kembali muncul pada form proyek operasional: ${forbidden}`);
 
-console.log('KENDALI V3.1.1 White Screen Fix preflight OK');
+console.log('KENDALI V3.1.3 QC Inspection Fix preflight OK');

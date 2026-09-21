@@ -3,7 +3,7 @@
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.1.1";
+const APP_VERSION = "APP-V3.1.3";
 const SERVICE_NAME = "KENDALI Natara Project Control";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -1147,6 +1147,7 @@ async function qcInspectHandler(request,env,user) {
     evidenceRequired:true
   },user);
   const doc=await storeEvidenceDocument(env,user,file,{projectId,category:"QC_EVIDENCE",title:`QC ${workItem.data.item || workItemId} - ${date}`,notes,relatedCollection:"qc_inspections",relatedId:id});
+  await upsertRecord(env,"qc_inspections",id,{...inspection.data,evidenceDocumentId:doc.id,evidenceOriginalName:file.name},user);
   await upsertRecord(env,"qc_work_items",workItemId,{...workItem.data,lastInspectionId:id,lastInspectionDate:date,lastResult:result,lastEvidenceId:doc.id},user);
   const openDefects = await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='defects' AND json_extract(data_json,'$.projectId')=? AND json_extract(data_json,'$.workItemId')=?`).bind(projectId,workItemId).all();
   if (result === "PASS") {
@@ -1155,10 +1156,16 @@ async function qcInspectHandler(request,env,user) {
     }
   } else {
     const hasOpen=(openDefects.results || []).some(r=>activeLike(safeJsonParse(r.data_json,{}).status));
-    if (!hasOpen) await upsertRecord(env,"defects",crypto.randomUUID(),{
-      projectId,workItemId,qcInspectionId:id,date,item:workItem.data.item || "",severity:result==="NG"?"MAJOR":"MINOR",status:"OPEN",
-      picUserId:"",deadline:"",correctiveAction:"",notes:`Auto dari QC Inspection ${result}: ${notes}`
-    },user);
+    if (!hasOpen) {
+      const picUserId=await projectAssignment(env,projectId,"pelaksana");
+      await upsertRecord(env,"defects",crypto.randomUUID(),{
+        projectId,workItemId,qcInspectionId:id,date,item:workItem.data.item || "",area:workItem.data.item || "",category:workItem.data.category || "",
+        severity:result==="NG"?"B - MAYOR":"C - MINOR",status:"OPEN",picUserId,deadline:"",
+        description:`Hasil QC Inspection ${result}: ${notes || workItem.data.item || "Perlu tindak lanjut"}`,
+        suggestion:"Lakukan corrective action sesuai hasil inspeksi dan kirim bukti foto setelah perbaikan.",
+        notes:`Auto dari QC Inspection ${result}: ${notes}`
+      },user);
+    }
   }
   await audit(env,user,"QC_INSPECTION","qc_inspections",id,projectId,{workItemId,result,evidenceId:doc.id});
   return json({ok:true,inspection,document:doc});
@@ -1395,7 +1402,7 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.1.1-field-pr-qc-ati"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.1.2-project-name-fix"});
     if (path === "/api/health") return diagnostics(env);
     if (path === "/api/auth/login" && request.method === "POST") return loginHandler(request,env);
 

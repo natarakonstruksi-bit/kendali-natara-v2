@@ -1,4 +1,4 @@
-# KENDALI Natara V3.1.1 — White Screen Fix
+# KENDALI Natara V3.1.3 — QC Inspection Fix
 
 Versi ini memperbaiki layar putih pada V3.1. Penyebabnya adalah `renderAti` ditetapkan tanpa deklarasi pada ES module, sehingga browser melempar `ReferenceError` sebelum `init()` dijalankan.
 
@@ -37,3 +37,12 @@ npx wrangler deploy
 ```
 
 Pertahankan `package-lock.json` repository produksi bila sudah ada.
+
+
+## Fix V3.1.3 — Nama proyek pada dropdown
+Semua pilihan proyek menampilkan nama proyek sebenarnya. Data lama yang menyimpan nama pada field legacy tetap dibaca, dan frontend memakai nama dari dashboard sebagai fallback.
+
+
+## V3.1.3 — QC Inspection
+
+QC Inspection kembali menjadi modul utama sebelum Temuan QC. Checklist dapat disinkronkan dari RAB/HPP, setiap item dapat diinspeksi berulang, dan setiap inspeksi wajib upload bukti. Hasil NG/CONDITIONAL otomatis membuat Temuan & Corrective Action dengan PIC Pelaksana Lapangan proyek.
