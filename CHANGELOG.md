@@ -1,17 +1,10 @@
 # Changelog
 
-## V3.1.6 — Branding & Greeting UI
-
-- Tambah logo resmi Natara Konstruksi sebagai asset aplikasi.
-- Redesign login page menjadi corporate dark/white layout.
-- Branding sidebar diperbarui memakai logo Natara.
-- Tambah favicon Natara.
-- Tambah sapaan dinamis `Halo, [nama user]` pada topbar.
-- Tambah welcome banner personal pada Dashboard.
-- Role dan scope proyek user ditampilkan bersama sapaan.
-- Tidak mengubah schema D1.
-
-## V3.1.5 — QC Function Fix
-
-- Memperbaiki binding tombol QC Continuous Inspection.
-- Ambil foto, tambah sub-pekerjaan, edit hasil, ganti foto, dan hapus item kembali berfungsi.
+## V3.2.1 — Profil Natara & Portofolio Publik
+- Portal `/info` disederhanakan: hanya **Apa itu Natara** dan **Portofolio**.
+- Menghapus progres proyek, status operasional, QC, timeline update, dan statistik proyek dari halaman publik.
+- Menambah koleksi `public_portfolio` yang berdiri sendiri dari data operasional proyek.
+- Portofolio mendukung cover, multi-foto galeri, kategori, lokasi, tahun, ringkasan, deskripsi, featured, dan status publik/draft.
+- Profil publik mendukung judul, tagline, deskripsi Natara, fokus/layanan, pengantar portofolio, alamat, WhatsApp/kontak, dan Instagram.
+- Endpoint publik hanya mengirim data profil dan portofolio yang memang ditandai publik.
+- Resource D1/R2 lama tetap digunakan.

@@ -1,24 +1,30 @@
-# KENDALI Natara V3.1.6 — Branding & Greeting UI
+# KENDALI Natara V3.2.1 — Profil Natara & Portofolio
 
-V3.1.6 melanjutkan seluruh fungsi V3.1.5 dan menambahkan identitas visual Natara Konstruksi serta sapaan personal untuk user yang login.
+Versi ini mempertahankan seluruh fungsi internal KENDALI V3.1.6/V3.2, tetapi portal publik `/info` hanya berfungsi sebagai **website profil Natara Konstruksi dan portofolio**.
 
-## Perubahan V3.1.6
+## Halaman publik
+- `/info`
+- `/public`
+- `/informasi`
 
-- Logo Natara Konstruksi dipasang pada halaman login, sidebar, dashboard, dan favicon.
-- Halaman login didesain ulang menjadi tampilan corporate dua panel.
-- Warna UI memakai aksen terracotta dari logo Natara dengan sidebar dark.
-- Topbar menampilkan `Halo, [nama user]` dan role akun yang sedang login.
-- Dashboard menampilkan welcome banner `Halo, [nama lengkap user]` beserta tanggal dan scope akses proyek.
-- Nama yang ditampilkan selalu berasal dari session user aktif, bukan teks statis.
-- Seluruh fungsi QC Inspection V3.1.5 tetap dipertahankan.
+Tidak membutuhkan login.
+
+## Konten publik
+1. Apa itu Natara Konstruksi.
+2. Fokus/layanan Natara.
+3. Kontak dan alamat publik.
+4. Portofolio proyek: judul, kategori, lokasi, tahun, ringkasan, deskripsi, cover, dan galeri foto.
+
+Portal tidak menampilkan progress, RAB/HPP, cashflow, QC, CCO, opname, vendor, karyawan, tukang, dokumen internal, atau audit.
+
+## Pengelolaan
+Login KENDALI → **Profil & Portofolio** → Edit Profil / Tambah Portofolio.
 
 ## Deploy
-
-Tidak ada migration database baru pada V3.1.6 apabila migration 0014 sudah pernah dijalankan.
-
 ```bash
 npm run build
+npx wrangler d1 migrations apply DB --remote
 npx wrangler deploy
 ```
 
-Jika deployment environment belum pernah menjalankan migration 0014, jalankan migration terlebih dahulu.
+Migration baru `0016_public_company_portfolio.sql` hanya menandai versi schema karena `app_records` tetap generic. D1 dan R2 produksi yang lama tetap digunakan.

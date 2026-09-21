@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#111315">
+  <meta name="description" content="Profil dan portofolio Natara Konstruksi.">
+  <title>Natara Konstruksi — Profil & Portofolio</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="stylesheet" href="/public.css">
+</head>
+<body>
+  <header class="site-nav">
+    <a class="brand" href="/info" aria-label="Natara Konstruksi">
+      <img src="/assets/natara-mark.png" alt="Natara">
+      <div><b>NATARA KONSTRUKSI</b><span>Profil & Portofolio</span></div>
+    </a>
+    <nav>
+      <a href="#tentang">Tentang</a>
+      <a href="#portofolio">Portofolio</a>
+      <a id="navContact" class="nav-cta hidden" target="_blank" rel="noopener">Hubungi Kami</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">NATARA KONSTRUKSI</span>
+        <h1 id="siteTitle">Natara Konstruksi</h1>
+        <p id="siteTagline">Membangun dengan kontrol, mutu, dan tanggung jawab.</p>
+        <div class="hero-actions">
+          <a href="#portofolio" class="btn primary">Lihat Portofolio</a>
+          <a id="heroContact" class="btn outline hidden" target="_blank" rel="noopener">Hubungi Natara</a>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <img src="/assets/natara-logo.jpeg" alt="Logo Natara Konstruksi">
+      </div>
+    </section>
+
+    <section class="about-section" id="tentang">
+      <div class="section-number">01</div>
+      <div class="about-copy">
+        <span class="eyebrow dark">APA ITU NATARA?</span>
+        <h2>Tentang Natara Konstruksi</h2>
+        <p id="siteAbout">Natara Konstruksi adalah pelaksana konstruksi yang berfokus pada pengendalian pelaksanaan, mutu, progres, dan dokumentasi proyek secara terintegrasi.</p>
+        <div id="serviceTags" class="service-tags"></div>
+      </div>
+      <aside class="contact-card">
+        <div class="logo-panel"><img src="/assets/natara-mark.png" alt="Natara"></div>
+        <div><span>Alamat</span><b id="siteAddress">-</b></div>
+        <div><span>Kontak</span><b id="siteContactText">Natara Konstruksi</b></div>
+        <div class="contact-actions">
+          <a id="aboutContact" class="btn primary hidden" target="_blank" rel="noopener">Hubungi Natara</a>
+          <a id="instagramLink" class="btn light hidden" target="_blank" rel="noopener">Instagram</a>
+        </div>
+      </aside>
+    </section>
+
+    <section class="portfolio-section" id="portofolio">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow dark">02 — PORTOFOLIO</span>
+          <h2>Karya yang Telah Kami Kerjakan</h2>
+          <p id="portfolioIntro">Pilihan proyek Natara Konstruksi dari berbagai jenis pekerjaan.</p>
+        </div>
+        <div class="portfolio-count"><strong id="portfolioCount">0</strong><span>Portofolio</span></div>
+      </div>
+      <div class="portfolio-toolbar">
+        <input id="searchInput" type="search" placeholder="Cari nama proyek, kategori, lokasi, atau tahun…">
+        <select id="categoryFilter"><option value="">Semua kategori</option></select>
+      </div>
+      <div id="portfolioGrid" class="portfolio-grid"><div class="loading-card">Memuat portofolio…</div></div>
+      <div id="emptyState" class="empty hidden">Belum ada portofolio yang sesuai pencarian.</div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-brand"><img src="/assets/natara-mark.png" alt="Natara"><div><b>NATARA KONSTRUKSI</b><span>CV. Syarikah Konstruksi Indonesia</span></div></div>
+    <div class="footer-copy"><span>Profil & Portofolio Resmi</span><span id="footerYear"></span></div>
+  </footer>
+
+  <div id="detailBackdrop" class="detail-backdrop hidden" aria-hidden="true">
+    <div class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <button id="detailClose" class="detail-close" aria-label="Tutup">×</button>
+      <div id="detailBody"></div>
+    </div>
+  </div>
+
+  <script src="/public.js"></script>
+</body>
+</html>

@@ -12,7 +12,10 @@
       "/api/*",
       "/rest/*",
       "/storage/*",
-      "/auth/*"
+      "/auth/*",
+      "/info",
+      "/public",
+      "/informasi"
     ]
   },
   "d1_databases": [

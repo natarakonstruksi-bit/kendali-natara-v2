@@ -1,9 +1,9 @@
 /**
- * KENDALI Natara V3.1 — Field, Procurement, QC & ATI
+ * KENDALI Natara V3.2.1 — Public Company Profile & Portfolio
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.1.6";
+const APP_VERSION = "APP-V3.2.1";
 const SERVICE_NAME = "KENDALI Natara Project Control";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -21,13 +21,14 @@ const COLLECTIONS = new Set([
   "project_budget", "cash_in", "cash_out", "receivables", "payables", "payment_requests",
   "daily_progress", "weekly_progress", "opname", "qc_inspections", "defects", "cco", "approvals",
   "milestones", "retention", "closeout", "project_documents", "issues", "schedule", "procurement",
-  "qc_work_items", "qc_inspection_sessions", "qc_inspection_items", "qc_work_groups", "daily_workers", "qc_actions", "qc_verifications", "ati_assessments", "ati_work_requests", "ati_field_issues", "ati_issue_evaluations"
+  "qc_work_items", "qc_inspection_sessions", "qc_inspection_items", "qc_work_groups", "daily_workers", "qc_actions", "qc_verifications", "ati_assessments", "ati_work_requests", "ati_field_issues", "ati_issue_evaluations",
+  "public_project_settings", "public_updates", "public_site_settings", "public_portfolio"
 ]);
 
 const PROJECT_SCOPED_COLLECTIONS = new Set([
   "projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests",
   "daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones",
-  "retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations"
+  "retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates"
 ]);
 
 const DOC_CORE = ["CONTRACT", "RAB_BASELINE", "DED_FINAL", "TIME_SCHEDULE"];
@@ -54,13 +55,13 @@ const ROLE_LABELS = {
   viewer: "Viewer"
 };
 
-const ALL_VIEWS = ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","employees","master","audit"];
+const ALL_VIEWS = ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","public_info","employees","master","audit"];
 const ROLE_VIEWS = {
   administrator: ALL_VIEWS,
   direktur: ALL_VIEWS,
   head_unit_bisnis: ALL_VIEWS,
-  manager_operasional: ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","master","audit"],
-  admin_teknik: ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","master"],
+  manager_operasional: ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","public_info","master","audit"],
+  admin_teknik: ["dashboard","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","public_info","master"],
   project_manager: ["dashboard","projects","fund_requests","progress","opname","qc","cco","procurement","documents","flow","closeout"],
   pelaksana_lapangan: ["dashboard","projects","fund_requests","progress","qc","cco","procurement","documents","flow"],
   qs: ["dashboard","projects","fund_requests","progress","opname","cco","documents","flow"],
@@ -184,6 +185,7 @@ function collectionPermission(user, collection) {
   const fieldReaders=["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"];
 
   if (collection === "users") return allow();
+  if (["public_project_settings","public_updates","public_site_settings","public_portfolio"].includes(collection)) return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
   if (collection === "projects") return allow(projectReaders,["manager_operasional","admin_teknik"]);
   if (["cash_in","cash_out","receivables","payables"].includes(collection)) return allow(["finance","manager_operasional","admin_teknik"],["finance"]);
   if (collection === "project_budget") return allow(["finance","manager_operasional","admin_teknik","qs","project_manager"],["finance","qs","manager_operasional","admin_teknik"]);
@@ -245,6 +247,7 @@ function buildAccess(user) {
       qcCloseSession: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       qcDeleteSession: roleIn(user,["administrator","direktur","head_unit_bisnis"]),
       atiManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","kepala_ati","instruktur_ati"]),
+      managePublicInfo: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
       qcSyncRab: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","qc","qs"])
     }
   };
@@ -1617,6 +1620,78 @@ async function diagnostics(env) {
   return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,d1:Boolean(env.DB),r2:Boolean(env.FILES),collections:counts.results || [],meta:meta.results || []});
 }
 
+
+function publicSlug(value) {
+  return String(value || "").trim().toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,90) || "portofolio";
+}
+
+async function allRows(env, collection) {
+  const res = await env.DB.prepare(`SELECT id,data_json,updated_at FROM app_records WHERE collection=? ORDER BY updated_at DESC`).bind(collection).all();
+  return (res.results || []).map(r=>({id:r.id,data:safeJsonParse(r.data_json,{}),updated_at:r.updated_at}));
+}
+
+function publicPortfolioPayload(row, includeDescription=false) {
+  const d=row?.data||{};
+  const galleryIds=Array.isArray(d.galleryDocumentIds)?d.galleryDocumentIds.map(String).filter(Boolean):[];
+  const out={
+    id:String(row.id||''),slug:String(d.slug||publicSlug(d.title||row.id)),title:String(d.title||'Portofolio Natara'),
+    category:String(d.category||'Konstruksi'),location:String(d.location||''),year:String(d.year||''),summary:String(d.summary||''),
+    featured:truthy(d.featured),coverDocumentId:String(d.coverDocumentId||''),
+    coverUrl:d.coverDocumentId?`/api/public/media/${encodeURIComponent(d.coverDocumentId)}`:'',
+    galleryCount:galleryIds.length,galleryUrls:galleryIds.map(id=>`/api/public/media/${encodeURIComponent(id)}`)
+  };
+  if(includeDescription) out.description=String(d.description||'');
+  return out;
+}
+
+async function publicSiteHandler(env) {
+  const row=await getRecord(env,'public_site_settings','main');
+  const d=row?.data||{};
+  return json({ok:true,site:{
+    title:String(d.title||'Natara Konstruksi'),
+    tagline:String(d.tagline||'Membangun dengan kontrol, mutu, dan tanggung jawab.'),
+    about:String(d.about||'Natara Konstruksi adalah pelaksana konstruksi yang berfokus pada pengendalian pelaksanaan, mutu, progres, dan dokumentasi proyek secara terintegrasi.'),
+    services:Array.isArray(d.services)?d.services:String(d.services||'Pembangunan, Renovasi, Pelaksanaan Konstruksi').split(',').map(x=>x.trim()).filter(Boolean),
+    portfolioIntro:String(d.portfolioIntro||'Pilihan proyek Natara Konstruksi dari berbagai jenis pekerjaan.'),
+    contactLabel:String(d.contactLabel||'Hubungi Natara'),contactUrl:String(d.contactUrl||''),instagramUrl:String(d.instagramUrl||''),address:String(d.address||'')
+  }});
+}
+
+async function publicPortfolioHandler(env) {
+  const rows=(await allRows(env,'public_portfolio')).filter(r=>truthy(r.data.published)).map(r=>publicPortfolioPayload(r,false));
+  rows.sort((a,b)=>Number(b.featured)-Number(a.featured)||String(b.year||'').localeCompare(String(a.year||''))||a.title.localeCompare(b.title,'id'));
+  return json({ok:true,portfolio:rows});
+}
+
+async function publicPortfolioDetailHandler(env, slug) {
+  const rows=(await allRows(env,'public_portfolio')).filter(r=>truthy(r.data.published));
+  const row=rows.find(r=>String(r.data.slug||publicSlug(r.data.title||r.id))===String(slug));
+  if(!row) return json({ok:false,message:'Portofolio tidak ditemukan.'},404);
+  return json({ok:true,portfolio:publicPortfolioPayload(row,true)});
+}
+
+async function publicMediaHandler(env, docId) {
+  const id=String(docId||'');
+  const portfolio=(await allRows(env,'public_portfolio')).filter(r=>truthy(r.data.published));
+  const allowed=portfolio.some(r=>String(r.data.coverDocumentId||'')===id || (Array.isArray(r.data.galleryDocumentIds)&&r.data.galleryDocumentIds.map(String).includes(id)));
+  if(!allowed) return json({ok:false,message:'Media tidak tersedia untuk publik.'},404);
+  const doc=await getRecord(env,'project_documents',id);
+  if(!doc?.data?.objectKey||!env.FILES) return json({ok:false,message:'Media tidak ditemukan.'},404);
+  const obj=await env.FILES.get(doc.data.objectKey);
+  if(!obj) return json({ok:false,message:'Media tidak ditemukan.'},404);
+  const headers=new Headers();
+  headers.set('content-type',doc.data.mimeType||obj.httpMetadata?.contentType||'application/octet-stream');
+  headers.set('cache-control','public, max-age=3600');
+  headers.set('x-content-type-options','nosniff');
+  return new Response(obj.body,{headers});
+}
+
+async function servePublicPortal(request, env) {
+  if(!env.ASSETS) return json({ok:false,message:'ASSETS binding belum tersedia.'},503);
+  const u=new URL(request.url);u.pathname='/public.html';u.search='';
+  return env.ASSETS.fetch(new Request(u.toString(),{method:'GET',headers:request.headers}));
+}
+
 async function serveAssets(request, env) {
   if (!env.ASSETS) return json({ok:false,message:"ASSETS binding belum tersedia."},503);
   const res = await env.ASSETS.fetch(request);
@@ -1631,8 +1706,15 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.1.6-branding-greeting"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.2.1-company-portfolio"});
     if (path === "/api/health") return diagnostics(env);
+    if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
+    if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
+    if ((path === "/api/public/portfolio" || path === "/api/public/projects") && request.method === "GET") return publicPortfolioHandler(env);
+    const publicPortfolioMatch=path.match(/^\/api\/public\/(?:portfolio|projects)\/([^/]+)$/);
+    if(publicPortfolioMatch && request.method === "GET") return publicPortfolioDetailHandler(env,decodeURIComponent(publicPortfolioMatch[1]));
+    const publicMediaMatch=path.match(/^\/api\/public\/media\/([^/]+)$/);
+    if(publicMediaMatch && request.method === "GET") return publicMediaHandler(env,decodeURIComponent(publicMediaMatch[1]));
     if (path === "/api/auth/login" && request.method === "POST") return loginHandler(request,env);
 
     const auth = await authenticate(request,env);

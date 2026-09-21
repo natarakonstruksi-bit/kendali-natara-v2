@@ -1,11 +1,9 @@
-# Alur QC KENDALI V3.1.6
+# Alur Publik V3.2.1
 
-**QC membuka proyek → Mulai/Lanjutkan Catatan Pemeriksaan → pilih kelompok pekerjaan → tambah sub-pekerjaan → pilih Sesuai/Tidak sesuai → keterangan/foto → simpan.**
+**Internal KENDALI** tetap menjalankan alur proyek, keuangan, progress, opname, QC, CCO, procurement, ATI, dokumen, dan close-out sesuai role.
 
-Catatan bersifat berkelanjutan. Pada kunjungan berikutnya QC membuka catatan proyek yang sama dan menambah pemeriksaan baru.
+**Website Publik** dipisahkan dari alur operasional:
 
-Untuk hasil **Tidak sesuai**:
+`Admin/Manajemen → Profil & Portofolio → Isi Tentang Natara → Tambah Portofolio → Publikasikan → /info`
 
-**Sub-pekerjaan Tidak sesuai → Terbitkan Temuan → PIC otomatis Pelaksana Lapangan → Pelaksana mulai perbaikan → kirim bukti hasil → Waiting QC Check → QC Verifikasi → CLOSED atau REVISION REQUIRED.**
-
-Catatan inspeksi hanya ditutup setelah pemeriksaan proyek dianggap selesai oleh manajemen. Setelah ditutup, data inspeksi menjadi read-only.
+Data proyek internal tidak otomatis muncul. Portofolio merupakan data publik yang disusun khusus untuk website. `sourceProjectId` hanya opsional sebagai referensi internal/media dan tidak diekspos sebagai data operasional.

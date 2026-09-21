@@ -1,12 +1,12 @@
-# Deploy Checklist V3.1.6
+# Deploy Checklist — V3.2.1
 
-1. Replace source V3.1.5 dengan isi paket V3.1.6.
-2. Pastikan folder `public/assets/` ikut ter-upload.
+1. Replace source repository dengan isi paket V3.2.1.
+2. Pertahankan resource existing: D1 `kendali-natara-db-v2` dan R2 `kendali-natara-files-v2`.
 3. Jalankan `npm run build`.
-4. Pastikan hasil: `KENDALI V3.1.6 Branding & Greeting UI preflight OK`.
-5. Jika migration 0014 sebelumnya sudah sukses, tidak perlu migration baru.
-6. Jalankan `npx wrangler deploy`.
-7. Buka `/app-build.json` dan pastikan `APP-V3.1.6`.
-8. Hard refresh browser setelah deploy.
-9. Login dan cek nama user muncul pada topbar serta welcome banner Dashboard.
-10. Cek logo pada login, sidebar, dan tab browser.
+4. Jalankan `npx wrangler d1 migrations apply DB --remote`.
+5. Jalankan `npx wrangler deploy`.
+6. Hard refresh browser.
+7. Login sebagai Administrator/Manajemen → menu **Profil & Portofolio**.
+8. Isi profil Natara dan tambah minimal satu portofolio.
+9. Buka `/info` tanpa login dan pastikan hanya profil + portofolio yang tampil.
+10. Pastikan endpoint internal seperti `/api/dashboard` tanpa login tetap menghasilkan 401.

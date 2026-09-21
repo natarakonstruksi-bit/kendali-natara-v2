@@ -1,40 +1,18 @@
-# Role Matrix KENDALI V3.1
+# Role Matrix — V3.2 Sistem Informasi Publik
 
-| Role | Akses Utama | Scope Proyek |
-|---|---|---|
-| Administrator | Administrasi sistem, seluruh menu/data, karyawan, audit; **tidak mengambil keputusan vendor PR** | Semua |
-| Direktur | Monitoring seluruh menu/data; **tidak mengambil keputusan vendor PR** | Semua |
-| Head Unit Bisnis | Kontrol bisnis dan **pemilihan vendor PR** | Semua |
-| Manager Operasional / Head Operational | Operasional, QC, CCO, PR dan **pemilihan vendor PR** | Semua |
-| Admin Teknik | Administrasi proyek, dokumen, routing, PR/vendor data | Semua |
-| Project Manager | Proyek, progress, QC monitoring, CCO, PR | Hanya proyek yang ditangani |
-| Pelaksana Lapangan | Laporan harian, progress, QC corrective action, CCO/PR | Hanya proyek yang ditangani |
-| QS | Opname, RAB/CCO pricing | Sesuai akses role |
-| QC | Temuan, verifikasi QC, bukti | Sesuai akses role |
-| Finance | Finance, pengajuan dana, payroll view | Semua sesuai role |
-| Logistik / Procurement | PR vendor comparison, PO/SPK, vendor | Semua sesuai role |
-| Kepala ATI | Talent pool, upah/kehadiran, asesmen, pelatihan | ATI |
-| Instruktur ATI | Asesmen, pelatihan, monitoring talent | ATI |
-| Viewer | Read-only | Sesuai data yang diizinkan |
+Portal `/info` dapat dibaca semua orang tanpa login.
 
-## PIC yang dikunci
+Pengelolaan publikasi hanya untuk:
+- Administrator
+- Direktur
+- Head Unit Bisnis
+- Manager Operasional / Head Operational
+- Admin Teknik
 
-- Laporan Harian/Mingguan: **Pelaksana Lapangan**.
-- Schedule/Milestone/Issue lapangan: **Pelaksana Lapangan**.
-- Temuan/perbaikan QC: **Pelaksana Lapangan** sebagai PIC perbaikan; verifikasi oleh **QC**.
-- Opname: **QS / Quantity Surveyor**.
-- CCO pengaju lapangan: **Project Manager atau Pelaksana Lapangan**.
-- PO/SPK: **Logistik / Procurement**.
-- Surat: **Admin Teknik**.
-- Retensi: **Finance/Admin Teknik/Manager Operasional**.
-- Close-Out: **Admin Teknik/Manager Operasional/Project Manager**.
+PM, Pelaksana, QS, QC, Finance, Procurement, ATI, dan Viewer tidak mendapat menu **Informasi Publik** kecuali role diubah oleh manajemen.
 
-- Pengajuan Dana: **Pengaju = user yang sedang login**; tidak tersedia dropdown untuk memilih orang lain.
-- Purchase Request: pemilik/pengaju = **Project Manager yang ditugaskan pada proyek**; vendor dipilih hanya oleh **Head Operational atau Head Unit Bisnis**.
+Portal publik tidak memberikan akses ke API KENDALI internal. Endpoint internal `/api/*`, `/rest/*`, dan `/storage/*` tetap membutuhkan sesi login kecuali endpoint khusus `/api/public/*` yang hanya mengeluarkan data publikasi aman.
 
-## QC Inspection V3.1.6
 
-- **QC / Quality Control**: mulai/lanjut catatan inspeksi, tambah/edit sub-pekerjaan, foto, dan terbitkan temuan.
-- **Manager Operasional dan role manajemen atas**: dapat melihat serta menutup catatan pemeriksaan.
-- **Administrator/Direktur/Head Unit Bisnis**: dapat menghapus catatan yang belum memiliki temuan.
-- **Project Manager/Pelaksana/QS/Admin Teknik**: akses baca mengikuti role dan scope proyek; Pelaksana menerima Temuan QC sebagai PIC perbaikan bila ditugaskan pada proyek tersebut.
+## Profil & Portofolio Publik
+Administrator, Direktur, Head Unit Bisnis memiliki akses penuh. Manager Operasional dan Admin Teknik dapat mengelola profil/portofolio publik. Role proyek lapangan, QS, QC, Finance, Procurement, ATI, dan Viewer tidak mendapat menu ini.
