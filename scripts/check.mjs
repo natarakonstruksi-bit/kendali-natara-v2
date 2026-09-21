@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 const root = path.resolve(import.meta.dirname, '..');
 const required = [
   'src/worker.js','public/index.html','public/styles.css','public/app.js',
-  'migrations/0011_project_control_end_to_end.sql','migrations/0012_full_workflow_roles_qc_cco.sql','migrations/0013_field_pr_qc_ati.sql',
+  'migrations/0011_project_control_end_to_end.sql','migrations/0012_full_workflow_roles_qc_cco.sql','migrations/0013_field_pr_qc_ati.sql','migrations/0014_qc_continuous_inspection.sql',
   'wrangler.jsonc','package.json','README.md','ROLE-MATRIX.md','ALUR-KENDALI.md'
 ];
 for (const rel of required) if (!fs.existsSync(path.join(root,rel))) throw new Error(`File wajib tidak ditemukan: ${rel}`);
@@ -21,7 +21,7 @@ const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 
 const workerMarkers=[
   'APP-V3.1','ROLE_VIEWS','collectionPermission','/api/employees','/api/qc/inspect','syncQcFromRab',
-  'ccoActionHandler','paymentRequestActionHandler','procurementActionHandler','qcFindingActionHandler','daily_workers','ati_assessments','procurementVendorSelect','afterRecordUpsert','progressSeriesFor','isProjectScopedRole','projectAssignedToUser','accessibleProjectIds','sanitizeMetricsForUser'
+  'ccoActionHandler','paymentRequestActionHandler','procurementActionHandler','qcFindingActionHandler','qcSessionStartHandler','qcSessionAddItemHandler','qcSessionPublishHandler','qcSessionCloseHandler','qc_inspection_sessions','qc_inspection_items','daily_workers','ati_assessments','procurementVendorSelect','afterRecordUpsert','progressSeriesFor','isProjectScopedRole','projectAssignedToUser','accessibleProjectIds','sanitizeMetricsForUser'
 ];
 const appMarkers=[
   'Dashboard Proyek','progressChart','Pengajuan Dana Karyawan','QS = Quantity Surveyor','QC Dashboard',
@@ -54,8 +54,8 @@ for (const marker of [
   'Pengajuan Pekerjaan ATI',
   'Masalah Lapangan ATI',
   'Evaluasi Masalah ATI',
-  'QC Management System','QC Inspection — Checklist Semua Pekerjaan','Riwayat QC Inspection'
+  'QC Management System','Inspeksi QC berkelanjutan','Catatan ini <b>berkelanjutan</b>','qcGroupHtml','Terbitkan ${unpublished} temuan'
 ]) if(!app.includes(marker)) throw new Error(`Workflow marker frontend hilang: ${marker}`);
 for (const forbidden of ["f('code','Kode Proyek'",'>Kode Proyek<','<label>Kode Proyek']) if(app.includes(forbidden)) throw new Error(`Kode proyek kembali muncul pada form proyek operasional: ${forbidden}`);
 
-console.log('KENDALI V3.1.3 QC Inspection Fix preflight OK');
+console.log('KENDALI V3.1.4 Continuous QC Inspection preflight OK');

@@ -23,7 +23,7 @@
 
   <div id="app" class="app hidden">
     <aside id="sidebar" class="sidebar">
-      <div class="brand"><div class="brand-mark sm">K</div><div><b>KENDALI</b><span>Natara V3.1.3 QC Inspection</span></div></div>
+      <div class="brand"><div class="brand-mark sm">K</div><div><b>KENDALI</b><span>Natara V3.1.4 QC Continuous</span></div></div>
       <nav id="nav">
         <button data-view="dashboard" class="nav-item active">▦ Dashboard</button>
         <button data-view="projects" class="nav-item">▣ Proyek</button>
@@ -79,7 +79,7 @@
       if (login && app && login.classList.contains('hidden') && app.classList.contains('hidden')) {
         login.classList.remove('hidden');
         var card = login.querySelector('.login-card');
-        if (card) card.innerHTML = '<div class="brand-mark">K</div><h1>KENDALI Natara</h1><p>Aplikasi gagal dimuat.</p><div class="form-error" style="display:block">Frontend tidak berhasil dijalankan. Muat ulang halaman. Jika tetap muncul, gunakan build V3.1.3 atau periksa Console browser.</div><button class="btn primary wide" type="button" onclick="location.reload()">Muat Ulang</button>';
+        if (card) card.innerHTML = '<div class="brand-mark">K</div><h1>KENDALI Natara</h1><p>Aplikasi gagal dimuat.</p><div class="form-error" style="display:block">Frontend tidak berhasil dijalankan. Muat ulang halaman. Jika tetap muncul, gunakan build V3.1.4 atau periksa Console browser.</div><button class="btn primary wide" type="button" onclick="location.reload()">Muat Ulang</button>';
       }
     }, 3500);
   </script>
