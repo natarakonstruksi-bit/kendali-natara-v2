@@ -11,6 +11,7 @@ const required = [
 for (const rel of required) if (!fs.existsSync(path.join(root,rel))) throw new Error(`File wajib tidak ditemukan: ${rel}`);
 execFileSync(process.execPath,['--check',path.join(root,'src/worker.js')],{stdio:'inherit'});
 execFileSync(process.execPath,['--check',path.join(root,'public/app.js')],{stdio:'inherit'});
+execFileSync(process.execPath,[path.join(root,'scripts/runtime-smoke.mjs')],{stdio:'inherit'});
 
 const worker=fs.readFileSync(path.join(root,'src/worker.js'),'utf8');
 const app=fs.readFileSync(path.join(root,'public/app.js'),'utf8');
@@ -57,4 +58,4 @@ for (const marker of [
 ]) if(!app.includes(marker)) throw new Error(`Workflow marker frontend hilang: ${marker}`);
 for (const forbidden of ["f('code','Kode Proyek'",'>Kode Proyek<','<label>Kode Proyek']) if(app.includes(forbidden)) throw new Error(`Kode proyek kembali muncul pada form proyek operasional: ${forbidden}`);
 
-console.log('KENDALI V3.1 Field + Procurement + QC + ATI preflight OK');
+console.log('KENDALI V3.1.1 White Screen Fix preflight OK');

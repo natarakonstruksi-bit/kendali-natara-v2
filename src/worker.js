@@ -3,7 +3,7 @@
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.1";
+const APP_VERSION = "APP-V3.1.1";
 const SERVICE_NAME = "KENDALI Natara Project Control";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -1395,7 +1395,7 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.1-field-pr-qc-ati"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.1.1-field-pr-qc-ati"});
     if (path === "/api/health") return diagnostics(env);
     if (path === "/api/auth/login" && request.method === "POST") return loginHandler(request,env);
 

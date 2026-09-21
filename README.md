@@ -1,3 +1,9 @@
+# KENDALI Natara V3.1.1 — White Screen Fix
+
+Versi ini memperbaiki layar putih pada V3.1. Penyebabnya adalah `renderAti` ditetapkan tanpa deklarasi pada ES module, sehingga browser melempar `ReferenceError` sebelum `init()` dijalankan.
+
+Gunakan source ini untuk mengganti V3.1. Tidak ada migration baru; D1 dan R2 tetap memakai resource yang sama.
+
 # KENDALI Natara V3.1 — Field + Procurement + QC + ATI
 
 Versi ini melanjutkan V3.0.1 dan tetap memakai resource produksi yang sama:

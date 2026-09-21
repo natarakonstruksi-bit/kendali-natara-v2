@@ -1,3 +1,10 @@
+# KENDALI V3.1.1 — White Screen Fix
+
+- Memperbaiki error startup frontend `ReferenceError: renderAti is not defined` yang membuat `app.js` berhenti sebelum `init()` dan menyebabkan layar putih.
+- `renderAti` sekarang dideklarasikan sebagai function yang valid pada ES module.
+- Menambahkan fallback boot UI: jika frontend gagal dimuat, pengguna melihat pesan error dan tombol Muat Ulang, bukan layar putih.
+- Tidak mengubah skema D1, data proyek, role, QC, ATI, PR, atau R2.
+
 # Changelog
 
 ## V3.1.0
