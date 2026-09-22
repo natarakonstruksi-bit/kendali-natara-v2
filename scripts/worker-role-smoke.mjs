@@ -13,7 +13,7 @@ try{
     ['Head Operational','manager_operasional'],['Head of Operational','manager_operasional'],
     ['Koordinator Engineering','koordinator_engineering'],['Head of Engineering','koordinator_engineering'],
     ['Koordinator Supporting','koordinator_supporting'],['Head of Supporting','koordinator_supporting'],
-    ['Senior QC','qc'],['QC Interior','qc'],['Manager Logistik','procurement'],['Procurement / Purchasing','procurement']
+    ['Senior QC','qc'],['QC Interior','qc'],['Site Manager','project_manager'],['Superintendent','project_manager'],['Pengawas Lapangan','pelaksana_lapangan'],['Site Supervisor','pelaksana_lapangan'],['Manager Logistik','procurement'],['Procurement / Purchasing','procurement']
   ];
   for(const [label,want] of cases){const got=m.normalizeRole(label);if(got!==want)throw new Error(`${label} => ${got}; expected ${want}`);}
   const hu=m.buildAccess({id:'hu',role:'Head Unit Bisnis'});
@@ -27,7 +27,11 @@ try{
   const pm=m.buildAccess({id:'pm',role:'Project Manager'});
   if(!pm.views.includes('tasks')||pm.views.includes('finance'))throw new Error('Project Manager view mismatch');
   const pel=m.buildAccess({id:'pel',role:'Pelaksana Lapangan'});
-  if(!pel.views.includes('progress')||pel.views.includes('employees'))throw new Error('Pelaksana Lapangan view mismatch');
+  if(!pel.views.includes('progress')||!pel.views.includes('procurement')||!pel.views.includes('qc')||pel.views.includes('employees'))throw new Error('Pelaksana Lapangan view mismatch');
+  const pelPr=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'procurement');
+  const pelQc=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'defects');
+  if(!pelPr.read||!pelPr.create||!pelPr.update)throw new Error('Pelaksana harus dapat membuat/mengubah Purchase Request.');
+  if(!pelQc.read||!pelQc.update)throw new Error('Pelaksana harus dapat melihat dan memproses temuan QC.');
   console.log('Worker RBAC smoke OK — role aliases, hierarchy, permissions');
 } finally {
   try{fs.unlinkSync(tmp);}catch{}

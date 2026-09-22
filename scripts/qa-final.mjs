@@ -10,15 +10,36 @@ const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 function must(cond,msg){ if(!cond) throw new Error(msg); }
 function has(text,needle,msg=needle){ must(text.includes(needle),`QA marker hilang: ${msg}`); }
 
-must(pkg.version==='3.4.1','Versi package harus 3.4.1');
-has(worker,'APP-V3.4.1','APP version 3.4.1');
-has(html,'Natara Konstruksi • V3.4.1','label frontend 3.4.1');
+must(pkg.version==='3.4.5','Versi package harus 3.4.5');
+has(worker,'APP-V3.4.5','APP version 3.4.5');
+has(html,'Natara Konstruksi • V3.4.5','label frontend 3.4.5');
+has(html,'NARA SYSTEM','branding Nara System');
+has(html,'Masuk ke Nara System','login branding Nara System');
+has(worker,'const SERVICE_NAME = "Nara System";','service branding Nara System');
 
 // Dropdown posisi baru: legacy tidak boleh ditambahkan sebagai pilihan baru.
 must(!app.includes("ROLES.push('Head Operational')"),'Legacy `Head Operational` masih dipaksa masuk dropdown.');
 has(app,"'Head Unit Bisnis','Head of Operational','Head of Engineering','Head of Supporting'",'empat posisi puncak');
 has(app,"'head operational':'Head of Operational'",'normalisasi legacy display');
 has(worker,'["head operational","manager_operasional"]','backend alias legacy role');
+
+
+// Field role merge: Superintendent/Site Manager => Project Manager; Pengawas => Pelaksana Lapangan.
+must(!app.includes("'Project Manager','Site Manager','Pelaksana Lapangan','Pengawas Lapangan'"),'Role lapangan lama masih muncul sebagai pilihan aktif.');
+has(app,"['Operasional Proyek',['Project Manager','Pelaksana Lapangan']]",'role operasional proyek sudah digabung');
+has(app,"'site manager':'Project Manager'",'display alias Site Manager => Project Manager');
+has(app,"'pengawas lapangan':'Pelaksana Lapangan'",'display alias Pengawas => Pelaksana');
+has(worker,'["site manager","project_manager"]','backend alias Site Manager => Project Manager');
+has(worker,'["superintendent","project_manager"]','backend alias Superintendent => Project Manager');
+has(worker,'["pengawas lapangan","pelaksana_lapangan"]','backend alias Pengawas => Pelaksana');
+has(app,'Pengaju PR','PR menampilkan pengaju');
+has(worker,'PR hanya dapat disubmit oleh Project Manager proyek','Project Manager adalah pengaju formal PR');
+
+// Role QC aktif disederhanakan menjadi satu posisi: QC.
+has(app,"['Supporting / QC',['QC']]",'kelompok Supporting hanya memakai role QC');
+must(app.includes(`'QC',\n  'Finance'`),'QC harus tersedia sebagai pilihan posisi aktif.');
+must(!app.includes("'Senior QC','QC / Quality Control','QC Arsitektur','QC Interior','QC MEP'"),'Role QC terpisah masih muncul di pilihan aktif.');
+has(worker,'qc: "QC"','label akses QC canonical');
 
 // Button generation -> event binder. Ini menangkap class tombol yang dibuat tetapi tidak pernah diikat.
 const wiring=[
@@ -78,4 +99,16 @@ for(const m of [
 // Tugas Saya harus punya assignment, menunggu, deadline dan aksi.
 for(const m of ['Tugas Saya','Menunggu Tindakan Anda','waitingFor','dueDate','data-task-action="claim"','data-task-action="start"','Buka & Proses']) has(app,m,m);
 
-console.log('QA static wiring OK — roles, buttons, workflow endpoints, QC controls');
+
+// PR vendor workflow V3.4.5.
+for(const m of [
+  'PR_SPK_ADMIN','SPK_CREATED','PO/SPK dari PR hanya dapat dibuat oleh Admin Teknik',
+  'SPK/PO harus dibuat Admin Teknik sebelum PR dapat ditandai ORDERED',
+  'procurementSpkCreate'
+]) has(worker,m,`PR-SPK backend ${m}`);
+for(const m of [
+  'PR digunakan jika pekerjaan membutuhkan vendor','Project Manager adalah pengaju formal',
+  'Kirim Pembanding ke Head','Buat SPK / PO','SPK/PO dibuat dan masuk register PO/SPK'
+]) has(app,m,`PR-SPK frontend ${m}`);
+
+console.log('QA static wiring OK — roles, buttons, workflow endpoints, QC controls, PR-SPK flow');

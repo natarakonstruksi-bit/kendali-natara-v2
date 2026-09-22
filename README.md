@@ -1,6 +1,6 @@
-# KENDALI Natara V3.4.1 — QA Final + Workflow Inbox
+# Nara System V3.4.5 — QA Final + Workflow Inbox
 
-V3.4.1 melengkapi KENDALI menjadi sistem **task routing** lintas departemen. Setiap tahap workflow yang membutuhkan tindakan orang lain akan membuat **Tugas Saya** untuk user/role tujuan. Tugas tidak dapat sekadar dicentang selesai dari inbox: user harus membuka modul asal dan menjalankan aksi yang benar. Saat aksi selesai, tugas aktif ditutup dan tugas berikutnya otomatis dibuat untuk PIC/role selanjutnya.
+V3.4.5 melengkapi Nara System menjadi sistem **task routing** lintas departemen. Setiap tahap workflow yang membutuhkan tindakan orang lain akan membuat **Tugas Saya** untuk user/role tujuan. Tugas tidak dapat sekadar dicentang selesai dari inbox: user harus membuka modul asal dan menjalankan aksi yang benar. Saat aksi selesai, tugas aktif ditutup dan tugas berikutnya otomatis dibuat untuk PIC/role selanjutnya.
 
 ## Struktur komando utama
 
@@ -42,7 +42,7 @@ Role pengawas/manajemen mempunyai toggle **Semua Tugas Aktif** untuk melihat bot
 
 ## Aturan penting
 
-1. PM/Pelaksana/Site Manager/Pengawas tetap dibatasi ke proyek yang ditugaskan.
+1. Project Manager dan Pelaksana Lapangan tetap dibatasi ke proyek yang ditugaskan. Label lama Site Manager/Superintendent otomatis dibaca sebagai Project Manager; Pengawas Lapangan/Site Supervisor otomatis dibaca sebagai Pelaksana Lapangan.
 2. Tugas role-queue dapat dilihat oleh role tujuan, lalu salah satu user dapat klik **Ambil** agar tugas menjadi miliknya.
 3. Tugas yang sudah berada pada user tertentu tidak dapat diproses user lain kecuali role manajemen yang memang memiliki kewenangan pada modul sumber.
 4. Perubahan status workflow melalui generic Edit dikunci untuk modul workflow agar tahapan tidak dapat dilompati.
@@ -56,8 +56,31 @@ npx wrangler d1 migrations apply DB --remote
 npx wrangler deploy
 ```
 
-Schema database tidak berubah dari V3.4. Migration terakhir tetap `0019_workflow_inbox.sql`; jika migration itu sudah pernah diterapkan, V3.4.1 tidak menambah migration baru.
+Schema database tidak berubah dari V3.4. Migration terakhir tetap `0019_workflow_inbox.sql`; jika migration itu sudah pernah diterapkan, V3.4.5 tidak menambah migration baru.
 
 QA detail tersedia di `QA-MATRIX.md` dan `QA-RESULTS.md`.
 
 Tetap memakai D1/R2 produksi yang sama. Jangan membuat database baru.
+
+
+## Role QC
+V3.4.5 mempertahankan fungsi Quality Control sebagai satu posisi/role **QC**. Seluruh inspeksi, temuan, verifikasi, dan laporan QC menggunakan role yang sama. Label QC lama tetap kompatibel di backend tetapi tidak lagi tersedia sebagai pilihan posisi baru.
+
+
+## V3.4.5 — Penyatuan role lapangan
+
+- `Site Manager`, `Superintendent`, `SM` → **Project Manager**.
+- `Pengawas Lapangan`, `Site Supervisor` → **Pelaksana Lapangan**.
+- Pilihan jabatan baru hanya menampilkan **Project Manager** dan **Pelaksana Lapangan** untuk dua fungsi tersebut.
+- Data lama tetap kompatibel melalui alias backend dan fallback assignment proyek.
+- **Pelaksana Lapangan dapat membantu menyiapkan draft Purchase Request (PR)** untuk proyek yang ditugaskan, tetapi pengaju formal dan pihak yang submit adalah Project Manager. Setelah submit, tugas berpindah ke Procurement untuk melengkapi pembanding vendor.
+- **Pelaksana Lapangan dapat melihat temuan QC proyek dan menerima Tugas Perbaikan QC** jika ditetapkan sebagai PIC.
+
+
+## Catatan kompatibilitas branding
+Nama produk yang tampil kepada user sekarang adalah **Nara System**. Identifier teknis produksi yang sudah ada seperti Worker `kendali-natara-v2`, D1 `kendali-natara-db-v2`, R2 `kendali-natara-files-v2`, cookie `kendali_session`, password salt lama, dan tabel `kendali_audit_log` sengaja **tidak diubah** agar login, data, file, dan deployment existing tetap kompatibel.
+
+
+## PR Vendor V3.4.5
+
+Workflow PR resmi: **Project Manager → Procurement → Head of Operational/Head Unit Bisnis → Admin Teknik → Procurement**. Setelah vendor dipilih oleh Head, Admin Teknik wajib membuat SPK/PO; penyimpanan SPK/PO otomatis mengubah PR ke `SPK_CREATED` dan meneruskan tugas ke Procurement.

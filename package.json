@@ -1,6 +1,6 @@
 {
-  "name": "kendali-natara-project-control",
-  "version": "3.4.1",
+  "name": "nara-system-natara",
+  "version": "3.4.5",
   "private": true,
   "type": "module",
   "scripts": {

@@ -1,7 +1,7 @@
-# Deploy Checklist — KENDALI V3.4.1
+# Deploy Checklist — Nara System V3.4.5
 
 1. Backup/review repository production saat ini.
-2. Replace source dengan isi paket V3.4.1.
+2. Replace source dengan isi paket V3.4.5.
 3. Pertahankan D1 dan R2 existing; jangan membuat database baru.
 4. Jalankan build:
 
@@ -15,7 +15,7 @@ npm run build
 npx wrangler d1 migrations apply DB --remote
 ```
 
-Migration terakhir tetap `0019_workflow_inbox.sql`; V3.4.1 tidak menambah schema baru.
+Migration terakhir tetap `0019_workflow_inbox.sql`; V3.4.5 tidak menambah schema baru.
 
 6. Deploy:
 
@@ -36,3 +36,8 @@ npx wrangler deploy
 Tidak ada kebutuhan membuat akun/D1/R2 baru.
 
 12. Setelah deployment selesai, jalankan matrix pada `QA-MATRIX.md`, terutama upload QC/R2 dan login beberapa role nyata.
+
+
+> Branding berubah menjadi **Nara System**, tetapi nama Worker/D1/R2 produksi tetap dipertahankan agar deployment menimpa sistem existing dan tidak membuat resource baru.
+
+- V3.4.5 tidak menambah migration baru; migration terakhir tetap `0019_workflow_inbox.sql`.

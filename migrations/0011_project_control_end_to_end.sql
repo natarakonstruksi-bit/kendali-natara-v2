@@ -56,7 +56,7 @@ INSERT INTO app_records(collection,id,data_json,updated_at)
 SELECT
   'users',
   'USR-ADMIN',
-  '{"username":"admin","name":"Administrator KENDALI","email":"natarakonstruksi@gmail.com","role":"Administrator","jabatan":"Administrator","unit":"Natara Konstruksi","departemen":"Management","status":"Aktif","password":"h1$68695904f72cf8bf5db4917daaeefcbad005ca61223737e6543e461ba05ff0ba"}',
+  '{"username":"admin","name":"Administrator Nara System","email":"natarakonstruksi@gmail.com","role":"Administrator","jabatan":"Administrator","unit":"Natara Konstruksi","departemen":"Management","status":"Aktif","password":"h1$68695904f72cf8bf5db4917daaeefcbad005ca61223737e6543e461ba05ff0ba"}',
   CURRENT_TIMESTAMP
 WHERE NOT EXISTS (SELECT 1 FROM app_records WHERE collection='users');
 

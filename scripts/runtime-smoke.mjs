@@ -27,7 +27,12 @@ try {
   if(!globalThis.__kendaliQa) throw new Error('QA hook frontend tidak tersedia.');
   const q=globalThis.__kendaliQa;
   if(q.ROLES.includes('Head Operational')) throw new Error('Role legacy masih muncul di dropdown baru.');
+  if(q.ROLES.includes('Site Manager')||q.ROLES.includes('Pengawas Lapangan')) throw new Error('Role Site Manager/Pengawas masih muncul di dropdown aktif.');
+  if(!q.ROLES.includes('Project Manager')||!q.ROLES.includes('Pelaksana Lapangan')) throw new Error('Role Project Manager/Pelaksana wajib tersedia.');
   if(q.normalizePositionLabel('Head Operational')!=='Head of Operational') throw new Error('Normalisasi role legacy gagal.');
+  if(q.normalizePositionLabel('Site Manager')!=='Project Manager') throw new Error('Site Manager belum dinormalisasi ke Project Manager.');
+  if(q.normalizePositionLabel('Superintendent')!=='Project Manager') throw new Error('Superintendent belum dinormalisasi ke Project Manager.');
+  if(q.normalizePositionLabel('Pengawas Lapangan')!=='Pelaksana Lapangan') throw new Error('Pengawas belum dinormalisasi ke Pelaksana Lapangan.');
   if(q.V33_POSITION_GROUPS?.[0]?.[1]?.[0]!=='Head Unit Bisnis') throw new Error('Urutan Head Unit Bisnis tidak paling atas.');
   q.state.user={id:'u-field',name:'Tester'};
   q.state.projects=[{id:'p1',data:{name:'Proyek QA',pmUserId:'u-pm'}}];
