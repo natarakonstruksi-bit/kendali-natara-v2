@@ -1,11 +1,11 @@
 {
   "name": "kendali-natara-project-control",
-  "version": "3.2.1",
+  "version": "3.4.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node scripts/check.mjs",
-    "build": "node scripts/check.mjs",
+    "check": "node scripts/check.mjs && node scripts/qa-final.mjs && node scripts/worker-role-smoke.mjs",
+    "build": "node scripts/check.mjs && node scripts/qa-final.mjs && node scripts/worker-role-smoke.mjs",
     "dev": "wrangler dev",
     "migrate:local": "wrangler d1 migrations apply DB --local",
     "migrate:remote": "wrangler d1 migrations apply DB --remote",

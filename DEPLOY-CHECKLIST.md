@@ -1,12 +1,38 @@
-# Deploy Checklist — V3.2.1
+# Deploy Checklist — KENDALI V3.4.1
 
-1. Replace source repository dengan isi paket V3.2.1.
-2. Pertahankan resource existing: D1 `kendali-natara-db-v2` dan R2 `kendali-natara-files-v2`.
-3. Jalankan `npm run build`.
-4. Jalankan `npx wrangler d1 migrations apply DB --remote`.
-5. Jalankan `npx wrangler deploy`.
-6. Hard refresh browser.
-7. Login sebagai Administrator/Manajemen → menu **Profil & Portofolio**.
-8. Isi profil Natara dan tambah minimal satu portofolio.
-9. Buka `/info` tanpa login dan pastikan hanya profil + portofolio yang tampil.
-10. Pastikan endpoint internal seperti `/api/dashboard` tanpa login tetap menghasilkan 401.
+1. Backup/review repository production saat ini.
+2. Replace source dengan isi paket V3.4.1.
+3. Pertahankan D1 dan R2 existing; jangan membuat database baru.
+4. Jalankan build:
+
+```bash
+npm run build
+```
+
+5. Pastikan migration sampai `0019_workflow_inbox.sql` sudah diterapkan. Aman menjalankan perintah berikut karena Wrangler hanya menerapkan migration yang belum pernah dijalankan:
+
+```bash
+npx wrangler d1 migrations apply DB --remote
+```
+
+Migration terakhir tetap `0019_workflow_inbox.sql`; V3.4.1 tidak menambah schema baru.
+
+6. Deploy:
+
+```bash
+npx wrangler deploy
+```
+
+7. Hard refresh browser.
+8. Login Administrator dan buka **Tugas Saya**.
+9. Uji minimal satu proyek dengan skenario berikut:
+   - Pelaksana submit Progress → PM menerima task → PM approve → Head of Operational menerima task.
+   - Pelaksana submit CCO → Admin Teknik menerima → teruskan QS → QS menerima task.
+   - PM submit PR → Procurement menerima → isi vendor → Kirim Pembanding → Head of Operational menerima.
+   - QC terbitkan temuan → Pelaksana menerima → submit perbaikan → QC menerima verifikasi.
+10. Buka **Alur Proyek** dan pastikan `Tugas Aktif Proyek` menampilkan posisi/menunggu apa.
+11. Login dengan PM/Pelaksana dan pastikan proyek lain tetap tidak dapat diakses.
+
+Tidak ada kebutuhan membuat akun/D1/R2 baru.
+
+12. Setelah deployment selesai, jalankan matrix pada `QA-MATRIX.md`, terutama upload QC/R2 dan login beberapa role nyata.
