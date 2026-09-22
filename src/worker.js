@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.5 — PR → Vendor Approval → Admin Teknik SPK/PO Workflow
+ * Nara System V3.4.6 — PR → Vendor Approval → Admin Teknik SPK/PO Workflow
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.5";
+const APP_VERSION = "APP-V3.4.6";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -85,8 +85,9 @@ const ROLE_VIEWS = {
 };
 
 function normalizeRole(input) {
-  const raw = typeof input === "string" ? input : (input?.role || input?.jabatan || "");
-  const s = String(raw || "").trim().toLowerCase().replace(/[._-]+/g," ").replace(/\s+/g," ");
+  const candidates = typeof input === "string"
+    ? [input]
+    : [input?.position, input?.jabatan, input?.role, input?.roleKey].filter(Boolean);
   const aliases = new Map([
     ["admin","administrator"],["administrator","administrator"],["superadmin","administrator"],["super admin","administrator"],
     ["direktur","direktur"],["director","direktur"],["ceo","direktur"],
@@ -96,7 +97,8 @@ function normalizeRole(input) {
     ["head of supporting","koordinator_supporting"],["head supporting","koordinator_supporting"],["koordinator supporting","koordinator_supporting"],["coordinator supporting","koordinator_supporting"],
     ["admin teknik","admin_teknik"],["administrasi teknik","admin_teknik"],["administrasi proyek","admin_teknik"],
     ["project manager","project_manager"],["pm","project_manager"],
-    ["site manager","project_manager"],["sm","project_manager"],["superintendent","project_manager"],["site superintendent","project_manager"],["superindtent","project_manager"],
+    ["project manager superintendent","project_manager"],["project manager / superintendent","project_manager"],["superintendent / project manager","project_manager"],["pm / superintendent","project_manager"],
+    ["project manager (superintendent)","project_manager"],["site manager","project_manager"],["sm","project_manager"],["superintendent","project_manager"],["site superintendent","project_manager"],["superindtent","project_manager"],
     ["pelaksana lapangan","pelaksana_lapangan"],["pelaksana","pelaksana_lapangan"],
     ["pengawas","pelaksana_lapangan"],["pengawas lapangan","pelaksana_lapangan"],["site supervisor","pelaksana_lapangan"],
     ["estimator","estimator"],["senior estimator","estimator"],
@@ -110,7 +112,13 @@ function normalizeRole(input) {
     ["instruktur ati","instruktur_ati"],["instruktur","instruktur_ati"],["trainer ati","instruktur_ati"],
     ["viewer","viewer"]
   ]);
-  return aliases.get(s) || (ROLE_LABELS[s] ? s : "viewer");
+  for (const raw of candidates) {
+    const s = String(raw || "").trim().toLowerCase().replace(/[._-]+/g," ").replace(/\s*\/\s*/g," / ").replace(/\s+/g," ");
+    if (ROLE_LABELS[s]) return s;
+    const mapped = aliases.get(s);
+    if (mapped) return mapped;
+  }
+  return "viewer";
 }
 
 function roleIn(user, roles) { return roles.includes(normalizeRole(user)); }
@@ -268,6 +276,8 @@ function buildAccess(user) {
       procurementVendorSelect: roleIn(user,["head_unit_bisnis","manager_operasional"]),
       procurementSpkCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","admin_teknik"]),
       procurementOrder: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","procurement"]),
+      projectManagerProcurementAccess: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","project_manager"]),
+      projectManagerQcReadAccess: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","project_manager"]),
       qcInspect: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
       qcVerify: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
       qcCloseSession: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting"]),
@@ -383,8 +393,9 @@ function publicUser(u) {
     id: u.id,
     username: u.username || u.id,
     name: u.name || u.username || u.email || "",
-    role: u.role || "",
-    jabatan: u.jabatan || u.role || "",
+    role: u.role || u.jabatan || u.position || "",
+    jabatan: u.jabatan || u.position || u.role || "",
+    position: u.position || u.jabatan || u.role || "",
     unit: u.unit || "",
     departemen: u.departemen || "",
     email: u.email || "",
@@ -1888,7 +1899,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.5"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.6"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2103,7 +2114,7 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.5-pr-spk-admin-workflow"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.6-pm-access-fix"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);

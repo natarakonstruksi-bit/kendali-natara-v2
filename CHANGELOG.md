@@ -1,4 +1,4 @@
-# Changelog V3.4.5
+# Changelog V3.4.6
 
 ## PR Vendor → SPK/PO oleh Admin Teknik
 - PR diposisikan khusus untuk kebutuhan pekerjaan/material/jasa yang membutuhkan vendor.
@@ -17,7 +17,7 @@
 
 - Nama produk yang tampil kepada user diubah dari nama lama menjadi **Nara System**.
 - Halaman login, sidebar, browser title, welcome banner, workflow inbox, fallback error, dan service label sudah menggunakan Nara System.
-- Versi dinaikkan ke **V3.4.5**.
+- Versi dinaikkan ke **V3.4.6**.
 - Identifier teknis produksi (Worker, D1, R2, cookie, password salt, dan nama tabel legacy) dipertahankan agar deployment existing tidak terputus.
 
 
@@ -45,3 +45,10 @@
 ## Compatibility
 
 Tidak ada migration database baru. Migration terakhir tetap `0019_workflow_inbox.sql`.
+
+
+### V3.4.6
+- Memperbaiki resolusi role Project Manager dari Posisi/Jabatan.
+- Menjamin menu Procurement dan QC tersedia untuk Project Manager.
+- Menambah alias Project Manager/Superintendent.
+- Menambah smoke test khusus akses PM.

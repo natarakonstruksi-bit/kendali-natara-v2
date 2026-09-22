@@ -883,7 +883,7 @@ refreshAfterMutation=async function(){await v34PrevRefreshMutation();await refre
 
 
 /* ========================================================================== */
-/* NARA SYSTEM V3.4.5 — PR → VENDOR APPROVAL → ADMIN TEKNIK SPK / PO       */
+/* NARA SYSTEM V3.4.6 — PR → VENDOR APPROVAL → ADMIN TEKNIK SPK / PO       */
 /* ========================================================================== */
 TITLES.procurement=['Procurement / PR Vendor','Alur: Project Manager mengajukan kebutuhan vendor → Procurement melengkapi pembanding → Head of Operational/Head Unit Bisnis memilih vendor → Admin Teknik membuat SPK/PO → Procurement menindaklanjuti order dan penerimaan.'];
 configs.po.attachment=true;

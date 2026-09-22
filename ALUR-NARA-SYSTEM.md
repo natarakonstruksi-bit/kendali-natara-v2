@@ -1,8 +1,8 @@
-# Alur Nara System V3.4.5 — Dari Proyek Masuk sampai CLOSED
+# Alur Nara System V3.4.6 — Dari Proyek Masuk sampai CLOSED
 
 ## 1. Prinsip Workflow
 
-Nara System V3.4.5 menggunakan pola:
+Nara System V3.4.6 menggunakan pola:
 
 **Seseorang menyelesaikan tahap → sistem menutup tugasnya → sistem membuat tugas untuk orang/role berikutnya → tugas muncul di Tugas Saya penerima.**
 
@@ -140,12 +140,12 @@ Pilih satu proyek → bagian **Tugas Aktif Proyek** menunjukkan seluruh pekerjaa
 Progress fisik 100% belum berarti CLOSED. Proyek baru CLOSED setelah quality, dokumen, CCO, retention/FHO bila berlaku, piutang/hutang, payment request, closeout checklist, dan final reconciliation tidak menyisakan blocker.
 
 
-## Penyesuaian role lapangan V3.4.5
+## Penyesuaian role lapangan V3.4.6
 
 Struktur operasional proyek pada Nara System disederhanakan menjadi **Project Manager → Pelaksana Lapangan**. Superintendent/Site Manager adalah alias Project Manager; Pengawas Lapangan/Site Supervisor adalah alias Pelaksana Lapangan. Pelaksana dapat membantu menyiapkan draft PR kebutuhan proyek, tetapi Project Manager menjadi pengaju formal dan pihak yang submit. Pelaksana tetap menerima temuan QC untuk perbaikan melalui Tugas Saya.
 
 
-## Alur PR Vendor V3.4.5
+## Alur PR Vendor V3.4.6
 
 `DRAFT → SUBMITTED → READY_FOR_APPROVAL → APPROVED → SPK_CREATED → ORDERED → RECEIVED`
 

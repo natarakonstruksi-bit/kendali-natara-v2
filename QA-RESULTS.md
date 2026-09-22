@@ -1,4 +1,4 @@
-# QA Results — Nara System V3.4.5
+# QA Results — Nara System V3.4.6
 
 ## Hasil otomatis
 
@@ -18,7 +18,7 @@
 - Browser title `Nara System — Natara Konstruksi`: PASS
 - Login `NARA SYSTEM`: PASS
 - Tombol `Masuk ke Nara System`: PASS
-- Sidebar `NARA SYSTEM • V3.4.5`: PASS
+- Sidebar `NARA SYSTEM • V3.4.6`: PASS
 - Service backend `Nara System`: PASS
 - Identifier teknis legacy tetap kompatibel: PASS
 
@@ -41,3 +41,6 @@
 ## Catatan produksi
 
 Pengujian build tidak menggantikan browser QA pada Cloudflare produksi. Upload R2, session cookie, dan data D1 production tetap perlu diuji setelah deploy.
+
+- PM access smoke: Procurement + QC menu/read permission ✅
+- Jabatan Project Manager mengalahkan role legacy/stale ✅

@@ -1,6 +1,6 @@
-# Nara System V3.4.5 — QA Final + Workflow Inbox
+# Nara System V3.4.6 — QA Final + Workflow Inbox
 
-V3.4.5 melengkapi Nara System menjadi sistem **task routing** lintas departemen. Setiap tahap workflow yang membutuhkan tindakan orang lain akan membuat **Tugas Saya** untuk user/role tujuan. Tugas tidak dapat sekadar dicentang selesai dari inbox: user harus membuka modul asal dan menjalankan aksi yang benar. Saat aksi selesai, tugas aktif ditutup dan tugas berikutnya otomatis dibuat untuk PIC/role selanjutnya.
+V3.4.6 melengkapi Nara System menjadi sistem **task routing** lintas departemen. Setiap tahap workflow yang membutuhkan tindakan orang lain akan membuat **Tugas Saya** untuk user/role tujuan. Tugas tidak dapat sekadar dicentang selesai dari inbox: user harus membuka modul asal dan menjalankan aksi yang benar. Saat aksi selesai, tugas aktif ditutup dan tugas berikutnya otomatis dibuat untuk PIC/role selanjutnya.
 
 ## Struktur komando utama
 
@@ -56,7 +56,7 @@ npx wrangler d1 migrations apply DB --remote
 npx wrangler deploy
 ```
 
-Schema database tidak berubah dari V3.4. Migration terakhir tetap `0019_workflow_inbox.sql`; jika migration itu sudah pernah diterapkan, V3.4.5 tidak menambah migration baru.
+Schema database tidak berubah dari V3.4. Migration terakhir tetap `0019_workflow_inbox.sql`; jika migration itu sudah pernah diterapkan, V3.4.6 tidak menambah migration baru.
 
 QA detail tersedia di `QA-MATRIX.md` dan `QA-RESULTS.md`.
 
@@ -64,10 +64,10 @@ Tetap memakai D1/R2 produksi yang sama. Jangan membuat database baru.
 
 
 ## Role QC
-V3.4.5 mempertahankan fungsi Quality Control sebagai satu posisi/role **QC**. Seluruh inspeksi, temuan, verifikasi, dan laporan QC menggunakan role yang sama. Label QC lama tetap kompatibel di backend tetapi tidak lagi tersedia sebagai pilihan posisi baru.
+V3.4.6 mempertahankan fungsi Quality Control sebagai satu posisi/role **QC**. Seluruh inspeksi, temuan, verifikasi, dan laporan QC menggunakan role yang sama. Label QC lama tetap kompatibel di backend tetapi tidak lagi tersedia sebagai pilihan posisi baru.
 
 
-## V3.4.5 — Penyatuan role lapangan
+## V3.4.6 — Penyatuan role lapangan
 
 - `Site Manager`, `Superintendent`, `SM` → **Project Manager**.
 - `Pengawas Lapangan`, `Site Supervisor` → **Pelaksana Lapangan**.
@@ -81,6 +81,10 @@ V3.4.5 mempertahankan fungsi Quality Control sebagai satu posisi/role **QC**. Se
 Nama produk yang tampil kepada user sekarang adalah **Nara System**. Identifier teknis produksi yang sudah ada seperti Worker `kendali-natara-v2`, D1 `kendali-natara-db-v2`, R2 `kendali-natara-files-v2`, cookie `kendali_session`, password salt lama, dan tabel `kendali_audit_log` sengaja **tidak diubah** agar login, data, file, dan deployment existing tetap kompatibel.
 
 
-## PR Vendor V3.4.5
+## PR Vendor V3.4.6
 
 Workflow PR resmi: **Project Manager → Procurement → Head of Operational/Head Unit Bisnis → Admin Teknik → Procurement**. Setelah vendor dipilih oleh Head, Admin Teknik wajib membuat SPK/PO; penyimpanan SPK/PO otomatis mengubah PR ke `SPK_CREATED` dan meneruskan tugas ke Procurement.
+
+
+## V3.4.6 — Project Manager Access Fix
+Project Manager memiliki akses menu Procurement dan QC untuk proyek yang ditugaskan. PM dapat membuat/memantau PR dan melihat inspeksi/temuan QC serta menangani tindak lanjut yang menjadi tanggung jawab proyek. Aksi inspeksi/verifikasi QC tetap khusus role QC/Head sesuai matriks. Resolusi role kini memprioritaskan Posisi/Jabatan agar akun lama dengan field role yang stale tidak jatuh menjadi Viewer.
