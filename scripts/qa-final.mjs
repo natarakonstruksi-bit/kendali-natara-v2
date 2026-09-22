@@ -10,9 +10,9 @@ const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 function must(cond,msg){ if(!cond) throw new Error(msg); }
 function has(text,needle,msg=needle){ must(text.includes(needle),`QA marker hilang: ${msg}`); }
 
-must(pkg.version==='3.4.6','Versi package harus 3.4.6');
-has(worker,'APP-V3.4.6','APP version 3.4.6');
-has(html,'Natara Konstruksi • V3.4.6','label frontend 3.4.6');
+must(pkg.version==='3.4.7','Versi package harus 3.4.7');
+has(worker,'APP-V3.4.7','APP version 3.4.7');
+has(html,'Natara Konstruksi • V3.4.7','label frontend 3.4.7');
 has(html,'NARA SYSTEM','branding Nara System');
 has(html,'Masuk ke Nara System','login branding Nara System');
 has(worker,'const SERVICE_NAME = "Nara System";','service branding Nara System');
@@ -100,7 +100,7 @@ for(const m of [
 for(const m of ['Tugas Saya','Menunggu Tindakan Anda','waitingFor','dueDate','data-task-action="claim"','data-task-action="start"','Buka & Proses']) has(app,m,m);
 
 
-// PR vendor workflow V3.4.6.
+// PR vendor workflow V3.4.7.
 for(const m of [
   'PR_SPK_ADMIN','SPK_CREATED','PO/SPK dari PR hanya dapat dibuat oleh Admin Teknik',
   'SPK/PO harus dibuat Admin Teknik sebelum PR dapat ditandai ORDERED',

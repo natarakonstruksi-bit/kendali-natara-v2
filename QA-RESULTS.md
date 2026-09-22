@@ -1,4 +1,13 @@
-# QA Results — Nara System V3.4.6
+# QA Results — Nara System V3.4.7
+
+Fokus regression: Project Manager membuka QC Dashboard dan Procurement tanpa 403 dari dependensi koleksi yang tidak diperlukan.
+
+- QC PM: koleksi inspeksi/temuan tetap dapat dibaca sesuai project scope; `qc_reports` tidak dimuat jika hak baca tidak ada.
+- Procurement PM: PR tetap dimuat; master vendor hanya dimuat oleh role pembanding vendor; PO/SPK hanya dimuat jika role punya hak baca.
+- PM tetap tidak diberi hak QC inspection/verification.
+- PM tetap tidak diberi hak mengelola master vendor.
+
+# QA Results — Nara System V3.4.7
 
 ## Hasil otomatis
 
@@ -18,7 +27,7 @@
 - Browser title `Nara System — Natara Konstruksi`: PASS
 - Login `NARA SYSTEM`: PASS
 - Tombol `Masuk ke Nara System`: PASS
-- Sidebar `NARA SYSTEM • V3.4.6`: PASS
+- Sidebar `NARA SYSTEM • V3.4.7`: PASS
 - Service backend `Nara System`: PASS
 - Identifier teknis legacy tetap kompatibel: PASS
 

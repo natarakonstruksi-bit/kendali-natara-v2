@@ -779,7 +779,7 @@ const v33BaseOpenModal=openModal;
 openModal=function(title,hint,html,onSubmit){v33BaseOpenModal(title,hint,html,onSubmit);$('#modalSave').textContent='Simpan';$('#modalCancel').classList.remove('hidden');$('.modal')?.classList.remove('report-modal');};
 
 const v33BaseRenderQc=renderQc;
-renderQc=async function(){await v33BaseRenderQc();const reports=await loadCollection('qc_reports',false);$('#content').insertAdjacentHTML('beforeend',v33ReportSection('QC',reports));v33BindReportActions('QC',reports);};
+renderQc=async function(){await v33BaseRenderQc();if(!canCollection('qc_reports','read'))return;const reports=await loadCollection('qc_reports',false);$('#content').insertAdjacentHTML('beforeend',v33ReportSection('QC',reports));v33BindReportActions('QC',reports);};
 const v33BaseRenderAti=renderAti;
 renderAti=async function(){await v33BaseRenderAti();const reports=await loadCollection('ati_reports',false);$('#content').insertAdjacentHTML('beforeend',v33ReportSection('ATI',reports));v33BindReportActions('ATI',reports);};
 
@@ -883,7 +883,7 @@ refreshAfterMutation=async function(){await v34PrevRefreshMutation();await refre
 
 
 /* ========================================================================== */
-/* NARA SYSTEM V3.4.6 — PR → VENDOR APPROVAL → ADMIN TEKNIK SPK / PO       */
+/* NARA SYSTEM V3.4.7 — PM QC + PROCUREMENT RUNTIME FIX       */
 /* ========================================================================== */
 TITLES.procurement=['Procurement / PR Vendor','Alur: Project Manager mengajukan kebutuhan vendor → Procurement melengkapi pembanding → Head of Operational/Head Unit Bisnis memilih vendor → Admin Teknik membuat SPK/PO → Procurement menindaklanjuti order dan penerimaan.'];
 configs.po.attachment=true;
@@ -895,7 +895,7 @@ function v345CanVendorCompare(){return v34RoleCan('procurement','manager_operasi
 function v345IsFormalPm(projectId){return String(v31AssignedPm(projectId)||'')===String(state.user.id||'');}
 
 openPrForm=async function(row=null){
-  state.v31Vendors=await loadCollection('vendor',false);
+  state.v31Vendors=(v345CanVendorCompare()&&canCollection('vendor','read'))?await loadCollection('vendor',false):[];
   const d=row?.data||{}; if(!d.prNumber)d.prNumber=v31DefaultPrNumber();
   const projectId=d.projectId||state.selectedProjectId||'';
   const pm=v31AssignedPm(projectId);
@@ -968,7 +968,10 @@ openPoFromPr=async function(prId){
 openPrDetail=function(r){const d=r.data;openModal('Detail Purchase Request',`${projectName(d.projectId)} • ${fmtDate(d.date)}`,`<div class="info-grid"><div class="info-card"><b>Project Manager / Pengaju</b><div>${esc(employeeName(d.projectManagerUserId||d.requesterUserId)||'-')}</div></div><div class="info-card"><b>Status Workflow</b><div>${statusPill(d.status||'DRAFT')}</div></div><div class="info-card"><b>Total HPP</b><div class="big-number">${fmtRp(d.totalHpp)}</div></div><div class="info-card"><b>Vendor Terpilih</b><div>${esc(d.selectedVendorName||'Belum dipilih')}</div><div class="muted">${d.selectedOfferAmount?fmtRp(d.selectedOfferAmount):''}</div></div><div class="info-card"><b>SPK / PO</b><div>${esc(d.poNumber||'Belum dibuat')}</div></div></div><h4>Daftar Material/Jasa</h4><div class="table-wrap"><table class="table"><thead><tr><th>No</th><th>Spesifikasi</th><th>Vol</th><th>Sat</th><th>HPP/Unit</th><th>Total HPP</th></tr></thead><tbody>${(d.items||[]).map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.description)}</td><td>${fmtNum(x.qty)}</td><td>${esc(x.unit)}</td><td class="num">${fmtRp(x.hppUnit)}</td><td class="num">${fmtRp(x.totalHpp)}</td></tr>`).join('')}</tbody></table></div><h4 style="margin-top:18px">Pembanding Vendor</h4><div class="table-wrap"><table class="table"><thead><tr><th>Vendor</th><th>VML</th><th>Penawaran</th><th>Term</th><th>Lead Time</th></tr></thead><tbody>${(d.vendorOffers||[]).map(v=>`<tr class="${v.id===d.selectedVendorOfferId?'selected-row':''}"><td>${esc(v.vendorName)}</td><td>${esc(v.vendorVmlId||'-')}</td><td class="num">${fmtRp(v.amount)}</td><td>${esc(v.term||'-')}</td><td>${esc(v.leadTime||'-')}</td></tr>`).join('')||'<tr><td colspan="5">Belum ada vendor.</td></tr>'}</tbody></table></div><div class="notice ${d.coiDeclaration?'green':'orange'}" style="margin-top:14px">Deklarasi Conflict of Interest PM: <b>${d.coiDeclaration?'Disetujui':'Belum disetujui'}</b></div>`,async()=>{});};
 
 renderProcurement=async function(){
-  state.v31Vendors=await loadCollection('vendor',false); const [prs,pos]=await Promise.all([loadCollection('procurement',Boolean(state.selectedProjectId)),loadCollection('po',Boolean(state.selectedProjectId))]);
+  const vendorPromise=canCollection('vendor','read')?loadCollection('vendor',false):Promise.resolve([]);
+  const poPromise=canCollection('po','read')?loadCollection('po',Boolean(state.selectedProjectId)):Promise.resolve([]);
+  const [vendors,prs,pos]=await Promise.all([vendorPromise,loadCollection('procurement',Boolean(state.selectedProjectId)),poPromise]);
+  state.v31Vendors=vendors;
   const canNew=v345CanPreparePr()&&canCollection('procurement','create');
   $('#content').innerHTML=`<div class="flow-strip"><div class="flow-step"><b>1. Project Manager</b>Ajukan PR Vendor</div><div class="flow-step"><b>2. Procurement</b>Quotation / Pembanding</div><div class="flow-step"><b>3. Head</b>Pilih & Setujui Vendor</div><div class="flow-step"><b>4. Admin Teknik</b>Buat SPK / PO</div><div class="flow-step"><b>5. Procurement</b>Order & Penerimaan</div></div><div class="notice blue"><b>PR digunakan jika pekerjaan membutuhkan vendor.</b> Pelaksana dapat membantu menyiapkan draft, tetapi Project Manager adalah pengaju formal dan yang melakukan submit. Setelah vendor disetujui Head of Operational/Head Unit Bisnis, tugas otomatis masuk ke Admin Teknik untuk membuat SPK/PO.</div><div class="card"><div class="card-head"><div><h3>Purchase Request Vendor</h3><p>PR → pembanding vendor → approval Head → SPK/PO oleh Admin Teknik.</p></div>${canNew?'<div class="card-actions"><button class="btn primary" id="v31NewPr">+ Buat Draft PR</button></div>':''}</div><div class="table-wrap"><table class="table"><thead><tr><th>No. PR</th><th>Tanggal</th><th>Proyek</th><th>Project Manager</th><th>Item</th><th>Total HPP</th><th>Vendor Pembanding</th><th>Vendor Terpilih</th><th>SPK/PO</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${prs.map(r=>`<tr><td><b>${esc(r.data.prNumber||'-')}</b></td><td>${fmtDate(r.data.date)}</td><td><b>${esc(projectName(r.data.projectId))}</b></td><td>${esc(employeeName(r.data.projectManagerUserId||r.data.requesterUserId||v31AssignedPm(r.data.projectId)))}</td><td>${(r.data.items||[]).length}</td><td class="num">${fmtRp(r.data.totalHpp)}</td><td>${(r.data.vendorOffers||[]).length}</td><td>${esc(r.data.selectedVendorName||'-')}</td><td>${esc(r.data.poNumber||'-')}</td><td>${statusPill(r.data.status||'DRAFT')}</td><td class="actions">${v31PrActions(r)}</td></tr>`).join('')||'<tr><td colspan="11" class="empty">Belum ada PR vendor.</td></tr>'}</tbody></table></div></div>${poTable(pos)}`;
   bindCrudActions(); bindWorkflowButtons(); if($('#v31NewPr'))$('#v31NewPr').onclick=()=>openPrForm(); $$('[data-pr-edit]').forEach(b=>b.onclick=()=>openPrForm(prs.find(x=>x.id===b.dataset.prEdit))); $$('[data-pr-select]').forEach(b=>b.onclick=()=>openPrDecision(prs.find(x=>x.id===b.dataset.prSelect))); $$('[data-pr-detail]').forEach(b=>b.onclick=()=>openPrDetail(prs.find(x=>x.id===b.dataset.prDetail)));
