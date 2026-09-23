@@ -1,41 +1,17 @@
-# QA Results — Nara System V3.4.10
+# QA Results — Nara System V3.4.12
 
-## Automated checks
+Local QA PASS untuk build/source package.
 
-`npm run build` menjalankan dan harus menghasilkan PASS untuk:
+- Frontend runtime smoke: PASS.
+- Static workflow/button wiring: PASS.
+- Worker RBAC smoke: PASS.
+- PM access/vendor/QC regression: PASS.
+- QC control + Before/After regression: PASS.
+- QS + As-Built smoke: PASS.
+- Formula Overall As-Built = rata-rata Arsitektur/Struktur/MEP: PASS.
+- As-Built upload/approval endpoint wiring: PASS.
+- Fresh migration: PASS (9 files).
+- Upgrade preservation user/project: PASS.
+- Tidak ada migration baru setelah `0019_workflow_inbox.sql`.
 
-- Frontend runtime smoke.
-- Nara System V3.4.10 preflight.
-- Static wiring QA.
-- Worker RBAC smoke.
-- PM access smoke.
-- PM page runtime smoke.
-- PM vendor flow smoke.
-- QC Control smoke.
-- Button/flow audit.
-
-## QC checks yang dicakup
-
-- Head of Supporting dapat input QC dan mempunyai capability inspeksi/verifikasi.
-- Head of Supporting/QC dapat create/read/update/delete Temuan QC.
-- Session QC mempunyai edit/delete endpoint.
-- Subitem mempunyai edit/delete/photo handler.
-- Finding mempunyai edit/delete handler.
-- Laporan QC mempunyai edit/delete action.
-- PM tetap read-only untuk operasi inspeksi/verifikasi.
-- Tombol kritikal QC mempunyai event binder dan matching route/backend marker.
-
-## Database
-
-`python scripts/db-smoke.py` menguji:
-
-- fresh migration seluruh migration 0011–0019;
-- upgrade preservation untuk data user/proyek existing.
-
-V3.4.10 tidak menambah migration baru.
-
-## Batas QA lokal
-
-PASS lokal tidak sama dengan jaminan absolut environment produksi. Upload R2 remote, D1 remote, cookie/session Cloudflare, cache asset, dan kombinasi data nyata tetap perlu smoke test sesudah deploy. Tidak ada known unbound button pada kontrol kritikal yang tercakup audit V3.4.10.
-
-- Vendor free-text smoke: PASS — PR tidak bergantung pada Master Vendor; nama vendor diketik langsung.
+Catatan: R2/D1 remote, cookie/session, cache asset, dan kombinasi data produksi tetap perlu smoke test setelah deploy.

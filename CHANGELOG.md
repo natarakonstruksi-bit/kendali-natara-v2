@@ -1,6 +1,26 @@
 # Changelog
 
-## V3.4.10 — Vendor Free Text
+## V3.4.12 — QS Volume + As-Built Drafter
+
+- QS disederhanakan menjadi Volume RAB dan Volume Realisasi, dengan % realisasi otomatis.
+- QS auto mengikuti assignment proyek dan edit dikunci setelah submit kecuali dikembalikan.
+- Modul baru As-Built / Drafter dengan progress Arsitektur, Struktur, MEP, Overall, dan status.
+- Drafter dapat upload/ganti file As-Built per disiplin.
+- Workflow As-Built: Drafter → Head of Engineering → Approved/Revisi, terintegrasi Tugas Saya.
+- Gate PHO membaca As-Built Approved bila tracker baru digunakan, dengan fallback legacy.
+- Tidak ada migration baru.
+
+## V3.4.11 — QC Before / After
+
+- Detail Temuan QC menampilkan **dua foto berdampingan: BEFORE dan AFTER**.
+- BEFORE menggunakan bukti dari Continuous QC Inspection atau foto temuan manual.
+- AFTER menggunakan foto hasil perbaikan terbaru yang dikirim Pelaksana.
+- Setiap panel menampilkan tanggal dan catatan; jika foto belum ada tampil placeholder yang jelas.
+- Bukti selain foto utama tetap tampil sebagai **Bukti Tambahan**.
+- Modal detail QC diperlebar dan responsif; pada mobile Before/After ditumpuk vertikal.
+- Tombol `Simpan` di modal detail dihilangkan karena detail bersifat read-only; tombol `Tutup` digunakan.
+- Upload hasil perbaikan (`After`) divalidasi sebagai gambar di backend.
+
 
 - Nama vendor pada PR diketik langsung oleh Project Manager; tidak perlu mendaftarkan/upload nama vendor ke Master Vendor.
 - Dropdown vendor dan ketergantungan load Master Vendor di PR dihapus.

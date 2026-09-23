@@ -1,4 +1,4 @@
-# Alur Nara System V3.4.10
+# Alur Nara System V3.4.12
 
 ## 1. Proyek masuk
 
@@ -58,22 +58,26 @@ Jika record yang dihapus mempunyai data turunan yang memang melekat pada record 
 
 Pelaksana/PM mengajukan → Admin Teknik memeriksa/routing → QS menghitung volume/RAB → tahap approval/escalation → client → addendum → closed. Setiap tahap menampilkan next action yang sesuai role.
 
-## 7. Opname
+## 7. QS / Volume
 
-QS menyiapkan opname → Head of Engineering melakukan verifikasi → Admin Teknik menutup administrasi sesuai status workflow.
+QS mengisi **Volume RAB** dan **Volume Realisasi** per item/area. Sistem menghitung persentase realisasi otomatis. Setelah data siap: `QS → Head of Engineering → Admin Teknik`. Jika Head of Engineering mengembalikan, status kembali ke QS untuk revisi.
 
-## 8. Pengajuan Dana / Finance
+## 8. As-Built / Drafter
+
+Drafter memperbarui progress **Arsitektur / Struktur / MEP** dan meng-upload file tiap disiplin. Overall adalah rata-rata ketiga progress. Saat semua 100% dan file lengkap: `Drafter → Head of Engineering → APPROVED`. Jika revisi, tugas kembali ke Drafter melalui `Tugas Saya`.
+
+## 9. Pengajuan Dana / Finance
 
 Requester mengajukan → Head of Operational review/approve → Finance memproses pembayaran. Cash Out terbentuk ketika pembayaran benar-benar ditandai Paid, bukan saat pengajuan dibuat.
 
-## 9. Laporan QC dan ATI
+## 10. Laporan QC dan ATI
 
 QC/Head of Supporting dapat membuat laporan mingguan/bulanan dari snapshot data inspeksi dan temuan periode. Laporan dikirim ke Head Unit Bisnis untuk review. Metadata laporan dapat diedit/hapus oleh role berwenang; snapshot data inspeksi periode tetap dipertahankan sebagai hasil historis.
 
-## 10. Tugas Saya
+## 11. Tugas Saya
 
 Setiap handoff membuat task dengan status, PIC/role tujuan, deadline, modul sumber, dan `menunggu apa`. User membuka tugas lalu menyelesaikannya dari modul sumber. Penyelesaian aksi membuat task sekarang selesai dan menyalurkan task berikutnya sesuai alur.
 
-## 11. Gate Proyek
+## 12. Gate Proyek
 
 Nara System mengevaluasi tahap proyek dari SETUP/PRECON/MOBILIZATION/EXECUTION sampai PHO/RETENTION/FHO/FINANCIAL CLOSE/CLOSED. Progress fisik 100% tidak otomatis berarti CLOSED; QC/defect, CCO, dokumen, serah terima, vendor, dan financial close tetap harus selesai.

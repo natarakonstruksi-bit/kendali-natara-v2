@@ -41,6 +41,10 @@ try {
   if(!q.v34WorkflowButtons('daily_progress',{id:'r1',data:{status:'DRAFT',projectId:'p1'}}).includes('data-v34-action="submit"')) throw new Error('Tombol progress submit tidak dihasilkan.');
   if(!q.v34WorkflowButtons('opname',{id:'o1',data:{status:'DRAFT',projectId:'p1'}}).includes('Kirim Engineering')) throw new Error('Tombol opname submit tidak dihasilkan.');
   if(!q.v34AtiRequestButtons({id:'a1',data:{status:'DRAFT'}}).includes('Ajukan ke ATI')) throw new Error('Tombol workflow ATI tidak dihasilkan.');
+  if(typeof q.asBuiltOverall!=='function'||q.asBuiltOverall({architectureProgress:60,structureProgress:80,mepProgress:0})!==47) throw new Error('Formula Overall As-Built gagal.');
+  q.state.access={roleKey:'drafter',capabilities:{},collections:{as_built_progress:{read:true,create:true,update:true,delete:false}},views:['tasks','asbuilt']};
+  q.state.projects=[{id:'p1',data:{name:'Proyek QA',drafterUserId:'u-field'}}];
+  if(!q.asBuiltActionButtons(null,'p1').includes('data-asbuilt-edit')) throw new Error('Tombol mulai As-Built tidak dihasilkan.');
   const qcg=q.qcGroupHtml({id:'g1',name:'Pekerjaan Struktur Bawah'},[],true,'p1');
   if(!qcg.includes('data-qc-new-photo')||!qcg.includes('data-qc-add-sub')) throw new Error('Kontrol Tambah Foto / Tambah Item QC tidak dihasilkan.');
   q.state.access={roleKey:'manager_operasional',capabilities:{workflowOversight:true},collections:{procurement:{read:true,create:true,update:true,delete:false},po:{read:true,create:true,update:true,delete:false}},views:['tasks']};

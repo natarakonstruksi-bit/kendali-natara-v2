@@ -1,6 +1,27 @@
-# Nara System V3.4.10 — Vendor Free Text + QC Control QA
+# Nara System V3.4.12 — QS Volume + As-Built Drafter
 
-V3.4.10 memperkuat modul Quality Control dan melakukan audit wiring tombol/alur utama Nara System. Fokus revisi ini adalah memastikan **Head of Supporting tetap dapat menjalankan fungsi QC penuh**, data QC utama mempunyai kontrol **Edit/Hapus**, dan perpindahan tugas tetap mengikuti workflow agar status tidak dapat dilompati lewat edit biasa.
+V3.4.12 menyederhanakan modul **QS** menjadi kontrol **Volume RAB vs Volume Realisasi**, dan menambahkan modul baru **As-Built / Drafter** seperti tabel referensi: Arsitektur %, Struktur %, MEP %, Overall Progress, serta Status As-Built. Drafter dapat meng-upload/ganti file As-Built tiap disiplin, kemudian mengirim hasil 100% ke Head of Engineering untuk approval.
+
+## QS — Volume RAB vs Volume Realisasi
+
+Form QS sekarang fokus pada: proyek, tanggal, item/area, satuan, **Volume RAB**, **Volume Realisasi**, dan catatan. Persentase realisasi dihitung otomatis. Workflow tetap: **QS → Head of Engineering → Admin Teknik**. Setelah QS submit, data tidak dapat diedit QS kecuali dikembalikan untuk revisi.
+
+## As-Built / Drafter
+
+Tabel As-Built menampilkan seluruh proyek yang relevan dengan kolom **Nama Proyek, Arsitektur %, Struktur %, MEP %, Overall Progress, Status As Built, Aksi**. Overall dihitung sebagai rata-rata tiga disiplin; contoh 60% + 80% + 0% menghasilkan 47% setelah pembulatan.
+
+Drafter dapat menyimpan progress bertahap dan upload/ganti file As-Built Arsitektur, Struktur, serta MEP. Saat ketiganya 100% dan ketiga file tersedia, tombol **Kirim Approval** aktif. Handoff masuk ke `Tugas Saya` Head of Engineering. Head of Engineering dapat **Approve** atau **Revisi**. Status final menjadi `APPROVED`.
+
+Drafter hanya dapat upload dokumen kategori `AS_BUILT` dan untuk proyek yang ditugaskan kepadanya. Gate PHO memakai tracker As-Built baru bila tracker sudah ada; proyek legacy tanpa tracker tetap kompatibel dengan dokumen AS_BUILT lama.
+
+## QC Before / After
+
+Pada modal **Detail Temuan QC** sekarang terdapat dua panel utama:
+
+- **BEFORE** — foto kondisi saat temuan dibuat/inspeksi, tanggal temuan, dan catatan temuan.
+- **AFTER** — foto terakhir yang dikirim Pelaksana sebagai hasil perbaikan, tanggal pengiriman, dan uraian perbaikan.
+
+Jika salah satu foto belum tersedia, sistem menampilkan placeholder yang jelas, bukan area kosong. Bukti tambahan tetap tersedia di bagian **Bukti Tambahan**. Riwayat Perbaikan dan Riwayat Verifikasi tetap berada di bawah perbandingan foto. Input foto hasil perbaikan dibatasi ke file gambar pada UI dan backend.
 
 ## Perubahan Vendor PR
 
@@ -69,7 +90,7 @@ Alur utama saat ini:
 - Project Manager dapat membaca QC proyek yang ditugaskan, tetapi inspeksi/verifikasi tetap QC/Head of Supporting.
 - Pelaksana Lapangan menerima Temuan QC yang ditugaskan untuk diperbaiki.
 
-## QA V3.4.10
+## QA V3.4.12
 
 `npm run build` menjalankan:
 
@@ -80,9 +101,10 @@ Alur utama saat ini:
 - PM access/runtime smoke;
 - PM vendor flow smoke;
 - QC Control smoke khusus Head of Supporting/QC;
-- button/flow audit untuk kontrol kritikal shell, task, PR, QC, ATI, dan reporting.
+- button/flow audit untuk kontrol kritikal shell, task, PR, QC, ATI, QS, As-Built, dan reporting;
+- QS + As-Built smoke untuk formula progress, upload, dan workflow approval.
 
-Database smoke juga menguji fresh migration dan upgrade-preservation. V3.4.10 **tidak menambah migration**; migration terakhir tetap `0019_workflow_inbox.sql`.
+Database smoke juga menguji fresh migration dan upgrade-preservation. V3.4.12 **tidak menambah migration**; migration terakhir tetap `0019_workflow_inbox.sql`.
 
 ## Deploy
 

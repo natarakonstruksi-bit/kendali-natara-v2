@@ -1,6 +1,6 @@
-# Deploy Checklist — Nara System V3.4.10
+# Deploy Checklist — Nara System V3.4.12
 
-1. Pastikan deploy memakai package **V3.4.10 QC Control + Button/Flow QA**.
+1. Pastikan deploy memakai package **V3.4.12 QS Volume + As-Built Drafter**.
 2. Jangan membuat D1 atau R2 baru. Tetap gunakan binding produksi existing.
 3. Jalankan QA/build lokal:
 

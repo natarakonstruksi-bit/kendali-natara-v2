@@ -19,7 +19,8 @@ const pairs=[
   ['data-qc-new-photo','[data-qc-new-photo]'],['data-qc-add-sub','[data-qc-add-sub]'],['data-qc-item-photo','[data-qc-item-photo]'],['data-qc-item-result','[data-qc-item-result]'],['data-qc-item-edit','[data-qc-item-edit]'],['data-qc-item-delete','[data-qc-item-delete]'],
   ['data-qc-action','[data-qc-action]'],['data-qc-detail','[data-qc-detail]'],['data-qc-finding-edit','[data-qc-finding-edit]'],['data-qc-finding-delete','[data-qc-finding-delete]'],
   ['data-ati-flow','[data-ati-flow]'],['data-employee-edit','[data-employee-edit]'],['data-employee-delete','[data-employee-delete]'],
-  ['data-report-detail','data-report-detail'],['data-report-edit','data-report-edit'],['data-report-delete','data-report-delete'],['data-report-review','data-report-review'],['data-report-create','data-report-create']
+  ['data-report-detail','data-report-detail'],['data-report-edit','data-report-edit'],['data-report-delete','data-report-delete'],['data-report-review','data-report-review'],['data-report-create','data-report-create'],
+  ['data-asbuilt-edit','[data-asbuilt-edit]'],['data-asbuilt-detail','[data-asbuilt-detail]'],['data-asbuilt-action','[data-asbuilt-action]']
 ];
 for(const [producer,binder] of pairs){must(app.includes(producer),`Button producer hilang: ${producer}`);must(app.includes(binder),`Button binder hilang: ${producer}`)}
 
@@ -40,4 +41,6 @@ for(const marker of ['qcSessionAddItemHandler','qcSessionUpdateItemHandler','qcS
 // No placeholder href/javascript stubs for actionable buttons.
 must(!/onclick\s*=\s*["']\s*["']/.test(app+html),'Ditemukan onclick kosong.');
 must(!/href\s*=\s*["']javascript:void\(0\)/i.test(app+html),'Ditemukan javascript:void(0) placeholder.');
-console.log('Button/flow audit OK — critical shell, workflow, PR, QC, ATI and reporting controls are wired to handlers/routes');
+must(worker.includes('asBuiltActionHandler'),'Backend As-Built action handler hilang.');
+must(app.includes('/api/as-built/${encodeURIComponent(id)}/action'),'Frontend As-Built action endpoint hilang.');
+console.log('Button/flow audit OK — critical shell, workflow, PR, QC, ATI, QS and As-Built controls are wired to handlers/routes');

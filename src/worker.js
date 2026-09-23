@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.10 — Vendor Free Text + QC Control QA
+ * Nara System V3.4.12 — QS Volume + As-Built Drafter
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.10";
+const APP_VERSION = "APP-V3.4.12";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -23,13 +23,13 @@ const COLLECTIONS = new Set([
   "milestones", "retention", "closeout", "project_documents", "issues", "schedule", "procurement",
   "qc_work_items", "qc_inspection_sessions", "qc_inspection_items", "qc_work_groups", "daily_workers", "qc_actions", "qc_verifications", "ati_assessments", "ati_work_requests", "ati_field_issues", "ati_issue_evaluations",
   "public_project_settings", "public_updates", "public_site_settings", "public_portfolio",
-  "qc_reports", "ati_reports", "workflow_tasks"
+  "qc_reports", "ati_reports", "workflow_tasks", "as_built_progress"
 ]);
 
 const PROJECT_SCOPED_COLLECTIONS = new Set([
   "projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests",
   "daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones",
-  "retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks"
+  "retention","closeout","project_documents","issues","schedule","procurement","as_built_progress","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks"
 ]);
 
 const DOC_CORE = ["CONTRACT", "RAB_BASELINE", "DED_FINAL", "TIME_SCHEDULE"];
@@ -61,20 +61,20 @@ const ROLE_LABELS = {
   viewer: "Viewer"
 };
 
-const ALL_VIEWS = ["dashboard","tasks","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","public_info","employees","master","audit"];
+const ALL_VIEWS = ["dashboard","tasks","projects","finance","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","employees","master","audit"];
 const ROLE_VIEWS = {
   administrator: ALL_VIEWS,
   direktur: ALL_VIEWS,
   head_unit_bisnis: ALL_VIEWS,
-  manager_operasional: ["dashboard","tasks","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","public_info","master","audit"],
-  koordinator_engineering: ["dashboard","tasks","projects","progress","opname","qc","cco","procurement","documents","flow","closeout"],
+  manager_operasional: ["dashboard","tasks","projects","finance","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","master","audit"],
+  koordinator_engineering: ["dashboard","tasks","projects","progress","opname","asbuilt","qc","cco","procurement","documents","flow","closeout"],
   koordinator_supporting: ["dashboard","tasks","projects","progress","qc","documents","flow","closeout"],
-  admin_teknik: ["dashboard","tasks","projects","finance","fund_requests","progress","opname","qc","cco","procurement","ati","documents","flow","closeout","public_info","master"],
-  project_manager: ["dashboard","tasks","projects","fund_requests","progress","opname","qc","cco","procurement","documents","flow","closeout"],
+  admin_teknik: ["dashboard","tasks","projects","finance","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","master"],
+  project_manager: ["dashboard","tasks","projects","fund_requests","progress","opname","asbuilt","qc","cco","procurement","documents","flow","closeout"],
   pelaksana_lapangan: ["dashboard","tasks","projects","fund_requests","progress","qc","cco","procurement","documents","flow"],
   estimator: ["dashboard","tasks","projects","cco","documents","flow"],
   qs: ["dashboard","tasks","projects","fund_requests","progress","opname","cco","documents","flow"],
-  drafter: ["dashboard","tasks","projects","documents","flow"],
+  drafter: ["dashboard","tasks","projects","asbuilt","documents","flow"],
   qc: ["dashboard","tasks","projects","fund_requests","progress","qc","documents","flow"],
   mep_engineer: ["dashboard","tasks","projects","progress","qc","documents","flow"],
   finance: ["dashboard","tasks","projects","finance","fund_requests","procurement","documents","flow","closeout"],
@@ -178,8 +178,13 @@ async function requireProjectAccess(env,user,projectId) {
 }
 
 async function recordAllowedByProjectScope(env,user,collection,id,data={}) {
-  if (!isProjectScopedRole(user)) return true;
   const projectId = recordProjectId(collection,id,data);
+  if (normalizeRole(user)==="drafter" && collection==="as_built_progress") {
+    if(!projectId) return false;
+    const assigned=await projectAssignment(env,projectId,"drafter");
+    return String(assigned||"")===String(user.id||"");
+  }
+  if (!isProjectScopedRole(user)) return true;
   if (!projectId) {
     return !PROJECT_SCOPED_COLLECTIONS.has(collection);
   }
@@ -227,6 +232,7 @@ function collectionPermission(user, collection) {
   if (collection === "ati_field_issues") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
   if (collection === "ati_issue_evaluations") return allow(["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
   if (collection === "opname") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","qs"],["manager_operasional","koordinator_engineering","admin_teknik","qs"]);
+  if (collection === "as_built_progress") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","drafter"],["koordinator_engineering","admin_teknik","drafter"],["koordinator_engineering","admin_teknik"]);
   if (collection === "qc_work_items") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","qc"],["manager_operasional","koordinator_supporting","qc"]);
   if (collection === "qc_work_groups") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","admin_teknik","qc"],["manager_operasional","koordinator_supporting"]);
   if (collection === "qc_inspection_sessions") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],[],[]);
@@ -237,7 +243,7 @@ function collectionPermission(user, collection) {
   if (collection === "approvals") return allow(["manager_operasional","admin_teknik","finance"],["manager_operasional","admin_teknik","finance"]);
   if (collection === "procurement") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","pelaksana_lapangan","procurement","finance"],["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","procurement"]);
   if (collection === "po") return allow(["manager_operasional","admin_teknik","project_manager","procurement","finance"],["manager_operasional","admin_teknik","procurement","finance"]);
-  if (collection === "project_documents") return allow(projectReaders,["manager_operasional","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","finance","procurement"],["manager_operasional"]);
+  if (collection === "project_documents") return allow(projectReaders,["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","drafter","qc","finance","procurement"],["manager_operasional","koordinator_engineering","admin_teknik"]);
   if (["retention","closeout"].includes(collection)) return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","finance"],["manager_operasional","admin_teknik","finance"]);
   if (collection === "rabs") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","estimator","qs"],["manager_operasional","koordinator_engineering","admin_teknik","estimator","qs"]);
   if (collection === "surat") return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
@@ -285,7 +291,9 @@ function buildAccess(user) {
       qcDeleteFinding: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
       atiManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","kepala_ati","instruktur_ati"]),
       managePublicInfo: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
-      qcSyncRab: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_engineering","koordinator_supporting","qc","qs"])
+      qcSyncRab: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_engineering","koordinator_supporting","qc","qs"]),
+      asBuiltApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","koordinator_engineering"]),
+      asBuiltEdit: roleIn(user,["administrator","direktur","head_unit_bisnis","koordinator_engineering","admin_teknik","drafter"])
     }
   };
 }
@@ -618,6 +626,12 @@ async function listRecords(env, collection, url, user=null) {
       return pid ? ids.has(pid) : !PROJECT_SCOPED_COLLECTIONS.has(collection);
     });
   }
+  if (user && normalizeRole(user)==="drafter" && ["as_built_progress","project_documents"].includes(collection)) {
+    const assigned=new Set();
+    const projects=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='projects'`).all();
+    for(const p of (projects.results||[])){const d=safeJsonParse(p.data_json,{});if(String(d.drafterUserId||"")===String(user.id||""))assigned.add(String(p.id));}
+    rows=rows.filter(r=>assigned.has(String(r.data.projectId||"")));
+  }
   return rows;
 }
 
@@ -814,7 +828,11 @@ function evaluateProject(projectRow, all) {
   const missing = arr => arr.filter(x => !docs.has(x));
   const coreMissing = missing(DOC_CORE);
   const preconMissing = missing(DOC_PRECON);
-  const phoMissing = missing(DOC_PHO);
+  const phoMissing = missing(["PHO_BAST"]);
+  const asBuiltRows=all.filter(r=>r.collection==="as_built_progress"&&String(r.data.projectId||"")===String(projectRow.id));
+  const asBuiltApproved=asBuiltRows.some(r=>String(r.data.status||"").toUpperCase()==="APPROVED");
+  // Backward compatibility: proyek lama tanpa tracker As-Built tetap boleh memakai dokumen AS_BUILT legacy.
+  if(asBuiltRows.length ? !asBuiltApproved : !docs.has("AS_BUILT")) phoMissing.push("AS_BUILT");
   const qcRequired = p.qcRequired === undefined ? true : truthy(p.qcRequired);
   const qcChecklistMissing = qcRequired && m.qcTotalItems === 0;
   const retentionRequired = truthy(p.retentionRequired ?? p.retensiRequired ?? p.retention_required);
@@ -906,10 +924,12 @@ async function uploadDocument(request, env, user) {
   const projectId = String(fd.get("projectId") || "").trim();
   if (!projectId) return json({ok:false,message:"Project wajib dipilih."},400);
   const denied = await requireProjectAccess(env,user,projectId); if (denied) return denied;
+  if (normalizeRole(user)==="drafter") { const assigned=await projectAssignment(env,projectId,"drafter"); if(String(assigned||"")!==String(user.id||"")) return json({ok:false,message:"Anda bukan Drafter yang ditugaskan pada proyek ini."},403); }
   if (!(file instanceof File)) return json({ok:false,message:"File wajib dipilih."},400);
   if (file.size > MAX_UPLOAD_BYTES) return json({ok:false,message:"Ukuran file maksimal 25 MB."},413);
   const id = crypto.randomUUID();
   const category = String(fd.get("category") || "OTHER").trim().toUpperCase();
+  if (normalizeRole(user)==="drafter" && category!=="AS_BUILT") return json({ok:false,message:"Drafter hanya dapat upload dokumen kategori AS_BUILT."},403);
   const key = `projects/${safeFilename(projectId)}/${safeFilename(category)}/${id}-${safeFilename(file.name)}`;
   await env.FILES.put(key,file.stream(),{httpMetadata:{contentType:file.type || "application/octet-stream"}});
   const data = {
@@ -930,6 +950,7 @@ async function updateDocument(request, env, user, id) {
   const old = await getRecord(env,"project_documents",id);
   if (!old) return json({ok:false,message:"Dokumen tidak ditemukan."},404);
   const deniedOld = await requireProjectAccess(env,user,old.data.projectId); if (deniedOld) return deniedOld;
+  if (normalizeRole(user)==="drafter") { const assigned=await projectAssignment(env,old.data.projectId,"drafter"); if(String(assigned||"")!==String(user.id||"")) return json({ok:false,message:"Anda bukan Drafter yang ditugaskan pada proyek ini."},403); }
   const type = (request.headers.get("content-type") || "").toLowerCase();
   let patch = {};
   let newFile = null;
@@ -945,6 +966,7 @@ async function updateDocument(request, env, user, id) {
   }
   const merged = {...old.data,...patch};
   if (patch.category) merged.category = String(patch.category).toUpperCase();
+  if (normalizeRole(user)==="drafter" && String(merged.category||"").toUpperCase()!=="AS_BUILT") return json({ok:false,message:"Drafter hanya dapat mengubah dokumen kategori AS_BUILT."},403);
   const deniedNew = await requireProjectAccess(env,user,merged.projectId); if (deniedNew) return deniedNew;
   if (newFile) {
     if (!env.FILES) return json({ok:false,message:"R2 binding FILES belum tersedia."},503);
@@ -970,6 +992,7 @@ async function deleteDocument(env,user,id) {
   const old = await getRecord(env,"project_documents",id);
   if (!old) return json({ok:false,message:"Dokumen tidak ditemukan."},404);
   const denied = await requireProjectAccess(env,user,old.data.projectId); if (denied) return denied;
+  if (normalizeRole(user)==="drafter") return json({ok:false,message:"Drafter tidak dapat menghapus dokumen proyek; gunakan Ganti File As-Built."},403);
   if (env.FILES && old.data.objectKey) { try { await env.FILES.delete(old.data.objectKey); } catch (_) {} }
   await env.DB.prepare(`DELETE FROM app_records WHERE collection='project_documents' AND id=?`).bind(id).run();
   await audit(env,user,"DELETE_DOCUMENT","project_documents",id,old.data.projectId || "",{title:old.data.title || old.data.originalName || ""});
@@ -980,6 +1003,7 @@ async function downloadDocument(env,user,id) {
   const old = await getRecord(env,"project_documents",id);
   if (!old) return json({ok:false,message:"Dokumen tidak ditemukan."},404);
   const denied = await requireProjectAccess(env,user,old.data.projectId); if (denied) return denied;
+  if (normalizeRole(user)==="drafter") { const assigned=await projectAssignment(env,old.data.projectId,"drafter"); if(String(assigned||"")!==String(user.id||"")) return json({ok:false,message:"Anda bukan Drafter yang ditugaskan pada proyek dokumen ini."},403); }
   if (!env.FILES || !old.data.objectKey) return json({ok:false,message:"File tidak tersedia."},404);
   const obj = await env.FILES.get(old.data.objectKey);
   if (!obj) return json({ok:false,message:"File tidak ditemukan di R2."},404);
@@ -1064,13 +1088,13 @@ async function getProjectBudgetValue(env, projectId) {
 
 const WORKFLOW_SOURCE_COLLECTIONS = new Set([
   "daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout",
-  "ati_work_requests","ati_field_issues","qc_reports","ati_reports"
+  "ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress"
 ]);
 
 function workflowRoleLabel(role) { return ROLE_LABELS[role] || role || ""; }
 function workflowActiveStatus(status) { return ["OPEN","IN_PROGRESS"].includes(String(status||"").toUpperCase()); }
 function workflowSourceView(collection) {
-  return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati"})[collection] || "dashboard";
+  return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt"})[collection] || "dashboard";
 }
 async function projectRoleUser(env, projectId, roleKey) {
   if (!projectId) return "";
@@ -1096,9 +1120,15 @@ async function workflowTaskSpec(env, collection, id, d={}) {
     return null;
   }
   if(collection==="opname"){
-    if(["DRAFT","RETURNED_TO_QS"].includes(status)) return mk("OPNAME_QS","Opname / QS", "QS menyusun dan memverifikasi volume opname","Kirim ke Head of Engineering",d.qsUserId||qs,"qs");
+    if(["DRAFT","RETURNED_TO_QS"].includes(status)) return mk("OPNAME_QS","Opname / QS", "QS mengisi Volume RAB dan Volume Realisasi pekerjaan","Kirim ke Head of Engineering",d.qsUserId||qs,"qs");
     if(status==="SUBMITTED_TO_ENGINEERING") return mk("OPNAME_ENGINEERING","Review Opname", "Head of Engineering memeriksa opname QS","Verifikasi Opname","","koordinator_engineering");
     if(status==="VERIFIED") return mk("OPNAME_ADMIN_CLOSE","Finalisasi BA Opname", "Admin Teknik memastikan BA/dokumen lengkap lalu menutup opname","Finalisasi & Tutup","","admin_teknik");
+    return null;
+  }
+  if(collection==="as_built_progress"){
+    const drafter=projectId?await projectRoleUser(env,projectId,"drafter"):"";
+    if(["NOT STARTED","IN PROGRESS","REVISION REQUIRED","DRAFT"].includes(status)) return mk("ASBUILT_DRAFTER","Progress As-Built", "Drafter memperbarui progres Arsitektur/Struktur/MEP dan file As-Built","Update As-Built",d.drafterUserId||drafter,"drafter");
+    if(status==="READY FOR APPROVAL") return mk("ASBUILT_ENGINEERING","Review As-Built", "Head of Engineering memeriksa file final As-Built","Approve / Revisi","","koordinator_engineering",{priority:"HIGH"});
     return null;
   }
   if(collection==="defects"){
@@ -1814,7 +1844,8 @@ async function employeeRoleKey(env,id) {
 async function projectAssignment(env,projectId,key) {
   const p=await getRecord(env,"projects",String(projectId || ""));
   if (!p) return "";
-  const fields = key === "pelaksana" || key === "pengawas" ? ["pelaksanaUserId","pengawasUserId"] : key === "site_manager" || key === "pm" ? ["pmUserId","projectManagerUserId","siteManagerUserId","smUserId"] : [];
+  const assignmentMap={pelaksana:["pelaksanaUserId","pengawasUserId"],pengawas:["pelaksanaUserId","pengawasUserId"],site_manager:["pmUserId","projectManagerUserId","siteManagerUserId","smUserId"],pm:["pmUserId","projectManagerUserId","siteManagerUserId","smUserId"],qs:["qsUserId"],drafter:["drafterUserId"],qc:["qcUserId"],mep_engineer:["mepUserId"],estimator:["estimatorUserId"],admin_teknik:["adminUserId"]};
+  const fields=assignmentMap[key]||[];
   for (const f of fields) if (p.data[f]) return String(p.data[f]);
   return "";
 }
@@ -1829,7 +1860,12 @@ async function normalizeOperationalResponsibility(env,collection,data) {
   }
   if (["schedule","milestones","issues"].includes(collection) && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "pelaksana_lapangan") throw new Error("PIC pelaksanaan wajib Pelaksana Lapangan.");
   if (collection === "defects" && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "pelaksana_lapangan") throw new Error("PIC perbaikan QC wajib Pelaksana Lapangan.");
-  if (collection === "opname" && d.qsUserId && (await employeeRoleKey(env,d.qsUserId)) !== "qs") throw new Error("PIC Opname wajib QS / Quantity Surveyor.");
+  if (collection === "opname") {
+    const assigned=await projectAssignment(env,d.projectId,"qs");
+    if (assigned) d.qsUserId=assigned;
+    if (!d.qsUserId) throw new Error("Proyek belum memiliki QS. Tetapkan QS pada master proyek terlebih dahulu.");
+    if ((await employeeRoleKey(env,d.qsUserId)) !== "qs") throw new Error("PIC Opname wajib QS / Quantity Surveyor.");
+  }
   if (collection === "po" && d.picUserId && !["project_manager","procurement"].includes(await employeeRoleKey(env,d.picUserId))) throw new Error("PIC PO/SPK wajib Project Manager proyek (atau role logistik lama untuk kompatibilitas data). ");
   if (collection === "cco" && d.requestedByUserId) { const rk=await employeeRoleKey(env,d.requestedByUserId); if(!["project_manager","pelaksana_lapangan"].includes(rk)) throw new Error("Pengaju lapangan CCO wajib Project Manager atau Pelaksana Lapangan."); }
   if (collection === "surat" && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "admin_teknik") throw new Error("PIC administrasi surat wajib Admin Teknik.");
@@ -1866,6 +1902,7 @@ async function qcFindingActionHandler(request,env,user,id) {
     if(!isPic && !roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","project_manager"])) return json({ok:false,message:"Hanya PIC Pelaksana atau manajemen proyek yang dapat mengirim hasil perbaikan."},403);
     if(old!=="ON PROGRESS") return json({ok:false,message:"Temuan harus ON PROGRESS sebelum dikirim ke QC."},409);
     if(!(file instanceof File) || file.size<=0) return json({ok:false,message:"Foto hasil perbaikan wajib di-upload."},400);
+    if(file.type && !String(file.type).toLowerCase().startsWith("image/")) return json({ok:false,message:"Bukti hasil perbaikan harus berupa foto/gambar."},400);
     const aid=crypto.randomUUID(); const doc=await storeEvidenceDocument(env,user,file,{projectId:d.projectId,category:"QC_EVIDENCE",title:`Hasil Perbaikan QC - ${d.item||d.area||id}`,notes:note,relatedCollection:"qc_actions",relatedId:aid});
     await upsertRecord(env,"qc_actions",aid,{projectId:d.projectId,findingId:id,date:new Date().toISOString().slice(0,10),action:"SUBMIT_FIX",description:note,afterDocumentId:doc.id,byUserId:user.id},user);
     d.status="WAITING QC CHECK"; d.lastFixDocumentId=doc.id; d.lastFixNote=note; d.submittedFixAt=new Date().toISOString();
@@ -1968,7 +2005,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.10"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.12"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2290,6 +2327,9 @@ export default {
     const prAction = path.match(/^\/api\/procurement\/([^/]+)\/action$/);
     if (prAction && request.method === "POST") return procurementActionHandler(request,env,auth.user,decodeURIComponent(prAction[1]));
 
+    const asBuiltAction = path.match(/^\/api\/as-built\/([^/]+)\/action$/);
+    if (asBuiltAction && request.method === "POST") return asBuiltActionHandler(request,env,auth.user,decodeURIComponent(asBuiltAction[1]));
+
     // Documents are project records too and obey role access.
     if (path === "/api/documents" && request.method === "GET") {
       if (collectionDenied(auth.user,"project_documents","read")) return json({ok:false,message:"Akses dokumen ditolak."},403);
@@ -2349,6 +2389,15 @@ export default {
           data.amount=num(pr.data.selectedOfferAmount)||num(data.amount);
           data.description=data.description||`SPK vendor PR ${pr.data.prNumber||pr.id}`;
         }
+        if (collection === "as_built_progress") {
+          const projectId=String(data.projectId||""); if(!projectId) return json({ok:false,message:"Proyek wajib dipilih."},400);
+          const existing=await env.DB.prepare(`SELECT id FROM app_records WHERE collection='as_built_progress' AND json_extract(data_json,'$.projectId')=? LIMIT 1`).bind(projectId).first();
+          if(existing) return json({ok:false,message:"Progress As-Built proyek ini sudah ada. Gunakan tombol Update."},409);
+          const drafter=await projectAssignment(env,projectId,"drafter");
+          if(!drafter) return json({ok:false,message:"Proyek belum memiliki Drafter/BIM. Tetapkan Drafter pada master proyek terlebih dahulu."},400);
+          if(normalizeRole(auth.user)==="drafter" && String(drafter)!==String(auth.user.id||"")) return json({ok:false,message:"Anda bukan Drafter yang ditugaskan pada proyek ini."},403);
+          data=normalizeAsBuiltProgress({...data,drafterUserId:drafter},"");
+        }
         const targetProjectId = recordProjectId(collection,body.id || "",data);
         if (targetProjectId) { const denied = await requireProjectAccess(env,auth.user,targetProjectId); if (denied) return denied; }
         if (collection === "cco") data.status="DRAFT";
@@ -2387,6 +2436,13 @@ export default {
         if (!(await recordAllowedByProjectScope(env,auth.user,collection,id,old.data))) return json({ok:false,message:"Anda tidak ditugaskan pada proyek data ini."},403);
         const mergedProjectId = recordProjectId(collection,id,{...old.data,...data});
         if (mergedProjectId) { const denied = await requireProjectAccess(env,auth.user,mergedProjectId); if (denied) return denied; }
+        if (collection === "as_built_progress") {
+          const role=normalizeRole(auth.user); const oldStatus=String(old.data.status||"").toUpperCase();
+          const projectId=String(old.data.projectId||data.projectId||""); const drafter=await projectAssignment(env,projectId,"drafter");
+          if(role==="drafter" && String(drafter||old.data.drafterUserId||"")!==String(auth.user.id||"")) return json({ok:false,message:"Anda bukan Drafter yang ditugaskan pada proyek ini."},403);
+          if(role==="drafter" && ["READY FOR APPROVAL","APPROVED"].includes(oldStatus)) return json({ok:false,message:"As-Built sedang/final direview. Tunggu Head of Engineering atau kembalikan ke Drafter."},409);
+          data=normalizeAsBuiltProgress({...old.data,...data,projectId,drafterUserId:drafter||old.data.drafterUserId},oldStatus);
+        }
         try { data=await normalizeOperationalResponsibility(env,collection,{...old.data,...data}); } catch(e) { return json({ok:false,message:e.message},400); }
         if (collection === "procurement") data=normalizePrArrays({...old.data,...data});
         const roleKey=normalizeRole(auth.user);
@@ -2401,6 +2457,10 @@ export default {
         if (collection === "cco" && ["project_manager","pelaksana_lapangan"].includes(roleKey)) {
           if (old.data.requestedByUserId && old.data.requestedByUserId !== auth.user.id) return json({ok:false,message:"Anda hanya dapat mengedit CCO yang Anda ajukan."},403);
           if (!["DRAFT","RETURNED_TO_FIELD"].includes(String(old.data.status||"DRAFT").toUpperCase())) return json({ok:false,message:"CCO yang sudah masuk proses Admin/QS tidak dapat diedit oleh lapangan."},409);
+        }
+        if (collection === "opname") {
+          const st=String(old.data.status||"DRAFT").toUpperCase(); const rr=normalizeRole(auth.user);
+          if(rr==="qs"&&!['DRAFT','RETURNED_TO_QS'].includes(st)) return json({ok:false,message:"Opname yang sudah dikirim ke Head of Engineering tidak dapat diedit QS kecuali dikembalikan."},409);
         }
         if (collection === "procurement") {
           const st=String(old.data.status||"DRAFT").toUpperCase();
@@ -2489,3 +2549,46 @@ export default {
     return serveAssets(request,env);
   }
 };
+
+
+/* ========================================================================== */
+/* NARA SYSTEM V3.4.12 — QS VOLUME + AS-BUILT DRAFTER                       */
+/* ========================================================================== */
+function clampPercent(v){ return Math.max(0,Math.min(100,num(v))); }
+function normalizeAsBuiltProgress(data,oldStatus=""){
+  const d={...data};
+  d.architectureProgress=clampPercent(d.architectureProgress);
+  d.structureProgress=clampPercent(d.structureProgress);
+  d.mepProgress=clampPercent(d.mepProgress);
+  d.overallProgress=Math.round((d.architectureProgress+d.structureProgress+d.mepProgress)/3);
+  const old=String(oldStatus||d.status||"").toUpperCase();
+  if(old==="APPROVED") d.status="APPROVED";
+  else if(old==="READY FOR APPROVAL") d.status="READY FOR APPROVAL";
+  else if(old==="REVISION REQUIRED") d.status="REVISION REQUIRED";
+  else d.status=d.overallProgress<=0?"NOT STARTED":"IN PROGRESS";
+  return d;
+}
+async function asBuiltActionHandler(request,env,user,id){
+  const rec=await getRecord(env,"as_built_progress",id); if(!rec) return json({ok:false,message:"Progress As-Built tidak ditemukan."},404);
+  const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
+  const body=await parseJson(request)||{}; const action=String(body.action||"").toLowerCase(); const d={...rec.data}; const old=String(d.status||"NOT STARTED").toUpperCase();
+  const role=normalizeRole(user); const assigned=await projectAssignment(env,d.projectId,"drafter"); const isAssigned=String(assigned||d.drafterUserId||"")===String(user.id||"");
+  if(action==="submit"){
+    if(!["drafter","koordinator_engineering","admin_teknik","manager_operasional","head_unit_bisnis","administrator","direktur"].includes(role)) return json({ok:false,message:"Hanya Drafter/Engineering/Manajemen yang dapat mengirim As-Built untuk approval."},403);
+    if(role==="drafter"&&!isAssigned) return json({ok:false,message:"Anda bukan Drafter proyek ini."},403);
+    if(!["NOT STARTED","IN PROGRESS","REVISION REQUIRED","DRAFT"].includes(old)) return json({ok:false,message:"Status As-Built tidak dapat disubmit pada tahap ini."},409);
+    const n=normalizeAsBuiltProgress(d,"");
+    if(n.architectureProgress<100||n.structureProgress<100||n.mepProgress<100) return json({ok:false,message:"Arsitektur, Struktur, dan MEP harus 100% sebelum dikirim ke Head of Engineering."},409);
+    if(!d.architectureDocId||!d.structureDocId||!d.mepDocId) return json({ok:false,message:"File As-Built Arsitektur, Struktur, dan MEP wajib tersedia sebelum approval."},409);
+    d.status="READY FOR APPROVAL"; d.submittedAt=new Date().toISOString(); d.submittedByUserId=user.id;
+  } else if(action==="approve"){
+    if(!roleIn(user,["administrator","direktur","head_unit_bisnis","koordinator_engineering"])) return json({ok:false,message:"Hanya Head of Engineering/Manajemen yang dapat approve As-Built."},403);
+    if(old!=="READY FOR APPROVAL") return json({ok:false,message:"As-Built belum menunggu approval Engineering."},409);
+    d.status="APPROVED"; d.approvedAt=new Date().toISOString(); d.approvedByUserId=user.id; d.approvedByName=user.name||user.username||"";
+  } else if(action==="return"){
+    if(!roleIn(user,["administrator","direktur","head_unit_bisnis","koordinator_engineering"])) return json({ok:false,message:"Hanya Head of Engineering/Manajemen yang dapat mengembalikan As-Built."},403);
+    if(old!=="READY FOR APPROVAL") return json({ok:false,message:"As-Built belum menunggu approval Engineering."},409);
+    d.status="REVISION REQUIRED"; d.returnReason=String(body.notes||"Perlu revisi As-Built"); d.returnedAt=new Date().toISOString(); d.returnedByUserId=user.id;
+  } else return json({ok:false,message:"Action As-Built tidak dikenal."},400);
+  const out=await upsertRecord(env,"as_built_progress",id,d,user); await syncWorkflowTask(env,"as_built_progress",id,d,user); await audit(env,user,"AS_BUILT_ACTION","as_built_progress",id,d.projectId||"",{action,from:old,to:d.status}); return json({ok:true,row:out});
+}

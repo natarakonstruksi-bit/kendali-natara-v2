@@ -1,4 +1,4 @@
-# Role Matrix — Nara System V3.4.10
+# Role Matrix — Nara System V3.4.12
 
 ## Hierarki utama
 
@@ -15,18 +15,19 @@ Administrator/Direktur adalah akses sistem/manajemen dan bukan urutan operasiona
 |---|---|---|
 | Head Unit Bisnis | Semua proyek | Oversight BU, keputusan, vendor approval, review laporan QC/ATI |
 | Head of Operational | Semua proyek operasional | Review progress, approval operasional/fund/vendor, eksekusi proyek |
-| Head of Engineering | Engineering | Opname, QS, CCO teknis, baseline teknis |
+| Head of Engineering | Engineering | Review QS, CCO teknis, baseline teknis, approval As-Built |
 | **Head of Supporting** | Semua fungsi supporting/QC | **Input inspeksi QC, edit/hapus data QC, terbitkan temuan, verifikasi, laporan QC** |
 | Project Manager | Proyek ditugaskan | Kontrol proyek, review progress, PR + pembanding vendor, baca QC |
 | Pelaksana Lapangan | Proyek ditugaskan | Progress, pekerjaan lapangan, perbaikan Temuan QC, bantu draft kebutuhan |
-| QS / Quantity Surveyor | Proyek sesuai akses | Opname, volume, RAB CCO |
+| QS / Quantity Surveyor | Proyek sesuai akses | Volume RAB vs Volume Realisasi, RAB CCO |
+| Drafter / BIM | Proyek ditugaskan | Progress As-Built Arsitektur/Struktur/MEP, upload/ganti file, submit approval |
 | **QC** | Proyek sesuai akses | **Inspeksi, edit/hapus QC, temuan, verifikasi, laporan QC** |
 | Admin Teknik | Administrasi teknis | Routing CCO, dokumen, SPK/PO setelah vendor disetujui, close-out administratif |
 | Finance | Finance | Pengajuan dana, pembayaran, Cash In/Out, hutang/piutang |
 | Kepala ATI | ATI | Pengajuan tenaga, evaluasi masalah, kontrol ATI |
 | Instruktur ATI | ATI sesuai akses | Aktivitas/pelatihan/assessment ATI |
 
-## Hak khusus QC V3.4.10
+## Hak khusus QC V3.4.12
 
 **Head of Supporting dan QC** dapat:
 

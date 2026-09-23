@@ -1,4 +1,4 @@
-# QA Matrix — Nara System V3.4.10
+# QA Matrix — Nara System V3.4.12
 
 | Area | Skenario | Expected |
 |---|---|---|
@@ -21,3 +21,15 @@
 | DB Upgrade | user/project existing | Tetap terjaga |
 
 | Vendor free text | PM mengetik nama vendor langsung tanpa Master Vendor | PASS via smoke test |
+
+| QC Detail Before / After | QC/Head/PM read | Foto BEFORE + AFTER, tanggal, catatan, placeholder | Automated static/runtime smoke | PASS |
+
+## QS / As-Built
+
+- QS hanya input Volume RAB dan Volume Realisasi.
+- QS submit → Head of Engineering → Admin Teknik.
+- As-Built 3 disiplin + overall otomatis.
+- Upload/ganti file Arsitektur, Struktur, MEP.
+- Submit hanya jika 100% + 3 file tersedia.
+- Head of Engineering Approve / Revisi.
+- Handoff muncul di Tugas Saya.
