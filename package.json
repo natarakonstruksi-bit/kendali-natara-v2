@@ -1,11 +1,11 @@
 {
   "name": "nara-system-natara",
-  "version": "3.4.8",
+  "version": "3.4.10",
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node scripts/check.mjs && node scripts/qa-final.mjs && node scripts/worker-role-smoke.mjs && node scripts/pm-access-smoke.mjs && node scripts/pm-page-runtime-smoke.mjs && node scripts/pm-vendor-flow-smoke.mjs",
-    "build": "node scripts/check.mjs && node scripts/qa-final.mjs && node scripts/worker-role-smoke.mjs && node scripts/pm-access-smoke.mjs && node scripts/pm-page-runtime-smoke.mjs && node scripts/pm-vendor-flow-smoke.mjs",
+    "check": "node scripts/check.mjs && node scripts/qa-final.mjs && node scripts/worker-role-smoke.mjs && node scripts/pm-access-smoke.mjs && node scripts/pm-page-runtime-smoke.mjs && node scripts/pm-vendor-flow-smoke.mjs && node scripts/vendor-free-text-smoke.mjs && node scripts/qc-control-smoke.mjs && node scripts/button-flow-audit.mjs",
+    "build": "node scripts/check.mjs && node scripts/qa-final.mjs && node scripts/worker-role-smoke.mjs && node scripts/pm-access-smoke.mjs && node scripts/pm-page-runtime-smoke.mjs && node scripts/pm-vendor-flow-smoke.mjs && node scripts/vendor-free-text-smoke.mjs && node scripts/qc-control-smoke.mjs && node scripts/button-flow-audit.mjs",
     "dev": "wrangler dev",
     "migrate:local": "wrangler d1 migrations apply DB --local",
     "migrate:remote": "wrangler d1 migrations apply DB --remote",

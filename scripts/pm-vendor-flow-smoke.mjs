@@ -10,10 +10,14 @@ const checks=[
   [worker,'Project Manager menindaklanjuti SPK/PO'],
   [worker,'procurementOrder: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","project_manager"])'],
   [app,'Pembanding Vendor — Project Manager'],
+  [app,'Ketik nama vendor'],
+  [app,"vendorId:'',vendorName:$('.pv-vendor-name',r).value.trim()"],
   [app,'Kebutuhan + Pembanding Vendor'],
   [app,'Tugas PR diteruskan kembali ke Project Manager.'],
   [app,'Penanggung Jawab Vendor']
 ];
 for(const [text,needle] of checks) if(!text.includes(needle)) throw new Error(`PM vendor flow marker missing: ${needle}`);
 if(app.includes("['Keuangan / Supply',['Finance','Manager Logistik','Staf Logistik','Logistik / Procurement','Procurement / Purchasing']]")) throw new Error('Legacy procurement positions still exposed in active dropdown.');
-console.log('PM vendor flow smoke OK — PM fills vendor comparison, Head selects, Admin Teknik creates SPK/PO, task returns to PM.');
+if(app.includes('<select class=\"pv-vendor\">')) throw new Error('Vendor masih berupa dropdown master.');
+if(app.includes("loadCollection('vendor',false)")) throw new Error('PR masih memuat master vendor.');
+console.log('PM vendor flow smoke OK — PM types vendor names directly, Head selects, Admin Teknik creates SPK/PO, task returns to PM.');

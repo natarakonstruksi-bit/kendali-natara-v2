@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.8 — PM Vendor Comparison Workflow
+ * Nara System V3.4.10 — Vendor Free Text + QC Control QA
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.8";
+const APP_VERSION = "APP-V3.4.10";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -221,23 +221,23 @@ function collectionPermission(user, collection) {
   if (collection === "payment_requests") return allow(["finance","manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","procurement"],["finance","manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","procurement"],["finance","manager_operasional"]);
   if (["daily_progress","weekly_progress","schedule","milestones","issues"].includes(collection)) return allow(fieldReaders,projectOps);
   if (collection === "daily_workers") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","finance","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan"],["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan"]);
-  if (["qc_actions","qc_verifications"].includes(collection)) return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qc"],[],[]);
+  if (["qc_actions","qc_verifications"].includes(collection)) return allow(["manager_operasional","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qc"],[],[]);
   if (collection === "ati_assessments") return allow(["manager_operasional","admin_teknik","project_manager","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
   if (collection === "ati_work_requests") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","project_manager","kepala_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
   if (collection === "ati_field_issues") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
   if (collection === "ati_issue_evaluations") return allow(["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
   if (collection === "opname") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","qs"],["manager_operasional","koordinator_engineering","admin_teknik","qs"]);
-  if (collection === "qc_work_items") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","qc"]);
+  if (collection === "qc_work_items") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","qc"],["manager_operasional","koordinator_supporting","qc"]);
   if (collection === "qc_work_groups") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","admin_teknik","qc"],["manager_operasional","koordinator_supporting"]);
   if (collection === "qc_inspection_sessions") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],[],[]);
   if (collection === "qc_inspection_items") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],[],[]);
-  if (collection === "qc_inspections") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"],[],["manager_operasional"]);
-  if (collection === "defects") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","project_manager","pelaksana_lapangan","qc"]);
+  if (collection === "qc_inspections") return allow(["manager_operasional","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"],["manager_operasional","koordinator_supporting","qc"],["manager_operasional","koordinator_supporting","qc"]);
+  if (collection === "defects") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","project_manager","pelaksana_lapangan","qc"],["manager_operasional","koordinator_supporting","qc"]);
   if (collection === "cco") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","pelaksana_lapangan","estimator","qs"],["manager_operasional","koordinator_engineering","admin_teknik","qs","project_manager","pelaksana_lapangan"],["manager_operasional"]);
   if (collection === "approvals") return allow(["manager_operasional","admin_teknik","finance"],["manager_operasional","admin_teknik","finance"]);
   if (collection === "procurement") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","pelaksana_lapangan","procurement","finance"],["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","procurement"]);
   if (collection === "po") return allow(["manager_operasional","admin_teknik","project_manager","procurement","finance"],["manager_operasional","admin_teknik","procurement","finance"]);
-  if (collection === "project_documents") return allow(projectReaders,["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","finance","procurement"],["manager_operasional"]);
+  if (collection === "project_documents") return allow(projectReaders,["manager_operasional","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","finance","procurement"],["manager_operasional"]);
   if (["retention","closeout"].includes(collection)) return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","finance"],["manager_operasional","admin_teknik","finance"]);
   if (collection === "rabs") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","estimator","qs"],["manager_operasional","koordinator_engineering","admin_teknik","estimator","qs"]);
   if (collection === "surat") return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
@@ -281,7 +281,8 @@ function buildAccess(user) {
       qcInspect: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
       qcVerify: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
       qcCloseSession: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting"]),
-      qcDeleteSession: roleIn(user,["administrator","direktur","head_unit_bisnis"]),
+      qcDeleteSession: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
+      qcDeleteFinding: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
       atiManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","kepala_ati","instruktur_ati"]),
       managePublicInfo: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
       qcSyncRab: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_engineering","koordinator_supporting","qc","qs"])
@@ -657,6 +658,11 @@ async function deleteRecord(env, collection, id, user) {
   await env.DB.prepare(`DELETE FROM app_records WHERE collection=? AND id=?`).bind(collection,id).run();
   await audit(env,user,"DELETE",collection,id,existing.data.projectId || "",{});
   return true;
+}
+
+async function deleteRelatedDocuments(env,user,relatedCollection,relatedId) {
+  const q=await env.DB.prepare(`SELECT id FROM app_records WHERE collection='project_documents' AND json_extract(data_json,'$.relatedCollection')=? AND json_extract(data_json,'$.relatedId')=?`).bind(String(relatedCollection||""),String(relatedId||"")).all();
+  for (const r of (q.results||[])) await deleteRecord(env,"project_documents",r.id,user);
 }
 
 function num(v) {
@@ -1546,6 +1552,21 @@ async function qcSessionDetailHandler(env,user,id) {
   return json({ok:true,...d,canEdit:buildAccess(user).capabilities.qcInspect && String(d.session.data.status||"DRAFT").toUpperCase()==="DRAFT",canClose:buildAccess(user).capabilities.qcCloseSession,canDelete:buildAccess(user).capabilities.qcDeleteSession});
 }
 
+async function qcSessionUpdateHandler(request,env,user,id) {
+  if (!buildAccess(user).capabilities.qcInspect) return json({ok:false,message:"Role ini tidak dapat mengubah catatan inspeksi QC."},403);
+  const session=await getRecord(env,"qc_inspection_sessions",id);
+  if (!session) return json({ok:false,message:"Catatan pemeriksaan QC tidak ditemukan."},404);
+  if (String(session.data.status||"DRAFT").toUpperCase()!=="DRAFT") return json({ok:false,message:"Catatan pemeriksaan sudah ditutup dan tidak dapat diedit."},409);
+  const denied=await requireProjectAccess(env,user,session.data.projectId); if (denied) return denied;
+  const body=await parseJson(request)||{};
+  const next={...session.data};
+  if (body.startDate!==undefined) next.startDate=String(body.startDate||next.startDate);
+  if (body.note!==undefined) next.note=String(body.note||"");
+  const rec=await upsertRecord(env,"qc_inspection_sessions",id,{...next,updatedAt:new Date().toISOString()},user);
+  await audit(env,user,"QC_SESSION_EDIT","qc_inspection_sessions",id,session.data.projectId,{startDate:next.startDate});
+  return json({ok:true,row:rec});
+}
+
 async function qcSessionAddItemHandler(request,env,user,sessionId) {
   if (!buildAccess(user).capabilities.qcInspect) return json({ok:false,message:"Role ini tidak dapat menambah sub-pekerjaan QC."},403);
   const session=await getRecord(env,"qc_inspection_sessions",sessionId);
@@ -1616,10 +1637,13 @@ async function qcSessionDeleteItemHandler(env,user,id) {
   if (!buildAccess(user).capabilities.qcInspect) return json({ok:false,message:"Role ini tidak dapat menghapus sub-pekerjaan QC."},403);
   const item=await getRecord(env,"qc_inspection_items",id);
   if (!item) return json({ok:true});
-  if (item.data.findingId) return json({ok:false,message:`Sub-pekerjaan sudah diterbitkan menjadi temuan ${item.data.findingId} dan tidak dapat dihapus.`},409);
+  const linkedFindingId=String(item.data.findingId||"");
+  if (linkedFindingId && !buildAccess(user).capabilities.qcDeleteFinding) return json({ok:false,message:`Sub-pekerjaan sudah diterbitkan menjadi temuan ${linkedFindingId}. Hanya QC/Head of Supporting/Manajemen yang dapat menghapusnya.`},409);
   const session=await getRecord(env,"qc_inspection_sessions",item.data.sessionId);
   if (!session || String(session.data.status||"").toUpperCase()!=="DRAFT") return json({ok:false,message:"Catatan pemeriksaan sudah ditutup."},409);
   const denied=await requireProjectAccess(env,user,item.data.projectId); if (denied) return denied;
+  if (linkedFindingId) await deleteQcFindingData(env,user,linkedFindingId,{checkAccess:false});
+  await deleteRelatedDocuments(env,user,"qc_inspection_items",id);
   await deleteRecord(env,"qc_inspection_items",id,user);
   await recomputeQcSession(env,user,item.data.sessionId);
   return json({ok:true});
@@ -1652,7 +1676,7 @@ async function qcSessionPublishHandler(request,env,user,id) {
 }
 
 async function qcSessionCloseHandler(env,user,id) {
-  if (!buildAccess(user).capabilities.qcCloseSession) return json({ok:false,message:"Penutupan catatan pemeriksaan hanya untuk Manajemen/Head of Operational."},403);
+  if (!buildAccess(user).capabilities.qcCloseSession) return json({ok:false,message:"Penutupan catatan pemeriksaan hanya untuk QC/Head of Supporting/Manajemen."},403);
   const session=await getRecord(env,"qc_inspection_sessions",id);
   if (!session) return json({ok:false,message:"Catatan pemeriksaan tidak ditemukan."},404);
   const items=await qcSessionItems(env,id);
@@ -1664,15 +1688,58 @@ async function qcSessionCloseHandler(env,user,id) {
   return json({ok:true,row:rec});
 }
 
+async function deleteQcFindingData(env,user,id,{checkAccess=true}={}) {
+  const finding=await getRecord(env,"defects",id);
+  if (!finding) return false;
+  if (checkAccess) { const denied=await requireProjectAccess(env,user,finding.data.projectId); if (denied) throw new Error("Anda tidak ditugaskan pada proyek temuan ini."); }
+  const linked=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='qc_inspection_items' AND json_extract(data_json,'$.findingId')=?`).bind(id).all();
+  for (const r of (linked.results||[])) { const d=safeJsonParse(r.data_json,{}); await upsertRecord(env,"qc_inspection_items",r.id,{...d,findingId:"",updatedAt:new Date().toISOString()},user); }
+  const acts=await env.DB.prepare(`SELECT id FROM app_records WHERE collection='qc_actions' AND json_extract(data_json,'$.findingId')=?`).bind(id).all();
+  for (const r of (acts.results||[])) { await deleteRelatedDocuments(env,user,"qc_actions",r.id); await deleteRecord(env,"qc_actions",r.id,user); }
+  const vers=await env.DB.prepare(`SELECT id FROM app_records WHERE collection='qc_verifications' AND json_extract(data_json,'$.findingId')=?`).bind(id).all();
+  for (const r of (vers.results||[])) await deleteRecord(env,"qc_verifications",r.id,user);
+  await deleteRelatedDocuments(env,user,"defects",id);
+  await cancelWorkflowTasks(env,"defects",id,user);
+  await deleteRecord(env,"defects",id,user);
+  await audit(env,user,"QC_FINDING_DELETE","defects",id,finding.data.projectId||"",{linkedItems:(linked.results||[]).length});
+  return true;
+}
+
+async function qcFindingUpdateHandler(request,env,user,id) {
+  if (!buildAccess(user).capabilities.qcInspect) return json({ok:false,message:"Edit temuan QC hanya untuk QC/Head of Supporting/Manajemen."},403);
+  const rec=await getRecord(env,"defects",id); if(!rec) return json({ok:false,message:"Temuan QC tidak ditemukan."},404);
+  const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
+  const body=await parseJson(request)||{}; const next={...rec.data};
+  for (const k of ["date","area","item","category","severity","deadline","description","suggestion","notes"]) if (body[k]!==undefined) next[k]=String(body[k]||"");
+  if (body.picUserId!==undefined) { const pic=String(body.picUserId||""); if(!pic) return json({ok:false,message:"PIC Pelaksana wajib dipilih."},400); if((await employeeRoleKey(env,pic))!=="pelaksana_lapangan") return json({ok:false,message:"PIC perbaikan QC wajib Pelaksana Lapangan."},400); next.picUserId=pic; }
+  if(!String(next.description||"").trim()) return json({ok:false,message:"Deskripsi temuan wajib diisi."},400);
+  if(!String(next.deadline||"").trim()) return json({ok:false,message:"Deadline perbaikan wajib diisi."},400);
+  const out=await upsertRecord(env,"defects",id,{...next,updatedAt:new Date().toISOString()},user);
+  await syncWorkflowTask(env,"defects",id,out.data,user);
+  await audit(env,user,"QC_FINDING_EDIT","defects",id,rec.data.projectId||"",{status:rec.data.status||""});
+  return json({ok:true,row:out});
+}
+
+async function qcFindingDeleteHandler(env,user,id) {
+  if (!buildAccess(user).capabilities.qcDeleteFinding) return json({ok:false,message:"Hapus temuan QC hanya untuk QC/Head of Supporting/Manajemen."},403);
+  const rec=await getRecord(env,"defects",id); if(!rec) return json({ok:true});
+  const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
+  await deleteQcFindingData(env,user,id,{checkAccess:false});
+  return json({ok:true});
+}
+
 async function qcSessionDeleteHandler(env,user,id) {
-  if (!buildAccess(user).capabilities.qcDeleteSession) return json({ok:false,message:"Hapus catatan inspeksi hanya untuk Administrator/Direktur/Head Unit Bisnis."},403);
+  if (!buildAccess(user).capabilities.qcDeleteSession) return json({ok:false,message:"Hapus catatan inspeksi hanya untuk QC/Head of Supporting/Manajemen."},403);
   const session=await getRecord(env,"qc_inspection_sessions",id);
   if (!session) return json({ok:true});
+  const denied=await requireProjectAccess(env,user,session.data.projectId); if(denied) return denied;
   const items=await qcSessionItems(env,id);
-  if (items.some(x=>x.data.findingId)) return json({ok:false,message:"Catatan tidak dapat dihapus karena sudah memiliki temuan QC. Tutup catatan agar jejak audit tetap utuh."},409);
-  for (const it of items) await deleteRecord(env,"qc_inspection_items",it.id,user);
+  const findingIds=[...new Set(items.map(x=>String(x.data.findingId||"")).filter(Boolean))];
+  for (const fid of findingIds) await deleteQcFindingData(env,user,fid,{checkAccess:false});
+  for (const it of items) { await deleteRelatedDocuments(env,user,"qc_inspection_items",it.id); await deleteRecord(env,"qc_inspection_items",it.id,user); }
+  await deleteRelatedDocuments(env,user,"qc_inspection_sessions",id);
   await deleteRecord(env,"qc_inspection_sessions",id,user);
-  await audit(env,user,"QC_SESSION_DELETE","qc_inspection_sessions",id,session.data.projectId,{items:items.length});
+  await audit(env,user,"QC_SESSION_DELETE","qc_inspection_sessions",id,session.data.projectId,{items:items.length,findings:findingIds.length});
   return json({ok:true});
 }
 
@@ -1901,7 +1968,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.8"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.10"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2031,6 +2098,27 @@ async function reviewDivisionReport(env,user,type,id) {
   const data={...rec.data,status:"REVIEWED",reviewedAt:new Date().toISOString(),reviewedByUserId:user.id,reviewedByName:user.name||user.username||user.id}; const row=await upsertRecord(env,collection,id,data,user); await syncWorkflowTask(env,collection,id,data,user); await audit(env,user,"DIVISION_REPORT_REVIEW",collection,id,"",{}); return json({ok:true,row});
 }
 
+async function updateDivisionReport(request,env,user,type,id) {
+  const t=String(type||"").toUpperCase(); const cap=buildAccess(user).capabilities;
+  if(t==="QC" && !cap.qcReportCreate) return json({ok:false,message:"Role ini tidak dapat mengedit laporan QC."},403);
+  if(t==="ATI" && !cap.atiReportCreate) return json({ok:false,message:"Role ini tidak dapat mengedit laporan ATI."},403);
+  const collection=t==="QC"?"qc_reports":t==="ATI"?"ati_reports":""; if(!collection) return json({ok:false,message:"Jenis laporan tidak dikenal."},400);
+  const rec=await getRecord(env,collection,id); if(!rec) return json({ok:false,message:"Laporan tidak ditemukan."},404);
+  const body=await parseJson(request)||{}; const data={...rec.data};
+  if(body.title!==undefined) data.title=String(body.title||rec.data.title||"").trim()||rec.data.title;
+  if(body.notes!==undefined) data.notes=String(body.notes||"");
+  const row=await upsertRecord(env,collection,id,data,user); await audit(env,user,"DIVISION_REPORT_EDIT",collection,id,"",{status:data.status||""}); return json({ok:true,row});
+}
+
+async function deleteDivisionReport(env,user,type,id) {
+  const t=String(type||"").toUpperCase(); const cap=buildAccess(user).capabilities;
+  if(t==="QC" && !cap.qcReportCreate) return json({ok:false,message:"Role ini tidak dapat menghapus laporan QC."},403);
+  if(t==="ATI" && !cap.atiReportCreate) return json({ok:false,message:"Role ini tidak dapat menghapus laporan ATI."},403);
+  const collection=t==="QC"?"qc_reports":t==="ATI"?"ati_reports":""; if(!collection) return json({ok:false,message:"Jenis laporan tidak dikenal."},400);
+  const rec=await getRecord(env,collection,id); if(!rec) return json({ok:true});
+  await cancelWorkflowTasks(env,collection,id,user); await deleteRecord(env,collection,id,user); await audit(env,user,"DIVISION_REPORT_DELETE",collection,id,"",{status:rec.data.status||""}); return json({ok:true});
+}
+
 function publicSlug(value) {
   return String(value || "").trim().toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,90) || "portofolio";
 }
@@ -2144,6 +2232,9 @@ export default {
     if (path === "/api/reports/ati/generate" && request.method === "POST") return generateDivisionReport(request,env,auth.user,"ATI");
     const reportReviewMatch=path.match(/^\/api\/reports\/(qc|ati)\/([^/]+)\/review$/);
     if (reportReviewMatch && request.method === "POST") return reviewDivisionReport(env,auth.user,reportReviewMatch[1],decodeURIComponent(reportReviewMatch[2]));
+    const reportManageMatch=path.match(/^\/api\/reports\/(qc|ati)\/([^/]+)$/);
+    if (reportManageMatch && request.method === "PATCH") return updateDivisionReport(request,env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));
+    if (reportManageMatch && request.method === "DELETE") return deleteDivisionReport(env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));
 
     if (path === "/api/tasks/my" && request.method === "GET") return json({ok:true,rows:await listWorkflowTasks(env,auth.user,url)});
     const taskProjectMatch=path.match(/^\/api\/tasks\/project\/([^/]+)$/);
@@ -2173,6 +2264,7 @@ export default {
     if (path === "/api/qc/sessions" && request.method === "POST") return qcSessionStartHandler(request,env,auth.user);
     const qcSessionDetailMatch = path.match(/^\/api\/qc\/sessions\/([^/]+)$/);
     if (qcSessionDetailMatch && request.method === "GET") return qcSessionDetailHandler(env,auth.user,decodeURIComponent(qcSessionDetailMatch[1]));
+    if (qcSessionDetailMatch && request.method === "PATCH") return qcSessionUpdateHandler(request,env,auth.user,decodeURIComponent(qcSessionDetailMatch[1]));
     if (qcSessionDetailMatch && request.method === "DELETE") return qcSessionDeleteHandler(env,auth.user,decodeURIComponent(qcSessionDetailMatch[1]));
     const qcSessionItemsMatch = path.match(/^\/api\/qc\/sessions\/([^/]+)\/items$/);
     if (qcSessionItemsMatch && request.method === "POST") return qcSessionAddItemHandler(request,env,auth.user,decodeURIComponent(qcSessionItemsMatch[1]));
@@ -2185,6 +2277,9 @@ export default {
     if (qcSessionItemMatch && request.method === "DELETE") return qcSessionDeleteItemHandler(env,auth.user,decodeURIComponent(qcSessionItemMatch[1]));
     const qcSessionPhotoMatch = path.match(/^\/api\/qc\/session-items\/([^/]+)\/photo$/);
     if (qcSessionPhotoMatch && request.method === "POST") return qcSessionItemPhotoHandler(request,env,auth.user,decodeURIComponent(qcSessionPhotoMatch[1]));
+    const qcFindingMatch = path.match(/^\/api\/qc\/findings\/([^/]+)$/);
+    if (qcFindingMatch && request.method === "PATCH") return qcFindingUpdateHandler(request,env,auth.user,decodeURIComponent(qcFindingMatch[1]));
+    if (qcFindingMatch && request.method === "DELETE") return qcFindingDeleteHandler(env,auth.user,decodeURIComponent(qcFindingMatch[1]));
     const qcFindingAction = path.match(/^\/api\/qc\/findings\/([^/]+)\/action$/);
     if (qcFindingAction && request.method === "POST") return qcFindingActionHandler(request,env,auth.user,decodeURIComponent(qcFindingAction[1]));
 

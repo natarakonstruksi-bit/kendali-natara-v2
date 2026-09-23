@@ -10,9 +10,9 @@ const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 function must(cond,msg){ if(!cond) throw new Error(msg); }
 function has(text,needle,msg=needle){ must(text.includes(needle),`QA marker hilang: ${msg}`); }
 
-must(pkg.version==='3.4.8','Versi package harus 3.4.8');
-has(worker,'APP-V3.4.8','APP version 3.4.8');
-has(html,'Natara Konstruksi • V3.4.8','label frontend 3.4.8');
+must(pkg.version==='3.4.10','Versi package harus 3.4.10');
+has(worker,'APP-V3.4.10','APP version 3.4.10');
+has(html,'Natara Konstruksi • V3.4.10','label frontend 3.4.10');
 has(html,'NARA SYSTEM','branding Nara System');
 has(html,'Masuk ke Nara System','login branding Nara System');
 has(worker,'const SERVICE_NAME = "Nara System";','service branding Nara System');
@@ -59,11 +59,18 @@ const wiring=[
   ['data-qc-item-result','[data-qc-item-result]'],
   ['data-qc-item-delete','[data-qc-item-delete]'],
   ['data-qc-action','[data-qc-action]'],
-  ['data-qc-session','[data-qc-session]'],
+  ['data-qc-session-open','[data-qc-session-open]'],
+  ['data-qc-session-edit','[data-qc-session-edit]'],
+  ['data-qc-session-delete','[data-qc-session-delete]'],
+  ['data-qc-item-edit','[data-qc-item-edit]'],
+  ['data-qc-finding-edit','[data-qc-finding-edit]'],
+  ['data-qc-finding-delete','[data-qc-finding-delete]'],
   ['data-ati-flow','[data-ati-flow]'],
   ['data-employee-edit','[data-employee-edit]'],
   ['data-employee-delete','[data-employee-delete]'],
   ['data-report-detail','data-report-detail'],
+  ['data-report-edit','data-report-edit'],
+  ['data-report-delete','data-report-delete'],
   ['data-report-review','data-report-review'],
   ['data-report-create','data-report-create']
 ];
@@ -75,7 +82,7 @@ for(const [producer,binder] of wiring){
 // Endpoints utama workflow harus ada di frontend dan backend router/action.
 const endpointMarkers=[
   '/api/tasks/my','/api/tasks/','/api/progress/','/api/opname/','/api/issues/',
-  '/api/procurement/','/api/cco/','/api/payment-requests/','/api/ati/','/api/qc/sessions','/api/qc/session-items/'
+  '/api/procurement/','/api/cco/','/api/payment-requests/','/api/ati/','/api/qc/sessions','/api/qc/session-items/','/api/qc/findings/'
 ];
 for(const m of endpointMarkers){
   must(app.includes(m)||worker.includes(m),`Endpoint marker hilang: ${m}`);
@@ -96,6 +103,10 @@ for(const m of [
   "$$('[data-qc-item-delete]','#modalForm')"
 ]) has(app,m,m);
 
+// QC V3.4.10: Head of Supporting/QC manage full QC records with edit/delete and audit-safe cascades.
+for(const m of ['qcDeleteFinding','QC_FINDING_EDIT','QC_FINDING_DELETE','QC_SESSION_EDIT','deleteQcFindingData','deleteRelatedDocuments','DIVISION_REPORT_EDIT','DIVISION_REPORT_DELETE']) has(worker,m,`QC control backend ${m}`);
+for(const m of ['Edit Catatan Inspeksi QC','data-qc-item-edit','data-qc-finding-edit','data-qc-finding-delete','data-qc-session-delete','openQcItemEdit']) has(app,m,`QC control frontend ${m}`);
+
 // Tugas Saya harus punya assignment, menunggu, deadline dan aksi.
 for(const m of ['Tugas Saya','Menunggu Tindakan Anda','waitingFor','dueDate','data-task-action="claim"','data-task-action="start"','Buka & Proses']) has(app,m,m);
 
@@ -113,4 +124,4 @@ for(const m of [
 
 for(const m of ['Project Manager wajib menambahkan minimal satu pembanding vendor','PR dan pembanding vendor harus dikirim Project Manager ke Head','PR_PM_VENDOR']) has(worker,m,`PM vendor backend ${m}`);
 for(const m of ['Pembanding Vendor — Project Manager','Project Manager mengisi kebutuhan, HPP, dan pembanding/quotation vendor sekaligus','Tugas PR diteruskan kembali ke Project Manager']) has(app,m,`PM vendor frontend ${m}`);
-console.log('QA static wiring OK — roles, buttons, workflow endpoints, QC controls, PM vendor + PR-SPK flow');
+console.log('QA static wiring OK — roles, buttons, workflow endpoints, QC edit/delete controls, button bindings, PM vendor + PR-SPK flow');

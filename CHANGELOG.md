@@ -1,74 +1,43 @@
-## V3.4.8 — PM Vendor Comparison Workflow
-
-- Menghapus ketergantungan workflow PR terhadap role Procurement.
-- Project Manager sekarang mengisi sekaligus kebutuhan/HPP dan pembanding/quotation vendor.
-- Saat Project Manager mengirim PR, status langsung menuju `READY_FOR_APPROVAL` dan tugas masuk ke Head of Operational/Head Unit Bisnis untuk pemilihan vendor.
-- Setelah vendor disetujui, tugas masuk ke Admin Teknik untuk membuat SPK/PO dan menambahkannya ke register PO/SPK.
-- Setelah SPK/PO dibuat, tugas kembali ke Project Manager untuk tindak lanjut vendor (`ORDERED`) dan konfirmasi penerimaan material/jasa (`RECEIVED`).
-- Project Manager mendapat akses baca master vendor agar dapat mengisi vendor comparison; Admin Teknik dapat memelihara master vendor.
-- Pilihan posisi aktif `Logistik / Procurement` dan `Procurement / Purchasing` dihapus; data/alias lama tetap kompatibel di backend.
-- Menu user-facing diubah dari `Procurement` menjadi `PR / Vendor`.
-- Tidak ada migration database baru; migration terakhir tetap `0019_workflow_inbox.sql`.
-
 # Changelog
 
-## V3.4.8 — PM QC + Procurement Runtime Fix
-- Memperbaiki QC Dashboard Project Manager yang gagal karena frontend memaksa membaca `qc_reports` walau PM tidak memiliki akses laporan divisi.
-- Memperbaiki Procurement Project Manager yang gagal karena frontend memaksa membaca master `vendor`.
-- Procurement kini hanya memuat master vendor untuk role yang memang mengelola pembanding vendor.
-- Register PO/SPK juga dimuat hanya bila role memiliki hak baca; ini menjaga halaman Procurement tetap dapat digunakan oleh role lapangan sesuai kewenangannya.
-- Hak PM tetap least-privilege: dapat melihat QC proyek yang ditugaskan dan membuat/memantau PR, tanpa memperoleh akses laporan QC seluruh divisi atau master vendor yang tidak diperlukan.
+## V3.4.10 — Vendor Free Text
 
+- Nama vendor pada PR diketik langsung oleh Project Manager; tidak perlu mendaftarkan/upload nama vendor ke Master Vendor.
+- Dropdown vendor dan ketergantungan load Master Vendor di PR dihapus.
+- Quotation tetap dapat dilampirkan secara opsional; alur approval Head → Admin Teknik SPK/PO → PM tetap sama.
 
-## PR Vendor → SPK/PO oleh Admin Teknik
-- PR diposisikan khusus untuk kebutuhan pekerjaan/material/jasa yang membutuhkan vendor.
-- Project Manager menjadi pengaju formal PR dan pihak yang melakukan submit. Pelaksana Lapangan masih dapat membantu menyiapkan draft, tetapi tidak dapat submit atas nama PM.
-- Project Manager melengkapi pembanding/quotation vendor sebelum mengirim PR ke Head.
-- Head of Operational atau Head Unit Bisnis memilih dan menyetujui vendor.
-- Setelah vendor disetujui, `Tugas Saya` otomatis berpindah ke Admin Teknik untuk membuat SPK/PO.
-- Admin Teknik membuat register SPK/PO berdasarkan vendor dan nilai yang sudah disetujui.
-- Setelah SPK/PO tersimpan, PR berubah menjadi `SPK_CREATED` dan tugas otomatis kembali ke Project Manager untuk tindak lanjut vendor.
-- Project Manager menandai `ORDERED` lalu `RECEIVED`.
-- PO/SPK yang berstatus Approved/Ordered tetap membentuk committed cost/hutang sesuai engine Finance yang sudah ada.
-- Tidak ada migration baru.
+- Head of Supporting ditegaskan sebagai role QC penuh untuk input, edit/hapus, publish finding, verifikasi, close/delete session, dan laporan QC.
+- Menambah capability `qcDeleteFinding` dan memperluas `qcDeleteSession` untuk QC/Head of Supporting/manajemen.
+- Menambah PATCH session QC untuk edit tanggal mulai/catatan.
+- Menambah PATCH/DELETE dedicated untuk Temuan QC.
+- Delete sub-pekerjaan yang sudah terhubung Finding dapat melakukan cleanup relasi QC terkait dengan konfirmasi dan audit.
+- Delete session melakukan cleanup item, finding yang berasal dari session, history/task/evidence terkait, sambil mempertahankan audit trail.
+- UI Inspeksi QC mempunyai aksi `Buka / Edit / Hapus`.
+- UI sub-pekerjaan mempunyai `Edit / Hapus / Ganti Foto`.
+- UI Temuan QC mempunyai `Detail / Edit / Hapus` ditambah tombol workflow sesuai status.
+- Menambah edit/hapus Laporan QC/ATI bagi role yang berwenang; snapshot periode tidak dimanipulasi oleh Edit metadata.
+- Memperjelas copy/alur QC pada dashboard.
+- Menambah `qc-control-smoke.mjs` untuk hak Head of Supporting/QC dan PM read-only.
+- Menambah `button-flow-audit.mjs` untuk memeriksa wiring tombol/route kritikal dan menolak placeholder tombol kosong.
+- Tidak ada migration database baru; tetap memakai migration terakhir `0019_workflow_inbox.sql`.
 
+## V3.4.8 — PM Vendor Flow
 
-## Branding — Nara System
+- Menghapus Procurement sebagai tahap wajib workflow PR.
+- PM mengisi kebutuhan + pembanding vendor.
+- Head of Operational/Head Unit Bisnis memilih vendor.
+- Admin Teknik membuat SPK/PO.
+- Tugas kembali ke PM untuk tindak lanjut/order dan penerimaan.
 
-- Nama produk yang tampil kepada user diubah dari nama lama menjadi **Nara System**.
-- Halaman login, sidebar, browser title, welcome banner, workflow inbox, fallback error, dan service label sudah menggunakan Nara System.
-- Versi dinaikkan ke **V3.4.8**.
-- Identifier teknis produksi (Worker, D1, R2, cookie, password salt, dan nama tabel legacy) dipertahankan agar deployment existing tidak terputus.
+## V3.4.7 — PM QC + PR Runtime Fix
 
+- PM dapat membuka QC dan PR/Vendor tanpa gagal akibat pemanggilan koleksi yang tidak diizinkan.
 
-## Field Role Merge
+## V3.4.6 — PM Access Fix
 
-- Menggabungkan **Site Manager / Superintendent** ke role **Project Manager**.
-- Menggabungkan **Pengawas Lapangan / Site Supervisor** ke role **Pelaksana Lapangan**.
-- Menghapus Site Manager dan Pengawas Lapangan dari dropdown jabatan baru dan form assignment proyek.
-- Menambahkan compatibility alias agar akun/data lama tetap terbaca.
-- Project scope legacy tetap aman melalui fallback `siteManagerUserId` dan `pengawasUserId`.
+- Perbaikan resolusi role agar Posisi/Jabatan menjadi basis utama akses.
+- PM memperoleh akses read QC dan PR/Vendor pada proyek yang ditugaskan.
 
-## Pelaksana → Draft PR
+## V3.4.4 — Nara System Branding
 
-- Pelaksana Lapangan pada proyek yang ditugaskan masih dapat membantu menyiapkan/mengedit draft PR.
-- Pengaju formal PR selalu Project Manager proyek.
-- Hanya Project Manager (atau Manajemen sebagai override) yang dapat melakukan submit PR.
-- Setelah submit, tugas berpindah ke Procurement → Head of Operational/Head Unit Bisnis → Admin Teknik → Procurement.
-
-## Pelaksana → Temuan QC
-
-- Pelaksana tetap memiliki akses baca/update Temuan QC dalam scope proyek.
-- Tugas perbaikan QC ditampilkan pada QC Dashboard dan Tugas Saya jika akun menjadi PIC.
-- Setelah Pelaksana mengirim bukti perbaikan, handoff kembali ke QC untuk verifikasi.
-
-## Compatibility
-
-Tidak ada migration database baru. Migration terakhir tetap `0019_workflow_inbox.sql`.
-
-
-### V3.4.8
-- Memperbaiki resolusi role Project Manager dari Posisi/Jabatan.
-- Menjamin menu Procurement dan QC tersedia untuk Project Manager.
-- Menambah alias Project Manager/Superintendent.
-- Menambah smoke test khusus akses PM.
+- Branding produk diubah dari KENDALI menjadi Nara System tanpa mengganti identifier teknis produksi lama.

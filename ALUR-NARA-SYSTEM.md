@@ -1,173 +1,79 @@
-# Alur Nara System V3.4.6 — Dari Proyek Masuk sampai CLOSED
+# Alur Nara System V3.4.10
 
-## 1. Prinsip Workflow
+## 1. Proyek masuk
 
-Nara System V3.4.6 menggunakan pola:
+Head Unit Bisnis/Admin berwenang membuat proyek dan menetapkan Project Manager, Pelaksana Lapangan, QS, QC, serta PIC teknis lain. Project Manager dan Pelaksana dibatasi ke proyek yang ditugaskan.
 
-**Seseorang menyelesaikan tahap → sistem menutup tugasnya → sistem membuat tugas untuk orang/role berikutnya → tugas muncul di Tugas Saya penerima.**
+## 2. Persiapan / Engineering
 
-Inbox bukan tempat mencentang tugas secara manual. Tombol **Buka & Proses** membawa user ke modul sumber. Hanya aksi workflow yang sah yang dapat mengakhiri tugas dan meneruskan alur.
+Head of Engineering mengawal baseline teknis: DED/gambar, RAB/HPP, schedule, dan kesiapan dokumen. QS menangani volume/opname/CCO teknis. Admin Teknik mengawal administrasi teknis.
 
-## 2. Struktur Tanggung Jawab
+## 3. Eksekusi / Progress
 
-- **Head Unit Bisnis:** kontrol keseluruhan BU, keputusan akhir, menerima laporan QC/ATI, oversight semua workflow.
-- **Head of Operational:** kontrol eksekusi, PM/Pelaksana, progress, approval operasional, procurement/fund request.
-- **Head of Engineering:** RAB/HPP, schedule, QS/opname, CCO teknis, gambar/DED, engineering review.
-- **Head of Supporting:** QC/quality gate, defect, verifikasi mutu, readiness serah terima.
-- **PM:** memimpin satu proyek dan mereview progress/kendala/PR.
-- **Pelaksana Lapangan:** progress harian/mingguan, tenaga kerja, perbaikan defect, pengajuan kondisi lapangan.
-- **QS:** opname dan RAB CCO.
-- **QC:** inspeksi, temuan, verifikasi perbaikan.
-- **Procurement:** pembanding vendor, PO/SPK, order dan penerimaan.
-- **Finance:** pembayaran, cash in/out, AR/AP, fund request paid.
-- **Admin Teknik:** administrasi teknis, dokumen, routing CCO, closeout administratif.
-- **ATI:** tenaga tukang, attendance/upah, assessment, masalah, pelatihan, pemenuhan tenaga.
+Pelaksana Lapangan menginput progress aktual, foto, kendala, dan tenaga kerja. Laporan berpindah ke Project Manager untuk review lalu Head of Operational untuk review akhir sesuai workflow.
 
-## 3. Workflow per Modul
+## 4. PR Vendor
 
-### Progress Harian/Mingguan
-`DRAFT/RETURNED_TO_FIELD → SUBMITTED_TO_PM → PM_APPROVED → REVIEWED`
+`Project Manager → Head of Operational / Head Unit Bisnis → Admin Teknik → Project Manager`
 
-- Pelaksana menyusun dan submit.
-- Tugas otomatis muncul ke PM: **Review Progress**.
-- PM approve atau return ke Pelaksana.
-- Jika approve, tugas muncul ke Head of Operational: **Review Operasional**.
-- Head of Operational review → selesai.
+Project Manager mengisi kebutuhan pekerjaan/material/jasa, HPP detail, pembanding vendor, quotation, term, lead time, dan Conflict of Interest. Head memilih vendor. Admin Teknik membuat SPK/PO. Setelah SPK/PO terbentuk, tugas kembali ke PM untuk tindak lanjut/order dan konfirmasi penerimaan.
 
-### Opname / QS
-`DRAFT/RETURNED_TO_QS → SUBMITTED_TO_ENGINEERING → VERIFIED → CLOSED`
+## 5. QC — Continuous Inspection
 
-- QS submit opname.
-- Head of Engineering memverifikasi atau mengembalikan ke QS.
-- Setelah VERIFIED, tugas berpindah ke Admin Teknik untuk finalisasi administrasi/penutupan.
+### Membuat inspeksi
+QC atau Head of Supporting membuka satu catatan inspeksi berjalan untuk proyek. Pada setiap kelompok pekerjaan, inspector menambah sub-pekerjaan dan wajib memilih **Sesuai** atau **Tidak Sesuai**. Setiap item memiliki tanggal sendiri, keterangan, dan evidence foto bila diperlukan.
 
-### QC
-`Continuous Inspection → Tidak Sesuai → OPEN → ON PROGRESS → WAITING QC CHECK → CLOSED / REVISION REQUIRED`
+### Edit/Hapus
+- Session inspeksi: Buka, Edit, Hapus.
+- Sub-pekerjaan: Edit, Hapus, Ganti Foto.
+- Temuan: Detail, Edit, Hapus.
+- Laporan QC: Lihat, Edit, Hapus.
 
-- QC melakukan inspeksi berkelanjutan per proyek.
-- Sub-pekerjaan Tidak Sesuai diterbitkan sebagai temuan.
-- Tugas perbaikan muncul ke Pelaksana proyek.
-- Pelaksana mulai, perbaiki, unggah bukti, submit.
-- Tugas berpindah ke QC untuk verifikasi.
-- Sesuai → CLOSED. Tidak sesuai → kembali ke Pelaksana sebagai REVISION REQUIRED.
+Head of Supporting mempunyai fungsi input dan kontrol QC yang sama dengan QC untuk kebutuhan supervisi.
 
-### CCO / Addendum
-`DRAFT → SUBMITTED_TO_ADMIN → SENT_TO_QS → QS_PRICING → RAB_READY → SENT_TO_CLIENT → CLIENT_APPROVED → ADDENDUM_PROCESS → CLOSED`
+### Menjadi temuan
+Item `TIDAK SESUAI` dapat diterbitkan sebagai Temuan QC. PIC otomatis diarahkan ke Pelaksana Lapangan proyek. Tugas masuk ke `Tugas Saya` Pelaksana.
 
-- Pelaksana/PM mengajukan CCO.
-- Admin Teknik menerima dan meneruskan ke QS.
-- QS menyusun RAB CCO.
-- Jika memerlukan eskalasi sesuai kebijakan, task muncul ke Head of Operational/management.
-- Admin Teknik meneruskan nilai final ke client.
-- Setelah client setuju, Admin Teknik memproses Addendum.
-- Upload/finalisasi Addendum → CLOSED.
+### Perbaikan
+Pelaksana menekan **Mulai**:
 
-### Pengajuan Dana
-`DRAFT/REJECTED → PENDING → APPROVED → PAID`
+`OPEN / REVISION REQUIRED → ON PROGRESS`
 
-- Requester submit.
-- Tugas approval ke Head of Operational.
-- Approved → tugas ke Finance.
-- Finance bayar → PAID dan Cash Out dibuat.
+Setelah perbaikan selesai, Pelaksana mengirim uraian + bukti after:
 
-### Procurement / PR
-`DRAFT/REJECTED → SUBMITTED → READY_FOR_APPROVAL → APPROVED → SPK_CREATED → ORDERED → RECEIVED`
+`ON PROGRESS → WAITING QC CHECK`
 
-- PM membuat PR multi-item.
-- Submit → task ke Procurement untuk isi beberapa pembanding vendor.
-- Procurement klik **Kirim Pembanding** setelah vendor offer tersedia.
-- Task ke Head of Operational/Head Unit Bisnis untuk memilih vendor.
-- Approved → task kembali ke Procurement untuk PO/order.
-- ORDERED → Procurement menerima barang/jasa.
-- RECEIVED → workflow selesai.
+### Verifikasi
+QC/Head of Supporting memverifikasi:
 
-### Issue / Kendala
-`OPEN → IN PROGRESS → WAITING → CLOSED`
+- Sesuai → `CLOSED`.
+- Tidak Sesuai → `REVISION REQUIRED`, dan tugas kembali ke Pelaksana.
 
-- PIC menerima tugas penyelesaian masalah.
-- Setelah tindakan selesai, kirim ke PM.
-- PM review dan close atau kembalikan sesuai kondisi.
+Status workflow tidak dapat dipindahkan dengan Edit biasa. Ini menjaga task routing dan histori tetap konsisten.
 
-### Retensi
-`OPEN/HOLD → RELEASED → CLOSED`
+### Penghapusan relasional
+Jika record yang dihapus mempunyai data turunan yang memang melekat pada record tersebut, backend membersihkan relasi terkait (finding/task/history/evidence) dan tetap membuat audit trail penghapusan.
 
-- PIC/Finance memastikan kewajiban retensi selesai.
-- RELEASED → Admin Teknik final close.
+## 6. CCO / Addendum
 
-### Close-Out
-`OPEN/IN PROGRESS → CLOSED`
+Pelaksana/PM mengajukan → Admin Teknik memeriksa/routing → QS menghitung volume/RAB → tahap approval/escalation → client → addendum → closed. Setiap tahap menampilkan next action yang sesuai role.
 
-- Setiap checklist closeout mempunyai owner/PIC.
-- Tugas muncul pada owner tersebut; bila tidak ditentukan, masuk queue Admin Teknik.
-- Setelah bukti dan kewajiban selesai, checklist CLOSED.
+## 7. Opname
 
-### ATI — Pengajuan Pekerjaan/Tenaga
-`DRAFT → DIAJUKAN → DIPROSES → TERPENUHI → SELESAI`
+QS menyiapkan opname → Head of Engineering melakukan verifikasi → Admin Teknik menutup administrasi sesuai status workflow.
 
-- Requester mengajukan.
-- Kepala ATI menerima dan memproses.
-- Setelah kebutuhan terpenuhi, task kembali ke requester untuk konfirmasi.
+## 8. Pengajuan Dana / Finance
 
-### ATI — Masalah Lapangan
-`OPEN/IN PROGRESS → WAITING EVALUATION → CLOSED`
+Requester mengajukan → Head of Operational review/approve → Finance memproses pembayaran. Cash Out terbentuk ketika pembayaran benar-benar ditandai Paid, bukan saat pengajuan dibuat.
 
-- PIC menangani masalah.
-- Hasil tindakan dikirim ke Kepala ATI untuk evaluasi.
-- Kepala ATI close setelah evaluasi selesai.
+## 9. Laporan QC dan ATI
 
-### Laporan QC / ATI
-`SUBMITTED → REVIEWED`
+QC/Head of Supporting dapat membuat laporan mingguan/bulanan dari snapshot data inspeksi dan temuan periode. Laporan dikirim ke Head Unit Bisnis untuk review. Metadata laporan dapat diedit/hapus oleh role berwenang; snapshot data inspeksi periode tetap dipertahankan sebagai hasil historis.
 
-- QC/ATI membuat laporan mingguan/bulanan dari snapshot dashboard masing-masing.
-- Tugas review otomatis masuk ke Head Unit Bisnis.
-- Head Unit membuka laporan dan menandai Reviewed.
+## 10. Tugas Saya
 
-## 4. Di Mana Melihat “Sekarang Menunggu Apa?”
+Setiap handoff membuat task dengan status, PIC/role tujuan, deadline, modul sumber, dan `menunggu apa`. User membuka tugas lalu menyelesaikannya dari modul sumber. Penyelesaian aksi membuat task sekarang selesai dan menyalurkan task berikutnya sesuai alur.
 
-### Tugas Saya
-Menampilkan pekerjaan yang saat ini berada pada user/role yang login: tugas, proyek, modul, tahap, menunggu apa, deadline, dan next action.
+## 11. Gate Proyek
 
-### Semua Tugas Aktif
-Untuk Head/management: melihat semua workflow aktif lintas tim, termasuk tugas role-queue yang belum diambil.
-
-### Alur Proyek
-Pilih satu proyek → bagian **Tugas Aktif Proyek** menunjukkan seluruh pekerjaan yang masih terbuka pada proyek tersebut. Bagian **Gate Aktif/Blocker** menunjukkan mengapa proyek belum dapat maju ke tahap lifecycle berikutnya.
-
-## 5. Lifecycle Proyek
-
-`SETUP → PRECON → MOBILIZATION → EXECUTION → PHO → RETENTION → FHO → FINANCIAL_CLOSE → CLOSED`
-
-Progress fisik 100% belum berarti CLOSED. Proyek baru CLOSED setelah quality, dokumen, CCO, retention/FHO bila berlaku, piutang/hutang, payment request, closeout checklist, dan final reconciliation tidak menyisakan blocker.
-
-
-## Penyesuaian role lapangan V3.4.6
-
-Struktur operasional proyek pada Nara System disederhanakan menjadi **Project Manager → Pelaksana Lapangan**. Superintendent/Site Manager adalah alias Project Manager; Pengawas Lapangan/Site Supervisor adalah alias Pelaksana Lapangan. Pelaksana dapat membantu menyiapkan draft PR kebutuhan proyek, tetapi Project Manager menjadi pengaju formal dan pihak yang submit. Pelaksana tetap menerima temuan QC untuk perbaikan melalui Tugas Saya.
-
-
-## Alur PR Vendor V3.4.6
-
-`DRAFT → SUBMITTED → READY_FOR_APPROVAL → APPROVED → SPK_CREATED → ORDERED → RECEIVED`
-
-1. **Project Manager** membuat/memfinalkan PR kebutuhan vendor dan melakukan submit. Pelaksana Lapangan boleh membantu menyiapkan draft, tetapi requester formal tetap Project Manager.
-2. **Procurement** menerima tugas, melengkapi quotation/pembanding beberapa vendor, lalu mengirim pembanding ke Head.
-3. **Head of Operational / Head Unit Bisnis** memilih vendor berdasarkan penawaran, term, lead time, dan kebutuhan operasional.
-4. Setelah vendor disetujui, **Admin Teknik** menerima tugas otomatis di `Tugas Saya`: membuat SPK/PO dengan vendor dan nilai terpilih.
-5. Saat SPK/PO tersimpan, PR otomatis menjadi `SPK_CREATED` dan register masuk ke **PO/SPK**.
-6. **Procurement** menerima tugas lanjutan untuk menindaklanjuti order ke vendor, lalu mengonfirmasi penerimaan material/jasa.
-
-Dengan alur ini Procurement tidak membuat SPK, dan PM tidak memilih vendor sendiri. Pemisahan fungsi: PM = kebutuhan, Procurement = sourcing/pembanding, Head = keputusan vendor, Admin Teknik = dokumen SPK/PO, Procurement = eksekusi order/penerimaan.
-
-## PR / Vendor — V3.4.8
-
-Alur vendor tidak lagi memakai role Procurement. Project Manager adalah pemilik proses vendor di proyek:
-
-1. Project Manager membuat PR, mengisi lingkup/material/jasa, volume, HPP/unit, total HPP, dan pembanding vendor/quotation.
-2. Project Manager menyetujui deklarasi Conflict of Interest lalu klik **Kirim ke Head**.
-3. PR masuk `READY_FOR_APPROVAL`; Head of Operational atau Head Unit Bisnis memilih vendor.
-4. Setelah vendor disetujui, PR menjadi `APPROVED` dan tugas masuk ke Admin Teknik.
-5. Admin Teknik membuat SPK/PO dan menyimpannya ke register PO/SPK; PR menjadi `SPK_CREATED`.
-6. Tugas otomatis kembali ke Project Manager untuk tindak lanjut vendor; PM menandai `ORDERED` saat pekerjaan/pemesanan resmi dijalankan.
-7. Setelah material/jasa diterima atau tahap vendor selesai, Project Manager menandai `RECEIVED`.
-
-Pelaksana Lapangan masih dapat membantu menyiapkan draft kebutuhan, tetapi pengaju formal, pengisi vendor comparison, dan penanggung jawab tindak lanjut vendor adalah Project Manager.
+Nara System mengevaluasi tahap proyek dari SETUP/PRECON/MOBILIZATION/EXECUTION sampai PHO/RETENTION/FHO/FINANCIAL CLOSE/CLOSED. Progress fisik 100% tidak otomatis berarti CLOSED; QC/defect, CCO, dokumen, serah terima, vendor, dan financial close tetap harus selesai.

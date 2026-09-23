@@ -23,7 +23,9 @@ try{
   const eng=m.buildAccess({id:'eng',role:'Head of Engineering'});
   if(!eng.views.includes('opname')||!eng.views.includes('cco'))throw new Error('Head of Engineering access mismatch');
   const sup=m.buildAccess({id:'sup',role:'Head of Supporting'});
-  if(!sup.views.includes('qc')||!sup.capabilities.qcCloseSession)throw new Error('Head of Supporting access mismatch');
+  if(!sup.views.includes('qc')||!sup.capabilities.qcCloseSession||!sup.capabilities.qcDeleteSession||!sup.capabilities.qcDeleteFinding||!sup.capabilities.qcInspect||!sup.capabilities.qcVerify)throw new Error('Head of Supporting access mismatch');
+  const supDef=m.collectionPermission({id:'sup',role:'Head of Supporting'},'defects'); if(!supDef.read||!supDef.create||!supDef.update||!supDef.delete)throw new Error('Head of Supporting QC CRUD mismatch');
+  const qc=m.buildAccess({id:'qc',role:'QC'}); if(!qc.capabilities.qcInspect||!qc.capabilities.qcVerify||!qc.capabilities.qcDeleteSession||!qc.capabilities.qcDeleteFinding)throw new Error('QC full control mismatch');
   const pm=m.buildAccess({id:'pm',role:'Project Manager'});
   if(!pm.views.includes('tasks')||pm.views.includes('finance'))throw new Error('Project Manager view mismatch');
   const pel=m.buildAccess({id:'pel',role:'Pelaksana Lapangan'});
