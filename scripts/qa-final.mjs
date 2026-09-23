@@ -10,9 +10,9 @@ const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 function must(cond,msg){ if(!cond) throw new Error(msg); }
 function has(text,needle,msg=needle){ must(text.includes(needle),`QA marker hilang: ${msg}`); }
 
-must(pkg.version==='3.4.7','Versi package harus 3.4.7');
-has(worker,'APP-V3.4.7','APP version 3.4.7');
-has(html,'Natara Konstruksi • V3.4.7','label frontend 3.4.7');
+must(pkg.version==='3.4.8','Versi package harus 3.4.8');
+has(worker,'APP-V3.4.8','APP version 3.4.8');
+has(html,'Natara Konstruksi • V3.4.8','label frontend 3.4.8');
 has(html,'NARA SYSTEM','branding Nara System');
 has(html,'Masuk ke Nara System','login branding Nara System');
 has(worker,'const SERVICE_NAME = "Nara System";','service branding Nara System');
@@ -100,15 +100,17 @@ for(const m of [
 for(const m of ['Tugas Saya','Menunggu Tindakan Anda','waitingFor','dueDate','data-task-action="claim"','data-task-action="start"','Buka & Proses']) has(app,m,m);
 
 
-// PR vendor workflow V3.4.7.
+// PR vendor workflow V3.4.8.
 for(const m of [
   'PR_SPK_ADMIN','SPK_CREATED','PO/SPK dari PR hanya dapat dibuat oleh Admin Teknik',
   'SPK/PO harus dibuat Admin Teknik sebelum PR dapat ditandai ORDERED',
   'procurementSpkCreate'
 ]) has(worker,m,`PR-SPK backend ${m}`);
 for(const m of [
-  'PR digunakan jika pekerjaan membutuhkan vendor','Project Manager adalah pengaju formal',
-  'Kirim Pembanding ke Head','Buat SPK / PO','SPK/PO dibuat dan masuk register PO/SPK'
+  'PR digunakan jika pekerjaan membutuhkan vendor','pengaju formal dan pihak yang submit adalah Project Manager',
+  'Kebutuhan + Pembanding Vendor','Buat SPK / PO','SPK/PO dibuat dan masuk register PO/SPK'
 ]) has(app,m,`PR-SPK frontend ${m}`);
 
-console.log('QA static wiring OK — roles, buttons, workflow endpoints, QC controls, PR-SPK flow');
+for(const m of ['Project Manager wajib menambahkan minimal satu pembanding vendor','PR dan pembanding vendor harus dikirim Project Manager ke Head','PR_PM_VENDOR']) has(worker,m,`PM vendor backend ${m}`);
+for(const m of ['Pembanding Vendor — Project Manager','Project Manager mengisi kebutuhan, HPP, dan pembanding/quotation vendor sekaligus','Tugas PR diteruskan kembali ke Project Manager']) has(app,m,`PM vendor frontend ${m}`);
+console.log('QA static wiring OK — roles, buttons, workflow endpoints, QC controls, PM vendor + PR-SPK flow');

@@ -40,7 +40,7 @@
 
   <div id="app" class="app hidden">
     <aside id="sidebar" class="sidebar">
-      <div class="brand"><div class="brand-logo-wrap"><img src="/assets/natara-mark.png" alt="Natara Konstruksi" /></div><div><b>NARA SYSTEM</b><span>Natara Konstruksi • V3.4.7</span></div></div>
+      <div class="brand"><div class="brand-logo-wrap"><img src="/assets/natara-mark.png" alt="Natara Konstruksi" /></div><div><b>NARA SYSTEM</b><span>Natara Konstruksi • V3.4.8</span></div></div>
       <nav id="nav">
         <button data-view="dashboard" class="nav-item active">▦ Dashboard</button>
         <button data-view="tasks" class="nav-item task-nav">✓ Tugas Saya <span id="taskBadge" class="task-badge hidden">0</span></button>
@@ -51,7 +51,7 @@
         <button data-view="opname" class="nav-item">▤ Opname / QS</button>
         <button data-view="qc" class="nav-item">✓ QC Dashboard</button>
         <button data-view="cco" class="nav-item">± CCO / Addendum</button>
-        <button data-view="procurement" class="nav-item">◫ Procurement</button>
+        <button data-view="procurement" class="nav-item">◫ PR / Vendor</button>
         <button data-view="ati" class="nav-item">♜ ATI</button>
         <button data-view="documents" class="nav-item">⌑ Dokumen</button>
         <button data-view="flow" class="nav-item">→ Alur Proyek</button>
@@ -102,7 +102,7 @@
       if (login && app && login.classList.contains('hidden') && app.classList.contains('hidden')) {
         login.classList.remove('hidden');
         var card = login.querySelector('.login-card');
-        if (card) card.innerHTML = '<img src="/assets/natara-mark.png" alt="Natara" style="width:64px;height:64px;border-radius:16px;margin-bottom:14px"><h1>Nara System</h1><p>Aplikasi gagal dimuat.</p><div class="form-error" style="display:block">Frontend tidak berhasil dijalankan. Muat ulang halaman. Jika tetap muncul, gunakan build V3.4.7 atau periksa Console browser.</div><button class="btn primary wide" type="button" onclick="location.reload()">Muat Ulang</button>';
+        if (card) card.innerHTML = '<img src="/assets/natara-mark.png" alt="Natara" style="width:64px;height:64px;border-radius:16px;margin-bottom:14px"><h1>Nara System</h1><p>Aplikasi gagal dimuat.</p><div class="form-error" style="display:block">Frontend tidak berhasil dijalankan. Muat ulang halaman. Jika tetap muncul, gunakan build V3.4.8 atau periksa Console browser.</div><button class="btn primary wide" type="button" onclick="location.reload()">Muat Ulang</button>';
       }
     }, 3500);
   </script>

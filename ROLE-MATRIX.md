@@ -23,7 +23,7 @@ Administrator/Direktur adalah akses sistem/manajemen dan tidak dianggap urutan j
 | QC | Ya | Tidak | Inspeksi, temuan, verifikasi defect, laporan QC |
 | Admin Teknik | Ya | Tidak | Routing CCO, dokumen, closeout administratif |
 | Finance | Ya | Tidak | Pembayaran fund request dan kontrol finance |
-| Procurement / Logistik | Ya | Tidak | Pembanding vendor, order, penerimaan |
+| Manager / Staf Logistik | Ya | Tidak | Pembanding vendor, order, penerimaan |
 | Kepala ATI | Ya | Tidak | Pengajuan tenaga, masalah/evaluasi ATI |
 | Instruktur ATI | Ya | Tidak | Aktivitas ATI sesuai kewenangan |
 
@@ -44,3 +44,13 @@ Pelaksana Lapangan pada proyek yang ditugaskan dapat membantu menyiapkan draft P
 ## Temuan QC untuk Pelaksana
 
 Temuan QC yang diterbitkan dari inspeksi diarahkan ke Pelaksana Lapangan. Temuan aktif muncul pada QC Dashboard dan Tugas Saya untuk PIC perbaikan; setelah bukti perbaikan dikirim, tugas berpindah kembali ke QC untuk verifikasi.
+
+## Penyesuaian PR Vendor V3.4.8
+
+| Posisi | Peran pada PR Vendor |
+|---|---|
+| Project Manager | Membuat PR, mengisi HPP, vendor comparison/quotation, submit ke Head, menindaklanjuti vendor setelah SPK/PO, konfirmasi penerimaan |
+| Head of Operational / Head Unit Bisnis | Memilih dan menyetujui vendor |
+| Admin Teknik | Membuat SPK/PO dari vendor terpilih dan memasukkannya ke register PO/SPK |
+| Pelaksana Lapangan | Dapat membantu menyiapkan draft kebutuhan, tidak menjadi pengaju formal |
+| Manager / Staf Logistik | Tidak menjadi tahap wajib pada workflow PR Vendor |

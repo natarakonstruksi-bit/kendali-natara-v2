@@ -157,3 +157,17 @@ Struktur operasional proyek pada Nara System disederhanakan menjadi **Project Ma
 6. **Procurement** menerima tugas lanjutan untuk menindaklanjuti order ke vendor, lalu mengonfirmasi penerimaan material/jasa.
 
 Dengan alur ini Procurement tidak membuat SPK, dan PM tidak memilih vendor sendiri. Pemisahan fungsi: PM = kebutuhan, Procurement = sourcing/pembanding, Head = keputusan vendor, Admin Teknik = dokumen SPK/PO, Procurement = eksekusi order/penerimaan.
+
+## PR / Vendor — V3.4.8
+
+Alur vendor tidak lagi memakai role Procurement. Project Manager adalah pemilik proses vendor di proyek:
+
+1. Project Manager membuat PR, mengisi lingkup/material/jasa, volume, HPP/unit, total HPP, dan pembanding vendor/quotation.
+2. Project Manager menyetujui deklarasi Conflict of Interest lalu klik **Kirim ke Head**.
+3. PR masuk `READY_FOR_APPROVAL`; Head of Operational atau Head Unit Bisnis memilih vendor.
+4. Setelah vendor disetujui, PR menjadi `APPROVED` dan tugas masuk ke Admin Teknik.
+5. Admin Teknik membuat SPK/PO dan menyimpannya ke register PO/SPK; PR menjadi `SPK_CREATED`.
+6. Tugas otomatis kembali ke Project Manager untuk tindak lanjut vendor; PM menandai `ORDERED` saat pekerjaan/pemesanan resmi dijalankan.
+7. Setelah material/jasa diterima atau tahap vendor selesai, Project Manager menandai `RECEIVED`.
+
+Pelaksana Lapangan masih dapat membantu menyiapkan draft kebutuhan, tetapi pengaju formal, pengisi vendor comparison, dan penanggung jawab tindak lanjut vendor adalah Project Manager.

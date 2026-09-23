@@ -18,4 +18,6 @@ for(const m of forbidden) if(app.includes(m)) throw new Error(`Legacy unconditio
 if(!worker.includes('project_manager: ["dashboard","tasks","projects","fund_requests","progress","opname","qc","cco","procurement","documents","flow","closeout"]')) throw new Error('PM menu access missing.');
 if(!worker.includes('if (collection === "procurement") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager"')) throw new Error('PM procurement record read missing.');
 if(!worker.includes('if (collection === "qc_inspection_sessions") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager"')) throw new Error('PM QC session read missing.');
-console.log('PM page runtime smoke OK — QC skips restricted report archive; Procurement skips restricted vendor/PO dependencies.');
+if(!worker.includes('if (collection === "vendor") return allow(["manager_operasional","admin_teknik","project_manager"')) throw new Error('PM vendor master read missing.');
+if(!app.includes("function v345CanVendorCompare(){return v34RoleCan('project_manager'")) throw new Error('PM vendor comparison frontend permission missing.');
+console.log('PM page runtime smoke OK — QC access safe; PM can load vendor master and fill vendor comparison.');

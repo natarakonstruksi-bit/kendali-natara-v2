@@ -1,4 +1,4 @@
-# QA Matrix — Nara System V3.4.7
+# QA Matrix — Nara System V3.4.8
 
 | Area | Skenario | Hasil yang diwajibkan |
 |---|---|---|

@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.7 — PM QC + Procurement Runtime Access Fix
+ * Nara System V3.4.8 — PM Vendor Comparison Workflow
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.7";
+const APP_VERSION = "APP-V3.4.8";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -55,7 +55,7 @@ const ROLE_LABELS = {
   qc: "QC",
   mep_engineer: "MEP Engineer",
   finance: "Finance",
-  procurement: "Logistik / Procurement",
+  procurement: "Logistik",
   kepala_ati: "Kepala ATI",
   instruktur_ati: "Instruktur ATI",
   viewer: "Viewer"
@@ -241,7 +241,7 @@ function collectionPermission(user, collection) {
   if (["retention","closeout"].includes(collection)) return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","finance"],["manager_operasional","admin_teknik","finance"]);
   if (collection === "rabs") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","estimator","qs"],["manager_operasional","koordinator_engineering","admin_teknik","estimator","qs"]);
   if (collection === "surat") return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
-  if (collection === "vendor") return allow(["manager_operasional","admin_teknik","procurement","finance"],["manager_operasional","procurement","finance"]);
+  if (collection === "vendor") return allow(["manager_operasional","admin_teknik","project_manager","procurement","finance"],["manager_operasional","admin_teknik","procurement","finance"]);
   if (collection === "tukang") return allow(["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","finance","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
   if (collection === "aset") return allow(["manager_operasional","admin_teknik","procurement"],["manager_operasional","admin_teknik"]);
   if (collection === "pelatihan") return allow(["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"]);
@@ -275,7 +275,7 @@ function buildAccess(user) {
       procurementApprove: roleIn(user,["head_unit_bisnis","manager_operasional"]),
       procurementVendorSelect: roleIn(user,["head_unit_bisnis","manager_operasional"]),
       procurementSpkCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","admin_teknik"]),
-      procurementOrder: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","procurement"]),
+      procurementOrder: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","project_manager"]),
       projectManagerProcurementAccess: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","project_manager"]),
       projectManagerQcReadAccess: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","project_manager"]),
       qcInspect: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
@@ -1117,12 +1117,12 @@ async function workflowTaskSpec(env, collection, id, d={}) {
     return null;
   }
   if(collection==="procurement"){
-    if(["DRAFT","REJECTED"].includes(status)) return mk("PR_PM_REQUEST","Purchase Request Vendor", "Project Manager melengkapi kebutuhan pekerjaan/vendor lalu submit ke Procurement","Submit PR",d.projectManagerUserId||pm,"project_manager");
-    if(status==="SUBMITTED") return mk("PR_VENDOR","Lengkapi Pembanding Vendor", "Procurement melengkapi penawaran/quotation vendor lalu kirim untuk keputusan","Kirim Pembanding Vendor","","procurement");
+    if(["DRAFT","REJECTED"].includes(status)) return mk("PR_PM_REQUEST","Purchase Request Vendor", "Project Manager melengkapi kebutuhan, HPP, dan pembanding vendor lalu mengirim ke Head","Kirim PR ke Head",d.projectManagerUserId||pm,"project_manager");
+    if(status==="SUBMITTED") return mk("PR_PM_VENDOR","Lengkapi Pembanding Vendor", "Project Manager melengkapi penawaran/quotation vendor lalu mengirim ke Head","Kirim ke Head",d.projectManagerUserId||pm,"project_manager");
     if(status==="READY_FOR_APPROVAL") return mk("PR_APPROVAL","Pilih Vendor PR", "Head of Operational/Head Unit Bisnis memilih dan menyetujui vendor","Pilih Vendor","","manager_operasional",{priority:"HIGH"});
     if(status==="APPROVED") return mk("PR_SPK_ADMIN","Buat SPK / PO Vendor", "Admin Teknik membuat SPK berdasarkan vendor terpilih lalu menambahkannya ke register PO/SPK","Buat SPK / PO","","admin_teknik",{priority:"HIGH"});
-    if(status==="SPK_CREATED") return mk("PR_ORDER","Eksekusi PO/SPK", "Procurement menindaklanjuti PO/SPK yang sudah dibuat Admin Teknik ke vendor","Tandai Ordered","","procurement");
-    if(status==="ORDERED") return mk("PR_RECEIVE","Penerimaan Material/Jasa", "Procurement mengonfirmasi barang/jasa diterima","Konfirmasi Diterima","","procurement");
+    if(status==="SPK_CREATED") return mk("PR_ORDER","Tindak Lanjut Vendor", "Project Manager menindaklanjuti SPK/PO ke vendor dan menandai pekerjaan/pemesanan dimulai","Tandai Ordered",d.projectManagerUserId||pm,"project_manager");
+    if(status==="ORDERED") return mk("PR_RECEIVE","Konfirmasi Pekerjaan / Material", "Project Manager mengonfirmasi material/jasa vendor telah diterima atau pekerjaan vendor telah selesai sesuai tahap","Konfirmasi Diterima",d.projectManagerUserId||pm,"project_manager");
     return null;
   }
   if(collection==="issues"){
@@ -1763,7 +1763,7 @@ async function normalizeOperationalResponsibility(env,collection,data) {
   if (["schedule","milestones","issues"].includes(collection) && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "pelaksana_lapangan") throw new Error("PIC pelaksanaan wajib Pelaksana Lapangan.");
   if (collection === "defects" && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "pelaksana_lapangan") throw new Error("PIC perbaikan QC wajib Pelaksana Lapangan.");
   if (collection === "opname" && d.qsUserId && (await employeeRoleKey(env,d.qsUserId)) !== "qs") throw new Error("PIC Opname wajib QS / Quantity Surveyor.");
-  if (collection === "po" && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "procurement") throw new Error("PIC PO/SPK wajib Logistik / Procurement.");
+  if (collection === "po" && d.picUserId && !["project_manager","procurement"].includes(await employeeRoleKey(env,d.picUserId))) throw new Error("PIC PO/SPK wajib Project Manager proyek (atau role logistik lama untuk kompatibilitas data). ");
   if (collection === "cco" && d.requestedByUserId) { const rk=await employeeRoleKey(env,d.requestedByUserId); if(!["project_manager","pelaksana_lapangan"].includes(rk)) throw new Error("Pengaju lapangan CCO wajib Project Manager atau Pelaksana Lapangan."); }
   if (collection === "surat" && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "admin_teknik") throw new Error("PIC administrasi surat wajib Admin Teknik.");
   if (collection === "aset" && d.picUserId) { const rk=await employeeRoleKey(env,d.picUserId); if(!["procurement","admin_teknik"].includes(rk)) throw new Error("PIC aset wajib Logistik/Procurement atau Admin Teknik."); }
@@ -1823,25 +1823,27 @@ async function procurementActionHandler(request,env,user,id) {
     if(!["DRAFT","REJECTED","REQUESTED"].includes(old)) return json({ok:false,message:"PR tidak dapat diajukan dari status ini."},409);
     if(!d.items.length) return json({ok:false,message:"PR wajib memiliki minimal 1 item pekerjaan/material/jasa."},400);
     if(!truthy(d.coiDeclaration)) return json({ok:false,message:"Deklarasi Conflict of Interest wajib disetujui oleh pengaju sebelum PR diajukan."},400);
-    next="SUBMITTED"; d.submittedByUserId=user.id; d.submittedAt=new Date().toISOString();
+    if(!d.vendorOffers.length) return json({ok:false,message:"Project Manager wajib menambahkan minimal satu pembanding vendor sebelum PR dikirim ke Head."},400);
+    next="READY_FOR_APPROVAL"; d.submittedByUserId=user.id; d.submittedAt=new Date().toISOString(); d.vendorComparisonReadyAt=d.submittedAt; d.vendorComparisonReadyBy=user.id;
   }
   else if(action==="vendor-ready") {
-    if(!roleIn(user,["procurement","manager_operasional","head_unit_bisnis","administrator","direktur"])) return json({ok:false,message:"Hanya Procurement atau Manajemen yang dapat meneruskan pembanding vendor."},403);
+    const assignedPm=await projectAssignment(env,d.projectId,"pm");
+    if(String(assignedPm||d.projectManagerUserId||"")!==String(user.id||"") && !roleIn(user,["manager_operasional","head_unit_bisnis","administrator","direktur"])) return json({ok:false,message:"Pembanding vendor hanya dapat diteruskan oleh Project Manager proyek atau Manajemen."},403);
     if(old!=="SUBMITTED") return json({ok:false,message:"PR harus SUBMITTED sebelum pembanding vendor dikirim."},409);
     if(!d.vendorOffers.length) return json({ok:false,message:"Tambahkan minimal satu penawaran vendor terlebih dahulu."},400);
     next="READY_FOR_APPROVAL"; d.vendorComparisonReadyAt=new Date().toISOString(); d.vendorComparisonReadyBy=user.id;
   }
   else if(action==="select-vendor" || action==="approve") {
     if(!caps.procurementVendorSelect) return json({ok:false,message:"Hanya Head of Operational atau Head Unit Bisnis yang dapat memilih vendor PR."},403);
-    if(old!=="READY_FOR_APPROVAL") return json({ok:false,message:"Pembanding vendor harus dikirim Procurement sebelum vendor dapat dipilih."},409);
+    if(old!=="READY_FOR_APPROVAL") return json({ok:false,message:"PR dan pembanding vendor harus dikirim Project Manager ke Head sebelum vendor dapat dipilih."},409);
     const offerId=String(body.vendorOfferId||body.offerId||"");
     const offer=d.vendorOffers.find(x=>x.id===offerId);
     if(!offer) return json({ok:false,message:"Pilih salah satu penawaran vendor yang tersedia."},400);
     next="APPROVED"; d.selectedVendorOfferId=offer.id; d.selectedVendorId=offer.vendorId; d.selectedVendorName=offer.vendorName; d.selectedVendorVmlId=offer.vendorVmlId; d.selectedOfferAmount=num(offer.amount); d.approvedByUserId=user.id; d.approvedAt=new Date().toISOString();
   }
   else if(action==="reject") { if(!caps.procurementApprove) return json({ok:false,message:"Role ini tidak dapat reject PR."},403); if(!["SUBMITTED","READY_FOR_APPROVAL","APPROVED"].includes(old)) return json({ok:false,message:"PR tidak dapat direject dari status ini."},409); next="REJECTED"; d.rejectReason=String(body.notes||""); }
-  else if(action==="order") { if(!caps.procurementOrder) return json({ok:false,message:"Role ini tidak dapat menandai PR sebagai dipesan."},403); if(old!=="SPK_CREATED") return json({ok:false,message:"SPK/PO harus dibuat Admin Teknik sebelum PR dapat ditandai ORDERED."},409); if(!d.poId) return json({ok:false,message:"Referensi PO/SPK belum tersedia."},409); next="ORDERED"; d.orderedAt=new Date().toISOString(); }
-  else if(action==="receive") { if(!caps.procurementOrder) return json({ok:false,message:"Role ini tidak dapat menerima material."},403); if(old!=="ORDERED") return json({ok:false,message:"PR harus ORDERED sebelum RECEIVED."},409); next="RECEIVED"; d.receivedAt=new Date().toISOString(); }
+  else if(action==="order") { if(!caps.procurementOrder) return json({ok:false,message:"Hanya Project Manager proyek atau Manajemen yang dapat menindaklanjuti vendor setelah SPK/PO dibuat."},403); const assignedPm=await projectAssignment(env,d.projectId,"pm"); if(normalizeRole(user)==="project_manager" && String(assignedPm||d.projectManagerUserId||"")!==String(user.id||"")) return json({ok:false,message:"Anda bukan Project Manager proyek ini."},403); if(old!=="SPK_CREATED") return json({ok:false,message:"SPK/PO harus dibuat Admin Teknik sebelum PR dapat ditandai ORDERED."},409); if(!d.poId) return json({ok:false,message:"Referensi PO/SPK belum tersedia."},409); next="ORDERED"; d.orderedAt=new Date().toISOString(); d.orderedByUserId=user.id; }
+  else if(action==="receive") { if(!caps.procurementOrder) return json({ok:false,message:"Hanya Project Manager proyek atau Manajemen yang dapat mengonfirmasi penerimaan material/jasa vendor."},403); const assignedPm=await projectAssignment(env,d.projectId,"pm"); if(normalizeRole(user)==="project_manager" && String(assignedPm||d.projectManagerUserId||"")!==String(user.id||"")) return json({ok:false,message:"Anda bukan Project Manager proyek ini."},403); if(old!=="ORDERED") return json({ok:false,message:"PR harus ORDERED sebelum RECEIVED."},409); next="RECEIVED"; d.receivedAt=new Date().toISOString(); d.receivedByUserId=user.id; }
   else return json({ok:false,message:"Action PR tidak dikenal."},400);
   d.status=next;
   const out=await upsertRecord(env,"procurement",id,d,user);
@@ -1899,7 +1901,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.7"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.8"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2307,16 +2309,13 @@ export default {
         }
         if (collection === "procurement") {
           const st=String(old.data.status||"DRAFT").toUpperCase();
-          const fieldRole=["project_manager","pelaksana_lapangan"].includes(roleKey);
-          if (fieldRole && !["DRAFT","REJECTED"].includes(st)) return json({ok:false,message:"PR yang sudah diajukan hanya dapat dilengkapi Procurement/Manajemen sesuai tahap."},409);
-          if (st==="SUBMITTED" && roleKey==="admin_teknik") return json({ok:false,message:"Admin Teknik baru menerima PR setelah vendor disetujui untuk pembuatan SPK/PO."},409);
-          if (!["DRAFT","REJECTED","SUBMITTED"].includes(st) && !isManagementRole(auth.user)) return json({ok:false,message:"PR yang sudah dipilih vendornya tidak dapat diedit pada tahap ini."},409);
           const assignedPm=await projectAssignment(env,data.projectId || old.data.projectId,"pm");
           if(!assignedPm) return json({ok:false,message:"Proyek belum memiliki Project Manager. Tetapkan PM sebelum mengubah PR."},400);
-          if (st==="SUBMITTED" && roleKey==="procurement") {
-            // Procurement hanya mengisi pembanding vendor; kebutuhan/HPP dari PM dikunci.
-            data={...old.data,vendorOffers:data.vendorOffers};
-          }
+          if (roleKey==="project_manager" && String(assignedPm)!==String(auth.user.id||"")) return json({ok:false,message:"Anda hanya dapat mengubah PR pada proyek yang Anda tangani."},403);
+          if (roleKey==="pelaksana_lapangan" && !["DRAFT","REJECTED"].includes(st)) return json({ok:false,message:"Pelaksana Lapangan hanya dapat membantu menyiapkan draft PR. Setelah diajukan, pengelolaan PR menjadi tanggung jawab Project Manager."},409);
+          if (roleKey==="project_manager" && !["DRAFT","REJECTED","SUBMITTED"].includes(st)) return json({ok:false,message:"PR yang sudah masuk approval Head tidak dapat diubah oleh Project Manager."},409);
+          if (st==="SUBMITTED" && roleKey==="admin_teknik") return json({ok:false,message:"Admin Teknik baru menerima PR setelah vendor disetujui untuk pembuatan SPK/PO."},409);
+          if (!["DRAFT","REJECTED","SUBMITTED"].includes(st) && !isManagementRole(auth.user)) return json({ok:false,message:"PR yang sudah dipilih vendornya tidak dapat diedit pada tahap ini."},409);
           data.preparedByUserId=old.data.preparedByUserId||auth.user.id; data.requesterUserId=assignedPm; data.projectManagerUserId=assignedPm;
         }
         // Critical workflow statuses cannot be edited manually; use the action endpoints above.

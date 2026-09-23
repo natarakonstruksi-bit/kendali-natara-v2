@@ -1,6 +1,6 @@
-# Nara System V3.4.7 — QA Final + Workflow Inbox
+# Nara System V3.4.8 — QA Final + Workflow Inbox
 
-V3.4.7 melengkapi Nara System menjadi sistem **task routing** lintas departemen. Setiap tahap workflow yang membutuhkan tindakan orang lain akan membuat **Tugas Saya** untuk user/role tujuan. Tugas tidak dapat sekadar dicentang selesai dari inbox: user harus membuka modul asal dan menjalankan aksi yang benar. Saat aksi selesai, tugas aktif ditutup dan tugas berikutnya otomatis dibuat untuk PIC/role selanjutnya.
+V3.4.8 melengkapi Nara System menjadi sistem **task routing** lintas departemen. Setiap tahap workflow yang membutuhkan tindakan orang lain akan membuat **Tugas Saya** untuk user/role tujuan. Tugas tidak dapat sekadar dicentang selesai dari inbox: user harus membuka modul asal dan menjalankan aksi yang benar. Saat aksi selesai, tugas aktif ditutup dan tugas berikutnya otomatis dibuat untuk PIC/role selanjutnya.
 
 ## Struktur komando utama
 
@@ -32,7 +32,7 @@ Role pengawas/manajemen mempunyai toggle **Semua Tugas Aktif** untuk melihat bot
 - **QC:** QC Inspection → bila Tidak Sesuai menjadi Temuan → Pelaksana memperbaiki → QC verifikasi → Closed / Revision ke Pelaksana.
 - **CCO:** Pelaksana/PM → Admin Teknik → QS → Admin Teknik / Head of Operational bila perlu eskalasi → Client → Addendum → Closed.
 - **Pengajuan Dana:** Requester → Head of Operational → Finance → Paid / Cash Out.
-- **Procurement:** PM → Procurement (pembanding vendor) → Head of Operational/Head Unit Bisnis pilih vendor → Procurement order → Procurement receive.
+- **Procurement:** PM mengisi kebutuhan + pembanding vendor → Head of Operational/Head Unit Bisnis memilih vendor → Admin Teknik membuat SPK/PO → PM menindaklanjuti vendor dan mengonfirmasi penerimaan.
 - **Issue/Kendala:** PIC → Project Manager review → Closed.
 - **Retensi:** PIC/Finance → Admin Teknik final close.
 - **Close-Out:** owner checklist/Admin Teknik → Closed.
@@ -56,7 +56,7 @@ npx wrangler d1 migrations apply DB --remote
 npx wrangler deploy
 ```
 
-Schema database tidak berubah dari V3.4. Migration terakhir tetap `0019_workflow_inbox.sql`; jika migration itu sudah pernah diterapkan, V3.4.7 tidak menambah migration baru.
+Schema database tidak berubah dari V3.4. Migration terakhir tetap `0019_workflow_inbox.sql`; jika migration itu sudah pernah diterapkan, V3.4.8 tidak menambah migration baru.
 
 QA detail tersedia di `QA-MATRIX.md` dan `QA-RESULTS.md`.
 
@@ -64,16 +64,16 @@ Tetap memakai D1/R2 produksi yang sama. Jangan membuat database baru.
 
 
 ## Role QC
-V3.4.7 mempertahankan fungsi Quality Control sebagai satu posisi/role **QC**. Seluruh inspeksi, temuan, verifikasi, dan laporan QC menggunakan role yang sama. Label QC lama tetap kompatibel di backend tetapi tidak lagi tersedia sebagai pilihan posisi baru.
+V3.4.8 mempertahankan fungsi Quality Control sebagai satu posisi/role **QC**. Seluruh inspeksi, temuan, verifikasi, dan laporan QC menggunakan role yang sama. Label QC lama tetap kompatibel di backend tetapi tidak lagi tersedia sebagai pilihan posisi baru.
 
 
-## V3.4.7 — Penyatuan role lapangan
+## V3.4.8 — Penyatuan role lapangan
 
 - `Site Manager`, `Superintendent`, `SM` → **Project Manager**.
 - `Pengawas Lapangan`, `Site Supervisor` → **Pelaksana Lapangan**.
 - Pilihan jabatan baru hanya menampilkan **Project Manager** dan **Pelaksana Lapangan** untuk dua fungsi tersebut.
 - Data lama tetap kompatibel melalui alias backend dan fallback assignment proyek.
-- **Pelaksana Lapangan dapat membantu menyiapkan draft Purchase Request (PR)** untuk proyek yang ditugaskan, tetapi pengaju formal dan pihak yang submit adalah Project Manager. Setelah submit, tugas berpindah ke Procurement untuk melengkapi pembanding vendor.
+- **Pelaksana Lapangan dapat membantu menyiapkan draft Purchase Request (PR)** untuk proyek yang ditugaskan, tetapi pengaju formal dan pihak yang submit adalah Project Manager. Project Manager mengisi pembanding vendor sebelum PR dikirim ke Head.
 - **Pelaksana Lapangan dapat melihat temuan QC proyek dan menerima Tugas Perbaikan QC** jika ditetapkan sebagai PIC.
 
 
@@ -81,10 +81,18 @@ V3.4.7 mempertahankan fungsi Quality Control sebagai satu posisi/role **QC**. Se
 Nama produk yang tampil kepada user sekarang adalah **Nara System**. Identifier teknis produksi yang sudah ada seperti Worker `kendali-natara-v2`, D1 `kendali-natara-db-v2`, R2 `kendali-natara-files-v2`, cookie `kendali_session`, password salt lama, dan tabel `kendali_audit_log` sengaja **tidak diubah** agar login, data, file, dan deployment existing tetap kompatibel.
 
 
-## PR Vendor V3.4.7
+## PR Vendor V3.4.8
 
-Workflow PR resmi: **Project Manager → Procurement → Head of Operational/Head Unit Bisnis → Admin Teknik → Procurement**. Setelah vendor dipilih oleh Head, Admin Teknik wajib membuat SPK/PO; penyimpanan SPK/PO otomatis mengubah PR ke `SPK_CREATED` dan meneruskan tugas ke Procurement.
+Workflow PR resmi: **Project Manager → Head of Operational/Head Unit Bisnis → Admin Teknik → Project Manager**. Setelah vendor dipilih oleh Head, Admin Teknik wajib membuat SPK/PO; penyimpanan SPK/PO otomatis mengubah PR ke `SPK_CREATED` dan meneruskan tugas ke Procurement.
 
 
-## V3.4.7 — Project Manager Access Fix
+## V3.4.8 — Project Manager Access Fix
 Project Manager memiliki akses menu Procurement dan QC untuk proyek yang ditugaskan. PM dapat membuat/memantau PR dan melihat inspeksi/temuan QC serta menangani tindak lanjut yang menjadi tanggung jawab proyek. Aksi inspeksi/verifikasi QC tetap khusus role QC/Head sesuai matriks. Resolusi role kini memprioritaskan Posisi/Jabatan agar akun lama dengan field role yang stale tidak jatuh menjadi Viewer.
+
+## V3.4.8 — Alur PR Vendor tanpa Procurement
+
+Pada struktur Natara saat ini tidak ada role Procurement sebagai pemegang workflow vendor. Alur resmi PR Vendor adalah:
+
+`Project Manager → Head of Operational / Head Unit Bisnis → Admin Teknik → Project Manager`
+
+Project Manager mengisi kebutuhan pekerjaan/material/jasa, HPP detail, pembanding vendor, quotation, term, lead time, dan deklarasi Conflict of Interest. Minimal satu pembanding vendor wajib tersedia sebelum PR dapat dikirim ke Head. Head memilih vendor yang disetujui. Setelah itu Admin Teknik membuat SPK/PO berdasarkan vendor terpilih dan memasukkannya ke register PO/SPK. Sesudah SPK/PO terbentuk, Nara System mengembalikan tugas ke Project Manager untuk menindaklanjuti vendor dan mengonfirmasi penerimaan material/jasa atau tahap pekerjaan vendor.
