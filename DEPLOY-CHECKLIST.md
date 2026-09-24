@@ -1,6 +1,6 @@
-# Deploy Checklist — Nara System V3.4.12
+# Deploy Checklist — Nara System V3.4.13
 
-1. Pastikan deploy memakai package **V3.4.12 QS Volume + As-Built Drafter**.
+1. Pastikan deploy memakai package **V3.4.13 Dual Progress Chart**.
 2. Jangan membuat D1 atau R2 baru. Tetap gunakan binding produksi existing.
 3. Jalankan QA/build lokal:
 

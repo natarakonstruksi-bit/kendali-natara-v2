@@ -1,6 +1,6 @@
-# Nara System V3.4.12 — QS Volume + As-Built Drafter
+# Nara System V3.4.13 — QS Volume + As-Built Drafter
 
-V3.4.12 menyederhanakan modul **QS** menjadi kontrol **Volume RAB vs Volume Realisasi**, dan menambahkan modul baru **As-Built / Drafter** seperti tabel referensi: Arsitektur %, Struktur %, MEP %, Overall Progress, serta Status As-Built. Drafter dapat meng-upload/ganti file As-Built tiap disiplin, kemudian mengirim hasil 100% ke Head of Engineering untuk approval.
+V3.4.13 menyederhanakan modul **QS** menjadi kontrol **Volume RAB vs Volume Realisasi**, dan menambahkan modul baru **As-Built / Drafter** seperti tabel referensi: Arsitektur %, Struktur %, MEP %, Overall Progress, serta Status As-Built. Drafter dapat meng-upload/ganti file As-Built tiap disiplin, kemudian mengirim hasil 100% ke Head of Engineering untuk approval.
 
 ## QS — Volume RAB vs Volume Realisasi
 
@@ -90,7 +90,7 @@ Alur utama saat ini:
 - Project Manager dapat membaca QC proyek yang ditugaskan, tetapi inspeksi/verifikasi tetap QC/Head of Supporting.
 - Pelaksana Lapangan menerima Temuan QC yang ditugaskan untuk diperbaiki.
 
-## QA V3.4.12
+## QA V3.4.13
 
 `npm run build` menjalankan:
 
@@ -104,7 +104,7 @@ Alur utama saat ini:
 - button/flow audit untuk kontrol kritikal shell, task, PR, QC, ATI, QS, As-Built, dan reporting;
 - QS + As-Built smoke untuk formula progress, upload, dan workflow approval.
 
-Database smoke juga menguji fresh migration dan upgrade-preservation. V3.4.12 **tidak menambah migration**; migration terakhir tetap `0019_workflow_inbox.sql`.
+Database smoke juga menguji fresh migration dan upgrade-preservation. V3.4.13 **tidak menambah migration**; migration terakhir tetap `0019_workflow_inbox.sql`.
 
 ## Deploy
 
@@ -122,3 +122,7 @@ npx wrangler d1 migrations apply DB --remote
 ```
 
 Tetap gunakan Worker, D1, dan R2 produksi yang sekarang. Identifier teknis lama sengaja dipertahankan agar login, data, dan file existing tetap kompatibel.
+
+
+## V3.4.13 — Dashboard Dua Garis
+Dashboard proyek menampilkan dua garis terpisah: **Rencana** dan **Realisasi**, plus deviasi aktual terhadap rencana. Timeline memakai tanggal sebenarnya; titik awal proyek digunakan sebagai anchor 0% agar satu input progress tetap terbaca sebagai garis. Bila Schedule/Kurva-S tersedia, baseline rencana dapat dibentuk dari bobot aktivitas, sedangkan planProgress dari laporan harian/mingguan tetap menjadi sumber dengan prioritas lebih tinggi.

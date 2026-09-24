@@ -1,4 +1,4 @@
-# Role Matrix — Nara System V3.4.12
+# Role Matrix — Nara System V3.4.13
 
 ## Hierarki utama
 
@@ -27,7 +27,7 @@ Administrator/Direktur adalah akses sistem/manajemen dan bukan urutan operasiona
 | Kepala ATI | ATI | Pengajuan tenaga, evaluasi masalah, kontrol ATI |
 | Instruktur ATI | ATI sesuai akses | Aktivitas/pelatihan/assessment ATI |
 
-## Hak khusus QC V3.4.12
+## Hak khusus QC V3.4.13
 
 **Head of Supporting dan QC** dapat:
 

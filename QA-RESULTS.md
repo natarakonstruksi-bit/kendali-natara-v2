@@ -1,17 +1,24 @@
-# QA Results — Nara System V3.4.12
+# QA Results — Nara System V3.4.13
 
-Local QA PASS untuk build/source package.
+Status: **PASS untuk build/smoke test lokal**.
 
-- Frontend runtime smoke: PASS.
-- Static workflow/button wiring: PASS.
-- Worker RBAC smoke: PASS.
-- PM access/vendor/QC regression: PASS.
-- QC control + Before/After regression: PASS.
-- QS + As-Built smoke: PASS.
-- Formula Overall As-Built = rata-rata Arsitektur/Struktur/MEP: PASS.
-- As-Built upload/approval endpoint wiring: PASS.
-- Fresh migration: PASS (9 files).
-- Upgrade preservation user/project: PASS.
-- Tidak ada migration baru setelah `0019_workflow_inbox.sql`.
+- Frontend runtime smoke: PASS
+- Worker RBAC smoke: PASS
+- PM QC / PR runtime smoke: PASS
+- PM vendor flow & vendor free-text: PASS
+- QC control + before/after: PASS
+- Button / workflow audit: PASS
+- QS Volume + As-Built: PASS
+- Dashboard dual progress chart: PASS
+- JavaScript syntax `public/app.js`: PASS
+- JavaScript syntax `src/worker.js`: PASS
 
-Catatan: R2/D1 remote, cookie/session, cache asset, dan kombinasi data produksi tetap perlu smoke test setelah deploy.
+## Dashboard V3.4.13
+- Dua series terpisah: Rencana dan Realisasi.
+- Sumbu waktu mengikuti tanggal aktual.
+- Titik awal proyek menjadi anchor 0% bila tersedia.
+- Satu data progress tetap dirender sebagai garis pendek, bukan titik yang tidak terlihat.
+- Baseline Rencana dapat memakai Time Schedule/Kurva-S; `planProgress` input harian/mingguan tetap lebih prioritas.
+- Ringkasan Rencana, Realisasi, dan Deviasi tampil pada setiap kartu proyek.
+
+Catatan: koneksi D1/R2 remote dan data produksi tetap perlu diverifikasi setelah deploy Cloudflare.

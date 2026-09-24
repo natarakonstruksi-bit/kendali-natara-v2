@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+const app=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+const worker=fs.readFileSync(new URL('../src/worker.js',import.meta.url),'utf8');
+const css=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+for(const marker of ['chart-plan','chart-actual','chart-plan-dot','chart-actual-dot','Rencana','Realisasi','Deviasi']) if(!app.includes(marker)) throw new Error(`Dashboard chart marker hilang: ${marker}`);
+if(!worker.includes('progressSeriesFor(projectId, all, project={})')) throw new Error('progressSeriesFor belum menerima master project');
+if(!worker.includes('progressSeries:progressSeriesFor(p.id,all,p.data)')) throw new Error('Dashboard belum mengirim master project ke progress series');
+if(!worker.includes('Tambahkan titik awal 0%')) throw new Error('Anchor titik awal belum ada');
+if(!css.includes('.chart-plan-dot')||!css.includes('.chart-current')) throw new Error('CSS dual chart belum lengkap');
+console.log('Dashboard dual progress chart smoke OK — Rencana + Realisasi + Deviasi wired.');

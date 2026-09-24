@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.12 — QS Volume + As-Built Drafter
+ * Nara System V3.4.13 — Dual Progress Chart
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.12";
+const APP_VERSION = "APP-V3.4.13";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -720,20 +720,71 @@ function latestProgress(projectId, all, project) {
 }
 
 
-function progressSeriesFor(projectId, all) {
+function progressSeriesFor(projectId, all, project={}) {
   const byDate = new Map();
   const rows = all.filter(r => (r.collection === "daily_progress" || r.collection === "weekly_progress") && String(r.data.projectId || "") === projectId);
   rows.sort((a,b) => String(a.data.date || a.updated_at || "").localeCompare(String(b.data.date || b.updated_at || "")));
+  const readOptional = (data,keys) => {
+    for (const k of keys) {
+      if (data && data[k] !== undefined && data[k] !== null && data[k] !== "") return Math.min(100,Math.max(0,num(data[k])));
+    }
+    return null;
+  };
+  const mergePoint = (date,patch,priority=1) => {
+    if (!date) return;
+    const prev = byDate.get(date) || {date,actual:null,plan:null,actualPriority:0,planPriority:0};
+    if (patch.actual !== null && patch.actual !== undefined && priority >= prev.actualPriority) { prev.actual=patch.actual; prev.actualPriority=priority; }
+    if (patch.plan !== null && patch.plan !== undefined && priority >= prev.planPriority) { prev.plan=patch.plan; prev.planPriority=priority; }
+    byDate.set(date,prev);
+  };
   for (const r of rows) {
     const date = String(r.data.date || r.updated_at || "").slice(0,10);
     if (!date) continue;
-    const actual = Math.min(100,Math.max(0,pickNum(r.data,["progress","actualProgress","percent"])));
-    const plan = Math.min(100,Math.max(0,pickNum(r.data,["planProgress","plannedProgress","plan","rencana"])));
-    const prev = byDate.get(date);
-    // Daily input is the most granular source, so it wins if both exist on same date.
-    if (!prev || r.collection === "daily_progress") byDate.set(date,{date,actual,plan,source:r.collection});
+    const actual = readOptional(r.data,["progress","progressPercent","actualProgress","percent"]);
+    const plan = readOptional(r.data,["planProgress","plannedProgress","plan","rencana"]);
+    mergePoint(date,{actual,plan},r.collection === "daily_progress" ? 3 : 2);
   }
-  return [...byDate.values()].slice(-60);
+
+  // Tambahkan titik awal 0% agar satu input progress tetap terbaca sebagai garis,
+  // bukan hanya satu titik. Tanggal awal berasal dari master proyek, bukan asumsi baru.
+  const startDate = String(project.startDate || project.start || "").slice(0,10);
+  if (startDate) {
+    const firstDate = [...byDate.keys()].sort()[0] || "";
+    if (!firstDate || startDate < firstDate) mergePoint(startDate,{actual:0,plan:0},1);
+  }
+
+  // Jika ada Time Schedule / Kurva-S, bentuk baseline rencana kumulatif dari bobot aktivitas.
+  // Nilai plan yang diinput langsung pada progress tetap memiliki prioritas lebih tinggi.
+  const schedule = all.filter(r => r.collection === "schedule" && String(r.data.projectId || "") === projectId && num(r.data.weight) > 0 && (r.data.startDate || r.data.endDate));
+  if (schedule.length) {
+    const dateSet = new Set([...byDate.keys()]);
+    for (const r of schedule) {
+      const a=String(r.data.startDate||"").slice(0,10), b=String(r.data.endDate||r.data.startDate||"").slice(0,10);
+      if(a) dateSet.add(a); if(b) dateSet.add(b);
+    }
+    const totalWeight=schedule.reduce((sum,r)=>sum+Math.max(0,num(r.data.weight)),0) || 100;
+    const plannedAt = date => {
+      const t=new Date(`${date}T12:00:00Z`).getTime();
+      let weighted=0;
+      for(const r of schedule){
+        const w=Math.max(0,num(r.data.weight));
+        const a=String(r.data.startDate||r.data.endDate||"").slice(0,10), b=String(r.data.endDate||r.data.startDate||"").slice(0,10);
+        if(!a||!b) continue;
+        const ta=new Date(`${a}T12:00:00Z`).getTime(), tb=new Date(`${b}T12:00:00Z`).getTime();
+        let f=0;
+        if(t>=tb) f=1; else if(t<=ta) f=0; else if(tb===ta) f=1; else f=(t-ta)/(tb-ta);
+        weighted += w*Math.max(0,Math.min(1,f));
+      }
+      return Math.min(100,Math.max(0,(weighted/totalWeight)*100));
+    };
+    [...dateSet].sort().forEach(date=>mergePoint(date,{plan:plannedAt(date)},1));
+  }
+
+  const endDate = String(project.endDate || project.targetFinish || project.targetDate || "").slice(0,10);
+  const hasExplicitOrSchedulePlan = [...byDate.values()].some(p => p.plan !== null);
+  if (endDate && hasExplicitOrSchedulePlan) mergePoint(endDate,{plan:100},1);
+
+  return [...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date)).slice(-90).map(({actualPriority,planPriority,...p})=>p);
 }
 
 function qcStatusCounts(projectId, all) {
@@ -889,7 +940,7 @@ async function loadControlRows(env,user=null) {
 async function dashboardHandler(env,user=null) {
   const all = await loadControlRows(env,user);
   const projects = all.filter(r => r.collection === "projects");
-  const rows = projects.map(p => ({...computeProjectMetrics(p,all), evaluatedStatus:evaluateProject(p,all).status, progressSeries:progressSeriesFor(p.id,all)}));
+  const rows = projects.map(p => ({...computeProjectMetrics(p,all), evaluatedStatus:evaluateProject(p,all).status, progressSeries:progressSeriesFor(p.id,all,p.data)}));
   const sum = key => rows.reduce((s,r)=>s+num(r[key]),0);
   const financeVisible = canSeeFinanceModule(user);
   const totals = {
@@ -2005,7 +2056,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.12"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.13"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2241,7 +2292,7 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.7-pm-qc-procurement-runtime-fix"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.13-dual-progress-chart"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -2552,7 +2603,7 @@ export default {
 
 
 /* ========================================================================== */
-/* NARA SYSTEM V3.4.12 — QS VOLUME + AS-BUILT DRAFTER                       */
+/* NARA SYSTEM V3.4.13 — DUAL PROGRESS CHART                               */
 /* ========================================================================== */
 function clampPercent(v){ return Math.max(0,Math.min(100,num(v))); }
 function normalizeAsBuiltProgress(data,oldStatus=""){

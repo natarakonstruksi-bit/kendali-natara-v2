@@ -178,12 +178,24 @@ async function renderView(){const meta=TITLES[state.view]||['Nara System',''];$(
 async function loadCollection(c,projectScoped=false){const key=`${c}|${projectScoped?state.selectedProjectId:''}`;if(state.cache.has(key))return state.cache.get(key);const q=projectScoped&&state.selectedProjectId?`?projectId=${encodeURIComponent(state.selectedProjectId)}`:'';const r=await api(`/api/records/${c}${q}`);const rows=r.rows||[];state.cache.set(key,rows);return rows;}
 
 function progressChart(series=[]){
-  if(!series.length)return `<div class="empty">Belum ada progress. Input Progress Harian/Mingguan untuk menampilkan grafik.</div>`;
-  const w=560,h=170,padL=28,padR=10,padT=12,padB=26,iw=w-padL-padR,ih=h-padT-padB;
-  const pts=series.slice(-30);const x=i=>padL+(pts.length===1?iw/2:(i/(pts.length-1))*iw);const y=v=>padT+ih-(Math.max(0,Math.min(100,num(v)))/100)*ih;
-  const actual=pts.map((p,i)=>`${x(i)},${y(p.actual)}`).join(' ');const plan=pts.map((p,i)=>`${x(i)},${y(p.plan)}`).join(' ');
+  if(!series.length)return `<div class="empty">Belum ada data Rencana dan Realisasi. Input Progress Harian/Mingguan untuk menampilkan grafik.</div>`;
+  const w=560,h=190,padL=30,padR=12,padT=18,padB=34,iw=w-padL-padR,ih=h-padT-padB;
+  const pts=series.slice(-45);
+  const times=pts.map(p=>new Date(`${p.date}T12:00:00`).getTime()).filter(Number.isFinite), minT=Math.min(...times), maxT=Math.max(...times);
+  const xDate=date=>{const t=new Date(`${date}T12:00:00`).getTime();return padL+((maxT===minT?0.5:(t-minT)/(maxT-minT))*iw)};
+  const y=v=>padT+ih-(Math.max(0,Math.min(100,num(v)))/100)*ih;
+  const actualPts=pts.filter(p=>p.actual!==null&&p.actual!==undefined).map(p=>({x:xDate(p.date),y:y(p.actual),v:num(p.actual),date:p.date}));
+  const planPts=pts.filter(p=>p.plan!==null&&p.plan!==undefined).map(p=>({x:xDate(p.date),y:y(p.plan),v:num(p.plan),date:p.date}));
+  const line=(arr,cls)=>arr.length>1?`<polyline class="${cls}" points="${arr.map(p=>`${p.x},${p.y}`).join(' ')}"/>`:arr.length===1?`<line class="${cls}" x1="${arr[0].x-14}" y1="${arr[0].y}" x2="${arr[0].x+14}" y2="${arr[0].y}"/>`:'';
+  const circles=(arr,cls)=>arr.map(p=>`<circle class="${cls}" cx="${p.x}" cy="${p.y}" r="3"/>`).join('');
   const grid=[0,25,50,75,100].map(v=>`<line class="chart-grid" x1="${padL}" y1="${y(v)}" x2="${w-padR}" y2="${y(v)}"/><text class="chart-label" x="2" y="${y(v)+3}">${v}%</text>`).join('');
-  return `<div class="chart-wrap"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Grafik progress rencana dan aktual">${grid}<polyline class="chart-plan" points="${plan}"/><polyline class="chart-actual" points="${actual}"/>${pts.map((p,i)=>`<circle cx="${x(i)}" cy="${y(p.actual)}" r="2.8" fill="#175cd3"/>`).join('')}<text class="chart-label" x="${padL}" y="${h-5}">${esc(pts[0].date)}</text><text class="chart-label" text-anchor="end" x="${w-padR}" y="${h-5}">${esc(pts.at(-1).date)}</text></svg><div class="chart-legend"><span><i class="legend-line"></i>Aktual/Realisasi</span><span><i class="legend-line plan"></i>Rencana</span></div></div>`;
+  const today=new Date();today.setHours(23,59,59,999);
+  const latestPast=(arr)=>{const past=arr.filter(p=>new Date(`${p.date}T12:00:00`)<=today);return (past.length?past:arr).at(-1)||null};
+  const lastActual=latestPast(actualPts), lastPlan=latestPast(planPts), deviation=(lastActual&&lastPlan)?lastActual.v-lastPlan.v:null;
+  const stats=`<div class="chart-current"><span><small>Rencana</small><b>${lastPlan?fmtNum(lastPlan.v)+'%':'-'}</b></span><span><small>Realisasi</small><b>${lastActual?fmtNum(lastActual.v)+'%':'-'}</b></span><span class="${deviation===null?'':deviation<0?'neg':deviation>0?'pos':''}"><small>Deviasi</small><b>${deviation===null?'-':`${deviation>0?'+':''}${fmtNum(deviation)}%`}</b></span></div>`;
+  const xLabels=pts.length?`<text class="chart-label" x="${padL}" y="${h-7}">${esc(fmtDate(pts[0].date))}</text>${pts.length>2?`<text class="chart-label" text-anchor="middle" x="${padL+iw/2}" y="${h-7}">${esc(fmtDate(pts[Math.floor((pts.length-1)/2)].date))}</text>`:''}<text class="chart-label" text-anchor="end" x="${w-padR}" y="${h-7}">${esc(fmtDate(pts.at(-1).date))}</text>`:'';
+  const emptyNote=!actualPts.length||!planPts.length?`<div class="chart-note">${!planPts.length?'Baseline Rencana belum tersedia. ':''}${!actualPts.length?'Realisasi belum diinput.':''}</div>`:'';
+  return `<div class="chart-wrap">${stats}<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Grafik dua garis progress rencana dan realisasi">${grid}${line(planPts,'chart-plan')}${line(actualPts,'chart-actual')}${circles(planPts,'chart-plan-dot')}${circles(actualPts,'chart-actual-dot')}${xLabels}</svg><div class="chart-legend"><span><i class="legend-line plan"></i>Rencana</span><span><i class="legend-line"></i>Realisasi</span></div>${emptyNote}</div>`;
 }
 
 async function renderDashboard(){
@@ -1077,7 +1089,7 @@ if(globalThis.KENDALI_TEST_MODE){
 init();
 
 /* ========================================================================== */
-/* NARA SYSTEM V3.4.12 — QS VOLUME + AS-BUILT DRAFTER                       */
+/* NARA SYSTEM V3.4.13 — DUAL PROGRESS CHART                       */
 /* ========================================================================== */
 TITLES.opname=['QS / Volume','QS cukup mencatat Volume RAB dan Volume Realisasi. Workflow tetap: QS → Head of Engineering → Admin Teknik.'];
 TITLES.asbuilt=['As-Built / Drafter','Progress As-Built per proyek: Arsitektur, Struktur, MEP, overall progress, file, dan approval Head of Engineering.'];

@@ -1,4 +1,4 @@
-# QA Matrix — Nara System V3.4.12
+# QA Matrix — Nara System V3.4.13
 
 | Area | Skenario | Expected |
 |---|---|---|
@@ -33,3 +33,10 @@
 - Submit hanya jika 100% + 3 file tersedia.
 - Head of Engineering Approve / Revisi.
 - Handoff muncul di Tugas Saya.
+
+
+### Dashboard Progress V3.4.13
+- Dua series Rencana/Realisasi dirender.
+- Satu titik progress tetap punya visual garis melalui anchor tanggal mulai proyek.
+- Data rencana dari planProgress tidak ditimpa baseline schedule.
+- Deviasi = Realisasi - Rencana.

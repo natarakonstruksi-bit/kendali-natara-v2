@@ -61,3 +61,11 @@
 ## V3.4.4 — Nara System Branding
 
 - Branding produk diubah dari KENDALI menjadi Nara System tanpa mengganti identifier teknis produksi lama.
+
+
+## V3.4.13
+- Dashboard proyek: grafik dua garis **Rencana** dan **Realisasi**.
+- Sumbu X mengikuti tanggal sebenarnya, bukan hanya indeks titik.
+- Tambah ringkasan Rencana, Realisasi, dan Deviasi per proyek.
+- Titik awal master proyek menjadi anchor 0% agar grafik tetap berupa garis walau baru ada satu laporan progress.
+- Baseline rencana dapat dibentuk dari Time Schedule/Kurva-S bila tersedia; input planProgress harian/mingguan tetap diprioritaskan.
