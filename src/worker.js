@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.13 — Dual Progress Chart
+ * Nara System V3.4.14 — QC Team + PM Finding PIC
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.13";
+const APP_VERSION = "APP-V3.4.14";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -238,7 +238,7 @@ function collectionPermission(user, collection) {
   if (collection === "qc_inspection_sessions") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],[],[]);
   if (collection === "qc_inspection_items") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],[],[]);
   if (collection === "qc_inspections") return allow(["manager_operasional","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"],["manager_operasional","koordinator_supporting","qc"],["manager_operasional","koordinator_supporting","qc"]);
-  if (collection === "defects") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","project_manager","pelaksana_lapangan","qc"],["manager_operasional","koordinator_supporting","qc"]);
+  if (collection === "defects") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","project_manager","qc"],["manager_operasional","koordinator_supporting","project_manager","qc"]);
   if (collection === "cco") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","pelaksana_lapangan","estimator","qs"],["manager_operasional","koordinator_engineering","admin_teknik","qs","project_manager","pelaksana_lapangan"],["manager_operasional"]);
   if (collection === "approvals") return allow(["manager_operasional","admin_teknik","finance"],["manager_operasional","admin_teknik","finance"]);
   if (collection === "procurement") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","pelaksana_lapangan","procurement","finance"],["manager_operasional","admin_teknik","project_manager","pelaksana_lapangan","procurement"]);
@@ -285,10 +285,11 @@ function buildAccess(user) {
       projectManagerProcurementAccess: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","project_manager"]),
       projectManagerQcReadAccess: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","project_manager"]),
       qcInspect: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
+      qcFindingManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc","project_manager"]),
       qcVerify: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
       qcCloseSession: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting"]),
       qcDeleteSession: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
-      qcDeleteFinding: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
+      qcDeleteFinding: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc","project_manager"]),
       atiManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","kepala_ati","instruktur_ati"]),
       managePublicInfo: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
       qcSyncRab: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_engineering","koordinator_supporting","qc","qs"]),
@@ -1150,7 +1151,7 @@ function workflowSourceView(collection) {
 async function projectRoleUser(env, projectId, roleKey) {
   if (!projectId) return "";
   const p=await getRecord(env,"projects",String(projectId)); if(!p) return "";
-  const map={project_manager:["pmUserId","projectManagerUserId","siteManagerUserId","smUserId"],pelaksana_lapangan:["pelaksanaUserId","pengawasUserId"],qs:["qsUserId"],qc:["qcUserId"],admin_teknik:["adminUserId"],estimator:["estimatorUserId"],drafter:["drafterUserId"],mep_engineer:["mepUserId"]};
+  const map={project_manager:["pmUserId","projectManagerUserId","siteManagerUserId","smUserId"],pelaksana_lapangan:["pelaksanaUserId","pengawasUserId"],qs:["qsUserId"],admin_teknik:["adminUserId"],estimator:["estimatorUserId"],drafter:["drafterUserId"],mep_engineer:["mepUserId"]};
   for(const k of (map[roleKey]||[])) if(p.data[k]) return String(p.data[k]);
   return "";
 }
@@ -1160,7 +1161,6 @@ async function workflowTaskSpec(env, collection, id, d={}) {
   const base={projectId,sourceCollection:collection,sourceId:id,targetView:workflowSourceView(collection),priority:"NORMAL",dueDate:String(d.deadline||d.dueDate||d.neededDate||d.releaseDate||"")};
   const pm=projectId?await projectRoleUser(env,projectId,"project_manager"):"";
   const pel=projectId?await projectRoleUser(env,projectId,"pelaksana_lapangan"):"";
-  const qc=projectId?await projectRoleUser(env,projectId,"qc"):"";
   const qs=projectId?await projectRoleUser(env,projectId,"qs"):"";
   const mk=(stage,title,waitingFor,actionLabel,assigneeUserId="",assigneeRole="",extra={})=>({...base,stage,title,waitingFor,actionLabel,assigneeUserId:String(assigneeUserId||""),assigneeRole:String(assigneeRole||""),assigneeRoleLabel:workflowRoleLabel(assigneeRole),...extra});
   if(collection==="daily_progress"||collection==="weekly_progress"){
@@ -1183,8 +1183,8 @@ async function workflowTaskSpec(env, collection, id, d={}) {
     return null;
   }
   if(collection==="defects"){
-    if(["OPEN","ON PROGRESS","IN PROGRESS","REVISION REQUIRED"].includes(status)) return mk("QC_FIX","Perbaikan Temuan QC", "Pelaksana memperbaiki temuan dan mengunggah bukti hasil","Perbaiki Temuan",d.picUserId||pel,"pelaksana_lapangan",{priority:String(d.severity||"").toUpperCase().includes("KRIT")?"CRITICAL":"HIGH"});
-    if(["WAITING QC CHECK","WAITING"].includes(status)) return mk("QC_VERIFY","Verifikasi Perbaikan QC", "QC memeriksa ulang hasil perbaikan","Verifikasi QC",qc,"qc",{priority:"HIGH"});
+    if(["OPEN","ON PROGRESS","IN PROGRESS","REVISION REQUIRED"].includes(status)) return mk("QC_PM_FOLLOWUP","Tindak Lanjut Temuan QC", "Project Manager menindaklanjuti temuan dan mengunggah bukti hasil perbaikan","Tindak Lanjut Temuan",d.picUserId||pm,"project_manager",{priority:String(d.severity||"").toUpperCase().includes("KRIT")?"CRITICAL":"HIGH"});
+    if(["WAITING QC CHECK","WAITING"].includes(status)) return mk("QC_VERIFY","Verifikasi Perbaikan QC", "Tim QC memeriksa ulang hasil perbaikan","Verifikasi QC","","qc",{priority:"HIGH"});
     return null;
   }
   if(collection==="cco"){
@@ -1525,7 +1525,8 @@ async function qcInspectHandler(request,env,user) {
   } else {
     const hasOpen=(openDefects.results || []).some(r=>activeLike(safeJsonParse(r.data_json,{}).status));
     if (!hasOpen) {
-      const picUserId=await projectAssignment(env,projectId,"pelaksana");
+      const picUserId=await projectAssignment(env,projectId,"pm");
+      if (!picUserId) return json({ok:false,message:"Proyek belum memiliki Project Manager. Tetapkan Project Manager sebelum menerbitkan temuan QC."},400);
       const fid=crypto.randomUUID(); const fd={
         projectId,workItemId,qcInspectionId:id,date,item:workItem.data.item || "",area:workItem.data.item || "",category:workItem.data.category || "",
         severity:result==="NG"?"B - MAYOR":"C - MINOR",status:"OPEN",picUserId,deadline:"",
@@ -1740,8 +1741,8 @@ async function qcSessionPublishHandler(request,env,user,id) {
   const severity=String(body.severity||"B - MAYOR").trim();
   const suggestion=String(body.suggestion||"Lakukan perbaikan sesuai hasil inspeksi QC dan ajukan bukti hasil perbaikan.");
   if (!deadline) return json({ok:false,message:"Deadline perbaikan wajib diisi."},400);
-  const picUserId=await projectAssignment(env,session.data.projectId,"pelaksana");
-  if (!picUserId) return json({ok:false,message:"Proyek belum memiliki Pelaksana Lapangan. Tetapkan Pelaksana sebelum menerbitkan temuan."},400);
+  const picUserId=await projectAssignment(env,session.data.projectId,"pm");
+  if (!picUserId) return json({ok:false,message:"Proyek belum memiliki Project Manager. Tetapkan Project Manager sebelum menerbitkan temuan."},400);
   const items=await qcSessionItems(env,id);
   const targets=items.filter(x=>normalizeContinuousQcResult(x.data.result)==="TIDAK SESUAI"&&!x.data.findingId);
   if (!targets.length) return json({ok:false,message:"Tidak ada sub-pekerjaan Tidak sesuai yang belum diterbitkan menjadi temuan."},409);
@@ -1787,12 +1788,12 @@ async function deleteQcFindingData(env,user,id,{checkAccess=true}={}) {
 }
 
 async function qcFindingUpdateHandler(request,env,user,id) {
-  if (!buildAccess(user).capabilities.qcInspect) return json({ok:false,message:"Edit temuan QC hanya untuk QC/Head of Supporting/Manajemen."},403);
+  if (!buildAccess(user).capabilities.qcFindingManage) return json({ok:false,message:"Edit temuan QC hanya untuk Project Manager, QC, Head of Supporting, atau Manajemen."},403);
   const rec=await getRecord(env,"defects",id); if(!rec) return json({ok:false,message:"Temuan QC tidak ditemukan."},404);
   const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
   const body=await parseJson(request)||{}; const next={...rec.data};
   for (const k of ["date","area","item","category","severity","deadline","description","suggestion","notes"]) if (body[k]!==undefined) next[k]=String(body[k]||"");
-  if (body.picUserId!==undefined) { const pic=String(body.picUserId||""); if(!pic) return json({ok:false,message:"PIC Pelaksana wajib dipilih."},400); if((await employeeRoleKey(env,pic))!=="pelaksana_lapangan") return json({ok:false,message:"PIC perbaikan QC wajib Pelaksana Lapangan."},400); next.picUserId=pic; }
+  const assignedPm=await projectAssignment(env,rec.data.projectId,"pm"); if(!assignedPm) return json({ok:false,message:"Proyek belum memiliki Project Manager."},400); next.picUserId=assignedPm;
   if(!String(next.description||"").trim()) return json({ok:false,message:"Deskripsi temuan wajib diisi."},400);
   if(!String(next.deadline||"").trim()) return json({ok:false,message:"Deadline perbaikan wajib diisi."},400);
   const out=await upsertRecord(env,"defects",id,{...next,updatedAt:new Date().toISOString()},user);
@@ -1802,7 +1803,7 @@ async function qcFindingUpdateHandler(request,env,user,id) {
 }
 
 async function qcFindingDeleteHandler(env,user,id) {
-  if (!buildAccess(user).capabilities.qcDeleteFinding) return json({ok:false,message:"Hapus temuan QC hanya untuk QC/Head of Supporting/Manajemen."},403);
+  if (!buildAccess(user).capabilities.qcDeleteFinding) return json({ok:false,message:"Hapus temuan QC hanya untuk Project Manager, QC, Head of Supporting, atau Manajemen."},403);
   const rec=await getRecord(env,"defects",id); if(!rec) return json({ok:true});
   const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
   await deleteQcFindingData(env,user,id,{checkAccess:false});
@@ -1895,7 +1896,7 @@ async function employeeRoleKey(env,id) {
 async function projectAssignment(env,projectId,key) {
   const p=await getRecord(env,"projects",String(projectId || ""));
   if (!p) return "";
-  const assignmentMap={pelaksana:["pelaksanaUserId","pengawasUserId"],pengawas:["pelaksanaUserId","pengawasUserId"],site_manager:["pmUserId","projectManagerUserId","siteManagerUserId","smUserId"],pm:["pmUserId","projectManagerUserId","siteManagerUserId","smUserId"],qs:["qsUserId"],drafter:["drafterUserId"],qc:["qcUserId"],mep_engineer:["mepUserId"],estimator:["estimatorUserId"],admin_teknik:["adminUserId"]};
+  const assignmentMap={pelaksana:["pelaksanaUserId","pengawasUserId"],pengawas:["pelaksanaUserId","pengawasUserId"],site_manager:["pmUserId","projectManagerUserId","siteManagerUserId","smUserId"],pm:["pmUserId","projectManagerUserId","siteManagerUserId","smUserId"],qs:["qsUserId"],drafter:["drafterUserId"],mep_engineer:["mepUserId"],estimator:["estimatorUserId"],admin_teknik:["adminUserId"]};
   const fields=assignmentMap[key]||[];
   for (const f of fields) if (p.data[f]) return String(p.data[f]);
   return "";
@@ -1910,7 +1911,7 @@ async function normalizeOperationalResponsibility(env,collection,data) {
     if ((await employeeRoleKey(env,d.picUserId)) !== "pelaksana_lapangan") throw new Error("PIC laporan progress wajib Pelaksana Lapangan.");
   }
   if (["schedule","milestones","issues"].includes(collection) && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "pelaksana_lapangan") throw new Error("PIC pelaksanaan wajib Pelaksana Lapangan.");
-  if (collection === "defects" && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "pelaksana_lapangan") throw new Error("PIC perbaikan QC wajib Pelaksana Lapangan.");
+  if (collection === "defects") { const assigned=await projectAssignment(env,d.projectId,"pm"); if(!assigned) throw new Error("Proyek belum memiliki Project Manager. Tetapkan Project Manager terlebih dahulu."); d.picUserId=assigned; }
   if (collection === "opname") {
     const assigned=await projectAssignment(env,d.projectId,"qs");
     if (assigned) d.qsUserId=assigned;
@@ -1946,11 +1947,11 @@ async function qcFindingActionHandler(request,env,user,id) {
   const d={...rec.data}; const old=String(d.status||"OPEN").toUpperCase();
   const role=normalizeRole(user); const isPic=d.picUserId && String(d.picUserId)===String(user.id);
   if(action==="start") {
-    if(!isPic && !roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","project_manager"])) return json({ok:false,message:"Hanya PIC Pelaksana atau manajemen proyek yang dapat memulai perbaikan."},403);
+    if(!isPic && !roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"])) return json({ok:false,message:"Hanya Project Manager PIC atau manajemen yang dapat memulai tindak lanjut temuan."},403);
     if(!["OPEN","REVISION REQUIRED"].includes(old)) return json({ok:false,message:"Temuan tidak berada pada status yang dapat mulai dikerjakan."},409);
     d.status="ON PROGRESS"; d.startedAt=new Date().toISOString(); d.startedByUserId=user.id;
   } else if(action==="submit-fix") {
-    if(!isPic && !roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","project_manager"])) return json({ok:false,message:"Hanya PIC Pelaksana atau manajemen proyek yang dapat mengirim hasil perbaikan."},403);
+    if(!isPic && !roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"])) return json({ok:false,message:"Hanya Project Manager PIC atau manajemen yang dapat mengirim hasil tindak lanjut."},403);
     if(old!=="ON PROGRESS") return json({ok:false,message:"Temuan harus ON PROGRESS sebelum dikirim ke QC."},409);
     if(!(file instanceof File) || file.size<=0) return json({ok:false,message:"Foto hasil perbaikan wajib di-upload."},400);
     if(file.type && !String(file.type).toLowerCase().startsWith("image/")) return json({ok:false,message:"Bukti hasil perbaikan harus berupa foto/gambar."},400);
@@ -2056,7 +2057,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.13"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.14"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2292,7 +2293,7 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.13-dual-progress-chart"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.14-qc-team-pm-pic"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -2456,7 +2457,7 @@ export default {
         if (["issues","retention","closeout","ati_field_issues"].includes(collection)) data.status="OPEN";
         if (collection === "payment_requests") { data.status="DRAFT"; data.requesterUserId=auth.user.id; }
         if (collection === "procurement") { const assignedPm=await projectAssignment(env,data.projectId,"pm"); if(!assignedPm) return json({ok:false,message:"Proyek belum memiliki Project Manager. Tetapkan PM sebelum membuat PR."},400); const rr=normalizeRole(auth.user); if(!["project_manager","pelaksana_lapangan","manager_operasional","head_unit_bisnis","administrator","direktur"].includes(rr)) return json({ok:false,message:"Draft PR hanya dapat disiapkan oleh Project Manager/Pelaksana. Pengajuan formal tetap oleh Project Manager."},403); data.status="DRAFT"; data.preparedByUserId=auth.user.id; data.requesterUserId=assignedPm; data.projectManagerUserId=assignedPm; data.totalHpp=(data.items||[]).reduce((a,x)=>a+num(x.totalHpp),0); }
-        if (collection === "defects") { data.status="OPEN"; data.picUserId=data.picUserId || await projectAssignment(env,data.projectId,"pelaksana"); }
+        if (collection === "defects") { data.status="OPEN"; data.picUserId=await projectAssignment(env,data.projectId,"pm"); if(!data.picUserId) return json({ok:false,message:"Proyek belum memiliki Project Manager. Tetapkan Project Manager sebelum membuat Temuan QC."},400); }
         const rec = await upsertRecord(env,collection,body.id || null,data,auth.user);
         await afterRecordUpsert(env,collection,rec,auth.user);
         return json({ok:true,row:rec},201);
@@ -2603,7 +2604,7 @@ export default {
 
 
 /* ========================================================================== */
-/* NARA SYSTEM V3.4.13 — DUAL PROGRESS CHART                               */
+/* NARA SYSTEM V3.4.14 — QC TEAM + PM FINDING PIC                               */
 /* ========================================================================== */
 function clampPercent(v){ return Math.max(0,Math.min(100,num(v))); }
 function normalizeAsBuiltProgress(data,oldStatus=""){

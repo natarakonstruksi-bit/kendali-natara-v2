@@ -1,4 +1,4 @@
-# QA Matrix — Nara System V3.4.13
+# QA Matrix — Nara System V3.4.14
 
 | Area | Skenario | Expected |
 |---|---|---|
@@ -40,3 +40,12 @@
 - Satu titik progress tetap punya visual garis melalui anchor tanggal mulai proyek.
 - Data rencana dari planProgress tidak ditimpa baseline schedule.
 - Deviasi = Realisasi - Rencana.
+
+
+### QC Team / PM PIC V3.4.14
+- Master Proyek tidak memiliki field satu QC per proyek.
+- Semua role QC + Head of Supporting dapat inspeksi lintas proyek.
+- Temuan QC otomatis ber-PIC Project Manager.
+- Project Manager dapat membuat/edit/hapus dan menindaklanjuti Temuan.
+- Pelaksana Lapangan dapat melihat Temuan tetapi tidak mengubah workflow.
+- Existing Temuan dimigrasikan ke PM melalui 0020.

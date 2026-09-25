@@ -33,7 +33,7 @@ try{
   const pelPr=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'procurement');
   const pelQc=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'defects');
   if(!pelPr.read||!pelPr.create||!pelPr.update)throw new Error('Pelaksana harus dapat membuat/mengubah Purchase Request.');
-  if(!pelQc.read||!pelQc.update)throw new Error('Pelaksana harus dapat melihat dan memproses temuan QC.');
+  if(!pelQc.read||pelQc.create||pelQc.update||pelQc.delete)throw new Error('Pelaksana hanya boleh melihat temuan QC; PIC/workflow temuan adalah Project Manager.');
   console.log('Worker RBAC smoke OK — role aliases, hierarchy, permissions');
 } finally {
   try{fs.unlinkSync(tmp);}catch{}

@@ -1,4 +1,4 @@
-# Role Matrix — Nara System V3.4.13
+# Role Matrix — Nara System V3.4.14
 
 ## Hierarki utama
 
@@ -60,3 +60,10 @@ Pelaksana Lapangan dapat melihat dan memproses Temuan QC yang diarahkan kepadany
 | Pelaksana Lapangan | Dapat membantu menyiapkan kebutuhan/draft, bukan submitter formal |
 
 Tidak ada role Procurement sebagai tahap wajib pada workflow aktif.
+
+
+## QC Team + PM PIC — V3.4.14
+- QC tidak di-assign pada Master Proyek; seluruh role **QC** bekerja sebagai tim lintas proyek.
+- **Head of Supporting** tetap memiliki kontrol inspeksi, edit/hapus, dan verifikasi QC.
+- **Project Manager** adalah PIC Temuan QC otomatis untuk proyeknya dan menerima Tugas Saya untuk tindak lanjut.
+- **Pelaksana Lapangan** dapat membaca Temuan QC proyek yang ditugaskan, tetapi tidak menjadi PIC dan tidak mengubah workflow Temuan.

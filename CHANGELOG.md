@@ -1,3 +1,11 @@
+## V3.4.14
+- Hapus assignment satu QC dari Master Proyek dan kolom QC pada Daftar Proyek.
+- QC menjadi team-wide: seluruh user role QC dan Head of Supporting dapat inspeksi lintas proyek.
+- PIC Temuan QC otomatis Project Manager proyek.
+- PM dapat membuat/edit/hapus Temuan dan menerima Tugas Saya untuk tindak lanjut.
+- Pelaksana tetap dapat melihat Temuan proyek tetapi tidak menjadi PIC workflow.
+- Migration `0020_qc_pm_pic.sql` memindahkan PIC Temuan lama ke PM proyek.
+
 # Changelog
 
 ## V3.4.12 — QS Volume + As-Built Drafter

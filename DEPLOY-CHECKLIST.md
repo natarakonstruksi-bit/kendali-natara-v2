@@ -1,6 +1,6 @@
-# Deploy Checklist — Nara System V3.4.13
+# Deploy Checklist — Nara System V3.4.14
 
-1. Pastikan deploy memakai package **V3.4.13 Dual Progress Chart**.
+1. Pastikan deploy memakai package **V3.4.14 QC Team + PM Finding PIC**.
 2. Jangan membuat D1 atau R2 baru. Tetap gunakan binding produksi existing.
 3. Jalankan QA/build lokal:
 
@@ -27,3 +27,7 @@ npx wrangler deploy
 10. Verifikasi audit log setelah penghapusan data QC.
 
 Catatan: build/static/runtime smoke menguji source dan wiring. Integrasi Cloudflare produksi seperti cookie/session, D1 remote, dan R2 remote tetap harus divalidasi sesudah deployment nyata.
+
+## V3.4.14
+- Jalankan `npx wrangler d1 migrations apply DB --remote` agar migration `0020_qc_pm_pic.sql` memindahkan PIC Temuan QC lama ke Project Manager proyek.
+- Setelah deploy: logout/login dan hard refresh.

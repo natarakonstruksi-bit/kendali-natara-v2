@@ -1,4 +1,4 @@
-# Alur Nara System V3.4.13
+# Alur Nara System V3.4.14
 
 ## 1. Proyek masuk
 
@@ -81,3 +81,9 @@ Setiap handoff membuat task dengan status, PIC/role tujuan, deadline, modul sumb
 ## 12. Gate Proyek
 
 Nara System mengevaluasi tahap proyek dari SETUP/PRECON/MOBILIZATION/EXECUTION sampai PHO/RETENTION/FHO/FINANCIAL CLOSE/CLOSED. Progress fisik 100% tidak otomatis berarti CLOSED; QC/defect, CCO, dokumen, serah terima, vendor, dan financial close tetap harus selesai.
+
+
+## Alur QC V3.4.14
+**Tim QC / Head of Supporting → inspeksi lintas proyek → Tidak Sesuai → Temuan QC → PIC otomatis Project Manager → PM tindak lanjut + foto After → Tim QC / Head of Supporting verifikasi → Closed / Revision Required.**
+
+Pelaksana Lapangan dapat melihat Temuan pada proyek assignment-nya sebagai informasi lapangan. Tidak ada lagi field assignment satu QC pada Master Proyek.

@@ -1,4 +1,4 @@
-# QA Results — Nara System V3.4.13
+# QA Results — Nara System V3.4.14
 
 Status: **PASS untuk build/smoke test lokal**.
 
@@ -22,3 +22,12 @@ Status: **PASS untuk build/smoke test lokal**.
 - Ringkasan Rencana, Realisasi, dan Deviasi tampil pada setiap kartu proyek.
 
 Catatan: koneksi D1/R2 remote dan data produksi tetap perlu diverifikasi setelah deploy Cloudflare.
+
+
+## QC Team + PM PIC V3.4.14
+- Field/kolom assignment QC per proyek: dihapus dari UI.
+- QC dan Head of Supporting tetap dapat inspeksi lintas proyek: PASS.
+- Project Manager dapat create/edit/delete Temuan QC pada proyek assignment: PASS.
+- Pelaksana Lapangan hanya read Temuan QC proyek assignment: PASS.
+- Workflow Temuan menuju PM dan antrean verifikasi kembali ke role QC: PASS.
+- Migration 0020 memindahkan PIC Temuan legacy dari Pelaksana ke PM proyek: PASS.

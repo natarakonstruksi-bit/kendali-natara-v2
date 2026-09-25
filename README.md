@@ -1,4 +1,8 @@
-# Nara System V3.4.13 — QS Volume + As-Built Drafter
+# Nara System V3.4.14 — QC Team + PM Finding PIC
+
+V3.4.14 mengubah struktur QC agar **QC tidak lagi ditetapkan satu orang per proyek**. Seluruh user role QC dan Head of Supporting dapat melakukan inspeksi lintas proyek. **PIC Temuan QC otomatis Project Manager proyek**; Project Manager dapat membuat/edit/hapus dan menindaklanjuti Temuan, sedangkan Pelaksana Lapangan tetap dapat melihat Temuan pada proyek yang ditugaskan kepadanya namun tidak menjadi PIC workflow.
+
+Migration baru `0020_qc_pm_pic.sql` memindahkan PIC Temuan existing ke PM yang terpasang pada Master Proyek.
 
 V3.4.13 menyederhanakan modul **QS** menjadi kontrol **Volume RAB vs Volume Realisasi**, dan menambahkan modul baru **As-Built / Drafter** seperti tabel referensi: Arsitektur %, Struktur %, MEP %, Overall Progress, serta Status As-Built. Drafter dapat meng-upload/ganti file As-Built tiap disiplin, kemudian mengirim hasil 100% ke Head of Engineering untuk approval.
 
@@ -88,9 +92,9 @@ Alur utama saat ini:
 - Site Manager / Superintendent / SM → **Project Manager**.
 - Pengawas Lapangan / Site Supervisor → **Pelaksana Lapangan**.
 - Project Manager dapat membaca QC proyek yang ditugaskan, tetapi inspeksi/verifikasi tetap QC/Head of Supporting.
-- Pelaksana Lapangan menerima Temuan QC yang ditugaskan untuk diperbaiki.
+- Pelaksana Lapangan dapat melihat Temuan QC pada proyek assignment-nya, tetapi PIC dan workflow tindak lanjut berada pada Project Manager.
 
-## QA V3.4.13
+## QA V3.4.14
 
 `npm run build` menjalankan:
 
@@ -104,14 +108,15 @@ Alur utama saat ini:
 - button/flow audit untuk kontrol kritikal shell, task, PR, QC, ATI, QS, As-Built, dan reporting;
 - QS + As-Built smoke untuk formula progress, upload, dan workflow approval.
 
-Database smoke juga menguji fresh migration dan upgrade-preservation. V3.4.13 **tidak menambah migration**; migration terakhir tetap `0019_workflow_inbox.sql`.
+Database smoke juga menguji fresh migration dan upgrade-preservation. V3.4.14 menambah migration `0020_qc_pm_pic.sql` untuk memindahkan PIC Temuan QC existing ke Project Manager proyek.
 
 ## Deploy
 
-Jika `0019_workflow_inbox.sql` sudah pernah diterapkan:
+Untuk V3.4.14 jalankan migration baru lalu deploy:
 
 ```bash
 npm run build
+npx wrangler d1 migrations apply DB --remote
 npx wrangler deploy
 ```
 
