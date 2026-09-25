@@ -1,4 +1,4 @@
-# QA Results — Nara System V3.4.14
+# QA Results — Nara System V3.4.15
 
 Status: **PASS untuk build/smoke test lokal**.
 
@@ -31,3 +31,12 @@ Catatan: koneksi D1/R2 remote dan data produksi tetap perlu diverifikasi setelah
 - Pelaksana Lapangan hanya read Temuan QC proyek assignment: PASS.
 - Workflow Temuan menuju PM dan antrean verifikasi kembali ke role QC: PASS.
 - Migration 0020 memindahkan PIC Temuan legacy dari Pelaksana ke PM proyek: PASS.
+
+## Public Information Website V3.4.15
+
+- `npm run build`: PASS
+- Public company-profile smoke: PASS
+- Fresh migrations 0011–0021: PASS
+- Upgrade preservation: PASS
+- Static portfolio asset presence: PASS
+- Public API static media fields wired: PASS

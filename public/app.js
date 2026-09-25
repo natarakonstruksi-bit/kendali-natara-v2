@@ -702,22 +702,43 @@ function publicAbsolute(path){return new URL(path,location.origin).toString();}
 function publicBool(v){return v===true||v===1||String(v||'').toLowerCase()==='true'||String(v||'')==='1'||String(v||'').toUpperCase()==='YA';}
 function publicSlugClient(value){return String(value||'').trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,90)||'portofolio';}
 function galleryIds(d){return Array.isArray(d.galleryDocumentIds)?d.galleryDocumentIds:[];}
+function galleryStaticUrls(d){return Array.isArray(d.galleryUrls)?d.galleryUrls:[];}
+function profileLines(v){return Array.isArray(v)?v.join('\n'):String(v||'');}
+function parseProfileLines(v){return String(v||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);}
+function profilePairs(v){return Array.isArray(v)?v.map(x=>`${x.title||''}|${x.description||''}`).join('\n'):'';}
+function parseProfilePairs(v){return parseProfileLines(v).map(line=>{const i=line.indexOf('|');return i<0?{title:line,description:''}:{title:line.slice(0,i).trim(),description:line.slice(i+1).trim()};});}
+function profileGroups(v){return Array.isArray(v)?v.map(x=>`${x.title||''}|${Array.isArray(x.items)?x.items.join('; '):''}`).join('\n'):'';}
+function parseProfileGroups(v){return parseProfileLines(v).map(line=>{const i=line.indexOf('|');const title=(i<0?line:line.slice(0,i)).trim();const items=(i<0?'':line.slice(i+1)).split(';').map(x=>x.trim()).filter(Boolean);return {title,items};});}
 
 async function openPublicSiteSettings(row=null){
   const d=row?.data||{};
   const html=`<div class="form-grid">
     <label class="span-2">Nama / Judul Utama<input name="title" value="${esc(d.title||'Natara Konstruksi')}" required></label>
-    <label class="span-2">Tagline<textarea name="tagline" required>${esc(d.tagline||'Membangun dengan kontrol, mutu, dan tanggung jawab.')}</textarea></label>
-    <label class="span-2">Apa itu Natara?<textarea name="about" required placeholder="Jelaskan Natara Konstruksi secara ringkas dan profesional.">${esc(d.about||'Natara Konstruksi adalah pelaksana konstruksi yang berfokus pada pengendalian pelaksanaan, mutu, progres, dan dokumentasi proyek secara terintegrasi.')}</textarea></label>
-    <label class="span-2">Fokus / Layanan<input name="services" value="${esc(Array.isArray(d.services)?d.services.join(', '):(d.services||'Pembangunan, Renovasi, Pelaksanaan Konstruksi'))}" placeholder="Pisahkan dengan koma"></label>
-    <label class="span-2">Pengantar Portofolio<textarea name="portfolioIntro">${esc(d.portfolioIntro||'Pilihan proyek Natara Konstruksi dari berbagai jenis pekerjaan.')}</textarea></label>
+    <label class="span-2">Tagline<textarea name="tagline" required>${esc(d.tagline||'Membangun dengan Arah.')}</textarea></label>
+    <label class="span-2">Apa itu Natara?<textarea name="about" required>${esc(d.about||'Natara Konstruksi adalah perusahaan jasa konstruksi yang berfokus pada pembangunan yang terencana, terarah, dan bertanggung jawab.')}</textarea></label>
+    <label class="span-2">Filosofi<textarea name="philosophy">${esc(d.philosophy||'Menata pembangunan dengan arah yang jelas dan tanggung jawab penuh.')}</textarea></label>
+    <label class="span-2">Visi<textarea name="vision">${esc(d.vision||'Menjadi perusahaan konstruksi yang terpercaya dan berkelanjutan melalui sistem kerja yang terarah, profesional, dan bertanggung jawab.')}</textarea></label>
+    <label class="span-2">Misi — satu poin per baris<textarea name="mission">${esc(profileLines(d.mission))}</textarea></label>
+    <label class="span-2">Nilai Perusahaan — format: Judul|Penjelasan<textarea name="values" placeholder="Amanah|Menjalankan setiap proyek...">${esc(profilePairs(d.values))}</textarea></label>
+    <label class="span-2">Kelompok Layanan — format: Judul|item 1; item 2<textarea name="serviceGroups">${esc(profileGroups(d.serviceGroups))}</textarea></label>
+    <label class="span-2">Pendekatan Kerja — format: Tahap|Penjelasan<textarea name="approach">${esc(profilePairs(d.approach))}</textarea></label>
+    <label class="span-2">Keunggulan — satu poin per baris<textarea name="advantages">${esc(profileLines(d.advantages))}</textarea></label>
+    <label class="span-2">Segmentasi Klien — satu poin per baris<textarea name="audience">${esc(profileLines(d.audience))}</textarea></label>
+    <label class="span-2">Penutup<textarea name="closing">${esc(d.closing||'Natara Konstruksi hadir untuk menjawab kebutuhan pembangunan yang tidak hanya kuat secara fisik, tetapi juga dapat dipertanggungjawabkan secara proses dan nilai.')}</textarea></label>
+    <label class="span-2">Pengantar Portofolio<textarea name="portfolioIntro">${esc(d.portfolioIntro||'Portofolio karya Natara Konstruksi dari hunian, usaha, hingga proyek pengembangan bangunan.')}</textarea></label>
     <label>Label Kontak<input name="contactLabel" value="${esc(d.contactLabel||'Hubungi Natara')}"></label>
     <label>Link Kontak / WhatsApp<input name="contactUrl" value="${esc(d.contactUrl||'')}" placeholder="https://wa.me/..."></label>
     <label>Instagram<input name="instagramUrl" value="${esc(d.instagramUrl||'')}" placeholder="https://instagram.com/..."></label>
     <label>Alamat Publik<input name="address" value="${esc(d.address||'')}"></label>
   </div>`;
-  openModal('Profil Publik Natara','Halaman publik hanya menampilkan profil Natara dan portofolio. Data operasional proyek tidak ikut ditampilkan.',html,async form=>{
-    const payload={title:form.title.value.trim(),tagline:form.tagline.value.trim(),about:form.about.value.trim(),services:form.services.value.split(',').map(x=>x.trim()).filter(Boolean),portfolioIntro:form.portfolioIntro.value.trim(),contactLabel:form.contactLabel.value.trim(),contactUrl:form.contactUrl.value.trim(),instagramUrl:form.instagramUrl.value.trim(),address:form.address.value.trim()};
+  openModal('Profil Publik Natara','Konten company profile yang tampil di website publik. Data operasional proyek tidak ikut ditampilkan.',html,async form=>{
+    const payload={
+      title:form.title.value.trim(),tagline:form.tagline.value.trim(),about:form.about.value.trim(),philosophy:form.philosophy.value.trim(),vision:form.vision.value.trim(),
+      mission:parseProfileLines(form.mission.value),values:parseProfilePairs(form.values.value),serviceGroups:parseProfileGroups(form.serviceGroups.value),approach:parseProfilePairs(form.approach.value),
+      advantages:parseProfileLines(form.advantages.value),audience:parseProfileLines(form.audience.value),closing:form.closing.value.trim(),
+      services:parseProfileGroups(form.serviceGroups.value).map(x=>x.title).filter(Boolean),portfolioIntro:form.portfolioIntro.value.trim(),
+      contactLabel:form.contactLabel.value.trim(),contactUrl:form.contactUrl.value.trim(),instagramUrl:form.instagramUrl.value.trim(),address:form.address.value.trim()
+    };
     if(row)await api('/api/records/public_site_settings/main',{method:'PUT',body:payload});else await api('/api/records/public_site_settings',{method:'POST',body:{id:'main',data:payload}});
     toast('Profil publik Natara tersimpan.');state.cache.clear();await renderPublicInfo();
   });
@@ -738,10 +759,11 @@ async function openPublicPortfolio(row=null){
     <label>Slug URL<input name="slug" value="${esc(d.slug||'')}" placeholder="otomatis dari nama"></label>
     <label class="span-2">Ringkasan<input name="summary" value="${esc(d.summary||'')}" required placeholder="Ringkasan singkat untuk kartu portofolio"></label>
     <label class="span-2">Deskripsi Portofolio<textarea name="description" placeholder="Jelaskan ruang lingkup/karya secara umum tanpa data internal sensitif.">${esc(d.description||'')}</textarea></label>
-    <label class="span-2">Foto Cover ${d.coverDocumentId?'(kosongkan untuk mempertahankan foto saat ini)':''}<input type="file" name="cover" accept="image/*"></label>
-    <label class="span-2">Tambah Foto Galeri<input type="file" name="gallery" accept="image/*" multiple><span class="muted small-text">Bisa memilih beberapa foto sekaligus. Foto lama tetap dipertahankan.</span></label>
-    ${galleryIds(d).length?`<label class="span-2 check-line"><input type="checkbox" name="clearGallery"> Hapus ${galleryIds(d).length} foto galeri lama sebelum menambah foto baru</label>`:''}
+    <label class="span-2">Foto Cover ${(d.coverDocumentId||d.coverUrl)?'(kosongkan untuk mempertahankan foto saat ini)':''}<input type="file" name="cover" accept="image/*"></label>
+    <label class="span-2">Tambah Foto Galeri<input type="file" name="gallery" accept="image/*" multiple><span class="muted small-text">Bisa memilih beberapa foto sekaligus. Foto company profile bawaan tetap dipertahankan.</span></label>
+    ${(galleryIds(d).length||galleryStaticUrls(d).length)?`<label class="span-2 check-line"><input type="checkbox" name="clearGallery"> Hapus seluruh galeri lama sebelum menambah foto baru</label>`:''}
     <input type="hidden" name="coverDocumentId" value="${esc(d.coverDocumentId||'')}">
+    <input type="hidden" name="coverUrl" value="${esc(d.coverUrl||'')}">
   </div>`;
   openModal(row?'Edit Portofolio':'Tambah Portofolio','Portofolio publik berdiri sendiri dari dashboard proyek. Tidak ada progres, keuangan, QC, CCO, vendor, atau data karyawan yang dipublikasikan.',html,async form=>{
     const sourceProjectId=form.sourceProjectId.value||'';
@@ -750,10 +772,11 @@ async function openPublicPortfolio(row=null){
     const cover=form.cover.files?.[0];
     if(cover){const up=await uploadRelatedDocument(cover,{projectId:mediaProjectId,category:'PUBLIC_PORTFOLIO',title:`Portfolio Cover - ${form.title.value}`,relatedCollection:'public_portfolio',relatedId:id});coverDocumentId=up.document?.id||coverDocumentId;}
     let galleries=form.clearGallery?.checked?[]:galleryIds(d).slice();
+    let staticGalleries=form.clearGallery?.checked?[]:galleryStaticUrls(d).slice();
     const files=Array.from(form.gallery.files||[]);
     for(const file of files){const up=await uploadRelatedDocument(file,{projectId:mediaProjectId,category:'PUBLIC_PORTFOLIO',title:`Portfolio Gallery - ${form.title.value}`,relatedCollection:'public_portfolio',relatedId:id});if(up.document?.id)galleries.push(up.document.id);}
     const title=form.title.value.trim();
-    const payload={published:form.published.checked,featured:form.featured.checked,sourceProjectId,title,slug:form.slug.value.trim()||publicSlugClient(title),category:form.category.value.trim()||'Konstruksi',year:form.year.value.trim(),location:form.location.value.trim(),summary:form.summary.value.trim(),description:form.description.value.trim(),coverDocumentId,galleryDocumentIds:galleries};
+    const payload={published:form.published.checked,featured:form.featured.checked,sourceProjectId,title,slug:form.slug.value.trim()||publicSlugClient(title),category:form.category.value.trim()||'Konstruksi',year:form.year.value.trim(),location:form.location.value.trim(),summary:form.summary.value.trim(),description:form.description.value.trim(),coverDocumentId,coverUrl:form.coverUrl.value.trim(),galleryDocumentIds:galleries,galleryUrls:staticGalleries,specs:d.specs||{}};
     if(row)await api(`/api/records/public_portfolio/${encodeURIComponent(id)}`,{method:'PUT',body:payload});else await api('/api/records/public_portfolio',{method:'POST',body:{id,data:payload}});
     toast(payload.published?'Portofolio dipublikasikan.':'Portofolio disimpan sebagai draft.');state.cache.clear();await renderPublicInfo();
   });
@@ -767,7 +790,7 @@ async function renderPublicInfo(){
     <div class="public-admin-hero"><div><span class="eyebrow">NATARA PUBLIC PROFILE</span><h2>Profil Natara & Portofolio</h2><p>Website publik hanya berisi penjelasan <b>apa itu Natara</b> dan <b>portofolio karya</b>. Tidak ada data operasional proyek yang dibuka.</p></div><div class="public-admin-actions"><a class="btn primary" href="/info" target="_blank" rel="noopener">Buka Website Publik ↗</a><button class="btn ghost" id="copyPublicUrl">Salin Link</button></div></div>
     <div class="notice blue"><b>Yang tampil ke publik:</b> profil Natara, fokus/layanan, kontak, dan portofolio yang Anda tandai Publik. Progress, RAB/HPP, cashflow, QC, CCO, vendor, dokumen internal, tukang dan karyawan tidak ditampilkan.</div>
     <div class="card"><div class="card-head"><div><h3>Profil Natara</h3><p>${esc(site?.data?.title||'Natara Konstruksi')} • ${esc(publicUrl)}</p></div><button class="btn" id="editPublicSite">Edit Profil</button></div><div class="card-body"><div class="public-site-summary"><div><b>Tagline</b><span>${esc(site?.data?.tagline||'Belum diatur')}</span></div><div><b>Kontak</b><span>${esc(site?.data?.contactLabel||'-')}</span></div><div><b>Alamat</b><span>${esc(site?.data?.address||'-')}</span></div></div><div style="margin-top:14px"><b>Apa itu Natara?</b><p class="muted">${esc(site?.data?.about||'Belum diisi.')}</p></div></div></div>
-    <div class="card"><div class="card-head"><div><h3>Portofolio</h3><p>Kelola karya yang akan ditampilkan pada website Natara.</p></div><button class="btn primary" id="addPortfolio">+ Tambah Portofolio</button></div><div class="table-wrap"><table class="table"><thead><tr><th>Status</th><th>Portofolio</th><th>Kategori</th><th>Lokasi</th><th>Tahun</th><th>Foto</th><th></th></tr></thead><tbody>${portfolio.map(r=>`<tr><td>${publicBool(r.data.published)?'<span class="pill green">PUBLIK</span>':'<span class="pill">DRAFT</span>'}</td><td><b>${esc(r.data.title||'-')}</b>${publicBool(r.data.featured)?'<div class="muted small-text">Portofolio pilihan</div>':''}</td><td>${esc(r.data.category||'-')}</td><td>${esc(r.data.location||'-')}</td><td>${esc(r.data.year||'-')}</td><td>${(r.data.coverDocumentId?1:0)+galleryIds(r.data).length} foto</td><td class="actions"><button class="btn small" data-portfolio="${esc(r.id)}">Edit</button>${canCollection('public_portfolio','delete')?`<button class="btn small danger" data-delete-portfolio="${esc(r.id)}">Hapus</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Belum ada portofolio. Klik “Tambah Portofolio”.</td></tr>'}</tbody></table></div></div>`;
+    <div class="card"><div class="card-head"><div><h3>Portofolio</h3><p>Kelola karya yang akan ditampilkan pada website Natara.</p></div><button class="btn primary" id="addPortfolio">+ Tambah Portofolio</button></div><div class="table-wrap"><table class="table"><thead><tr><th>Status</th><th>Portofolio</th><th>Kategori</th><th>Lokasi</th><th>Tahun</th><th>Foto</th><th></th></tr></thead><tbody>${portfolio.map(r=>`<tr><td>${publicBool(r.data.published)?'<span class="pill green">PUBLIK</span>':'<span class="pill">DRAFT</span>'}</td><td><b>${esc(r.data.title||'-')}</b>${publicBool(r.data.featured)?'<div class="muted small-text">Portofolio pilihan</div>':''}</td><td>${esc(r.data.category||'-')}</td><td>${esc(r.data.location||'-')}</td><td>${esc(r.data.year||'-')}</td><td>${(r.data.coverDocumentId||r.data.coverUrl?1:0)+galleryIds(r.data).length+galleryStaticUrls(r.data).length} foto</td><td class="actions"><button class="btn small" data-portfolio="${esc(r.id)}">Edit</button>${canCollection('public_portfolio','delete')?`<button class="btn small danger" data-delete-portfolio="${esc(r.id)}">Hapus</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Belum ada portofolio. Klik “Tambah Portofolio”.</td></tr>'}</tbody></table></div></div>`;
   $('#editPublicSite').onclick=()=>openPublicSiteSettings(site);
   $('#copyPublicUrl').onclick=async()=>{try{await navigator.clipboard.writeText(publicUrl);toast('Link website publik disalin.');}catch{toast(publicUrl);}};
   $('#addPortfolio').onclick=()=>openPublicPortfolio();

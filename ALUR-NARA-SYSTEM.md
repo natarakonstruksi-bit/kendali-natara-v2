@@ -1,4 +1,4 @@
-# Alur Nara System V3.4.14
+# Alur Nara System V3.4.15
 
 ## 1. Proyek masuk
 
@@ -87,3 +87,8 @@ Nara System mengevaluasi tahap proyek dari SETUP/PRECON/MOBILIZATION/EXECUTION s
 **Tim QC / Head of Supporting → inspeksi lintas proyek → Tidak Sesuai → Temuan QC → PIC otomatis Project Manager → PM tindak lanjut + foto After → Tim QC / Head of Supporting verifikasi → Closed / Revision Required.**
 
 Pelaksana Lapangan dapat melihat Temuan pada proyek assignment-nya sebagai informasi lapangan. Tidak ada lagi field assignment satu QC pada Master Proyek.
+
+
+## Sistem Informasi Publik V3.4.15
+
+`/info` dapat diakses tanpa login dan hanya menampilkan company profile serta portofolio Natara. Alurnya: **Profil Natara → Nilai/Layanan → Pendekatan Kerja → Keunggulan/Segmentasi → Portofolio → Kontak**. Data internal seperti RAB/HPP, cashflow, QC operasional, CCO, vendor, user, tukang, dan dokumen internal tidak dipublikasikan. Konten dikelola dari menu **Profil & Portofolio** pada Nara System.

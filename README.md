@@ -1,3 +1,11 @@
+# Nara System V3.4.15 — Public Information Website
+
+V3.4.15 memasukkan konten **Company Profile Natara Konstruksi** ke Sistem Informasi Publik `/info`. Website publik sekarang memuat Tentang Natara, Filosofi, Visi & Misi, Nilai Perusahaan, Layanan, Pendekatan Kerja, Keunggulan, Segmentasi Klien, Penutup, serta Portofolio lengkap dengan galeri. Konten dan visual portofolio diimpor dari company profile yang diberikan pengguna.
+
+Migration baru `0021_public_company_profile_seed.sql` mengisi profil publik dan 7 portofolio company-profile. Field kontak/alamat yang sudah ada tetap dipertahankan karena update memakai `json_patch`. Asset gambar company profile disimpan sebagai static assets agar dapat tampil tanpa membuka dokumen internal/R2.
+
+> Catatan sumber: daftar ringkas company profile menyebut **Cafe Rakil** dan **Rumah Am**, sedangkan halaman portofolio detail menggunakan **YD Cafe** dan **Rumah Amirullah**. V3.4.15 mengikuti halaman detail karena memiliki narasi dan visual proyek.
+
 # Nara System V3.4.14 — QC Team + PM Finding PIC
 
 V3.4.14 mengubah struktur QC agar **QC tidak lagi ditetapkan satu orang per proyek**. Seluruh user role QC dan Head of Supporting dapat melakukan inspeksi lintas proyek. **PIC Temuan QC otomatis Project Manager proyek**; Project Manager dapat membuat/edit/hapus dan menindaklanjuti Temuan, sedangkan Pelaksana Lapangan tetap dapat melihat Temuan pada proyek yang ditugaskan kepadanya namun tidak menjadi PIC workflow.

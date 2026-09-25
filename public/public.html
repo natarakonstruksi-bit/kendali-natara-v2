@@ -4,80 +4,127 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#111315">
-  <meta name="description" content="Profil dan portofolio Natara Konstruksi.">
-  <title>Natara Konstruksi — Profil & Portofolio</title>
+  <meta name="description" content="Profil resmi Natara Konstruksi - membangun dengan arah, sistem kerja terstruktur, dan portofolio karya.">
+  <title>Natara Konstruksi - Membangun dengan Arah</title>
   <link rel="icon" type="image/png" href="/assets/favicon.png">
   <link rel="stylesheet" href="/public.css">
 </head>
 <body>
   <header class="site-nav">
     <a class="brand" href="/info" aria-label="Natara Konstruksi">
-      <img src="/assets/natara-mark.png" alt="Natara">
-      <div><b>NATARA KONSTRUKSI</b><span>Profil & Portofolio</span></div>
+      <img src="/assets/natara-mark.png" alt="Logo Natara Konstruksi">
+      <div><b>NATARA KONSTRUKSI</b><span>Membangun dengan arah</span></div>
     </a>
-    <nav>
+    <button id="menuToggle" class="menu-toggle" aria-label="Buka navigasi" aria-expanded="false">☰</button>
+    <nav id="mainNav">
       <a href="#tentang">Tentang</a>
+      <a href="#layanan">Layanan</a>
+      <a href="#cara-kerja">Cara Kerja</a>
       <a href="#portofolio">Portofolio</a>
       <a id="navContact" class="nav-cta hidden" target="_blank" rel="noopener">Hubungi Kami</a>
     </nav>
   </header>
 
   <main>
-    <section class="hero">
+    <section class="hero" id="beranda">
+      <div class="hero-media" aria-hidden="true">
+        <img src="/assets/company-profile/losari-cover.webp" alt="">
+        <div class="hero-shade"></div>
+      </div>
       <div class="hero-copy">
         <span class="eyebrow">NATARA KONSTRUKSI</span>
         <h1 id="siteTitle">Natara Konstruksi</h1>
-        <p id="siteTagline">Membangun dengan kontrol, mutu, dan tanggung jawab.</p>
+        <p id="siteTagline">Membangun dengan arah.</p>
         <div class="hero-actions">
           <a href="#portofolio" class="btn primary">Lihat Portofolio</a>
+          <a href="#tentang" class="btn outline">Mengenal Natara</a>
           <a id="heroContact" class="btn outline hidden" target="_blank" rel="noopener">Hubungi Natara</a>
         </div>
       </div>
-      <div class="hero-visual">
-        <img src="/assets/natara-logo.jpeg" alt="Logo Natara Konstruksi">
+      <div class="hero-badge"><span>01</span><b>Company Profile</b><small>Natara Konstruksi</small></div>
+    </section>
+
+    <section class="section about-section" id="tentang">
+      <div class="section-kicker"><span>01</span><b>TENTANG NATARA</b></div>
+      <div class="about-grid">
+        <div class="about-copy">
+          <h2>Membangun bukan sekadar menyelesaikan bangunan.</h2>
+          <p id="siteAbout">Natara Konstruksi adalah perusahaan jasa konstruksi yang berfokus pada pembangunan yang terencana, terarah, dan bertanggung jawab.</p>
+          <blockquote id="sitePhilosophy">Menata pembangunan dengan arah yang jelas dan tanggung jawab penuh.</blockquote>
+        </div>
+        <div class="about-side">
+          <div class="mini-card"><span>Visi</span><p id="siteVision">Menjadi perusahaan konstruksi yang terpercaya dan berkelanjutan melalui sistem kerja yang terarah, profesional, dan bertanggung jawab.</p></div>
+          <div class="mini-card"><span>Misi</span><ol id="missionList"></ol></div>
+        </div>
       </div>
     </section>
 
-    <section class="about-section" id="tentang">
-      <div class="section-number">01</div>
-      <div class="about-copy">
-        <span class="eyebrow dark">APA ITU NATARA?</span>
-        <h2>Tentang Natara Konstruksi</h2>
-        <p id="siteAbout">Natara Konstruksi adalah pelaksana konstruksi yang berfokus pada pengendalian pelaksanaan, mutu, progres, dan dokumentasi proyek secara terintegrasi.</p>
-        <div id="serviceTags" class="service-tags"></div>
-      </div>
-      <aside class="contact-card">
-        <div class="logo-panel"><img src="/assets/natara-mark.png" alt="Natara"></div>
-        <div><span>Alamat</span><b id="siteAddress">-</b></div>
-        <div><span>Kontak</span><b id="siteContactText">Natara Konstruksi</b></div>
-        <div class="contact-actions">
-          <a id="aboutContact" class="btn primary hidden" target="_blank" rel="noopener">Hubungi Natara</a>
-          <a id="instagramLink" class="btn light hidden" target="_blank" rel="noopener">Instagram</a>
-        </div>
-      </aside>
+    <section class="section dark-section" id="nilai">
+      <div class="section-kicker light"><span>02</span><b>NILAI-NILAI PERUSAHAAN</b></div>
+      <div class="section-head light-head"><div><h2>Cara kami menjaga amanah pembangunan.</h2><p>Nilai yang menjadi dasar keputusan kerja Natara.</p></div></div>
+      <div id="valueGrid" class="value-grid"></div>
     </section>
 
-    <section class="portfolio-section" id="portofolio">
-      <div class="section-head">
-        <div>
-          <span class="eyebrow dark">02 — PORTOFOLIO</span>
-          <h2>Karya yang Telah Kami Kerjakan</h2>
-          <p id="portfolioIntro">Pilihan proyek Natara Konstruksi dari berbagai jenis pekerjaan.</p>
-        </div>
+    <section class="section services-section" id="layanan">
+      <div class="section-kicker"><span>03</span><b>LAYANAN KAMI</b></div>
+      <div class="section-head"><div><h2>Layanan konstruksi dari pembangunan hingga pengendalian proyek.</h2><p>Kami menangani kebutuhan konstruksi secara terencana, terukur, dan dengan alur kerja yang jelas.</p></div></div>
+      <div id="serviceGrid" class="service-grid"></div>
+    </section>
+
+    <section class="section process-section" id="cara-kerja">
+      <div class="section-kicker"><span>04</span><b>PENDEKATAN KERJA</b></div>
+      <div class="process-layout">
+        <div><h2>Terstruktur dari perencanaan hingga serah terima.</h2><p class="lead">Natara Konstruksi menerapkan pendekatan kerja yang sistematis dan terarah.</p></div>
+        <div id="approachList" class="approach-list"></div>
+      </div>
+    </section>
+
+    <section class="section split-section" id="keunggulan">
+      <div class="strength-panel">
+        <span class="eyebrow dark">KEUNGGULAN NATARA</span>
+        <h2>Proses yang jelas. Pengawasan yang disiplin.</h2>
+        <ul id="advantageList" class="check-list"></ul>
+      </div>
+      <div class="audience-panel">
+        <span class="eyebrow">SEGMENTASI KLIEN</span>
+        <h2>Kami hadir untuk klien yang menghargai proses.</h2>
+        <ul id="audienceList" class="check-list light-list"></ul>
+      </div>
+    </section>
+
+    <section class="section portfolio-section" id="portofolio">
+      <div class="section-kicker"><span>05</span><b>PORTOFOLIO</b></div>
+      <div class="section-head portfolio-head">
+        <div><h2>Proyek yang menjadi bagian dari perjalanan Natara.</h2><p id="portfolioIntro">Pilihan proyek Natara Konstruksi.</p></div>
         <div class="portfolio-count"><strong id="portfolioCount">0</strong><span>Portofolio</span></div>
       </div>
       <div class="portfolio-toolbar">
-        <input id="searchInput" type="search" placeholder="Cari nama proyek, kategori, lokasi, atau tahun…">
+        <input id="searchInput" type="search" placeholder="Cari nama proyek, kategori, atau lokasi…">
         <select id="categoryFilter"><option value="">Semua kategori</option></select>
       </div>
       <div id="portfolioGrid" class="portfolio-grid"><div class="loading-card">Memuat portofolio…</div></div>
       <div id="emptyState" class="empty hidden">Belum ada portofolio yang sesuai pencarian.</div>
     </section>
+
+    <section class="section closing-section">
+      <img src="/assets/natara-mark.png" alt="Natara Konstruksi">
+      <div><span class="eyebrow">NATARA KONSTRUKSI</span><h2 id="closingTitle">Membangun dengan Arah.</h2><p id="siteClosing">Natara Konstruksi hadir untuk menjawab kebutuhan pembangunan yang tidak hanya kuat secara fisik, tetapi juga dapat dipertanggungjawabkan secara proses dan nilai.</p></div>
+      <a id="closingContact" class="btn primary hidden" target="_blank" rel="noopener">Hubungi Natara</a>
+    </section>
+
+    <section class="section contact-section" id="kontak">
+      <div class="contact-main"><span class="eyebrow dark">KONTAK</span><h2>Mulai pembicaraan tentang proyek Anda.</h2><p>Hubungi Natara untuk konsultasi kebutuhan pembangunan, renovasi, atau manajemen proyek.</p></div>
+      <div class="contact-card">
+        <div><span>Alamat</span><b id="siteAddress">-</b></div>
+        <div><span>Kontak</span><b id="siteContactText">Natara Konstruksi</b></div>
+        <div class="contact-actions"><a id="aboutContact" class="btn primary hidden" target="_blank" rel="noopener">Hubungi Natara</a><a id="instagramLink" class="btn light hidden" target="_blank" rel="noopener">Instagram</a></div>
+      </div>
+    </section>
   </main>
 
   <footer>
-    <div class="footer-brand"><img src="/assets/natara-mark.png" alt="Natara"><div><b>NATARA KONSTRUKSI</b><span>CV. Syarikah Konstruksi Indonesia</span></div></div>
-    <div class="footer-copy"><span>Profil & Portofolio Resmi</span><span id="footerYear"></span></div>
+    <div class="footer-brand"><img src="/assets/natara-mark.png" alt="Natara"><div><b>NATARA KONSTRUKSI</b><span>Membangun dengan arah</span></div></div>
+    <div class="footer-copy"><span>Company Profile & Portofolio</span><span id="footerYear"></span></div>
   </footer>
 
   <div id="detailBackdrop" class="detail-backdrop hidden" aria-hidden="true">

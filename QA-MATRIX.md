@@ -1,4 +1,4 @@
-# QA Matrix — Nara System V3.4.14
+# QA Matrix — Nara System V3.4.15
 
 | Area | Skenario | Expected |
 |---|---|---|
@@ -49,3 +49,16 @@
 - Project Manager dapat membuat/edit/hapus dan menindaklanjuti Temuan.
 - Pelaksana Lapangan dapat melihat Temuan tetapi tidak mengubah workflow.
 - Existing Temuan dimigrasikan ke PM melalui 0020.
+
+## Public Information V3.4.15
+
+| Area | Skenario | Expected |
+|---|---|---|
+| Public profile | `/info` | Tentang, Nilai, Layanan, Cara Kerja, Keunggulan, Portofolio tampil |
+| Public seed | Migration 0021 | 7 portfolio company profile + profile settings tersedia |
+| Static media | Company profile assets | Cover/galeri WebP dapat diakses via static assets |
+| Public API | `coverUrl/galleryUrls/specs` | API mengembalikan media static dan spesifikasi |
+| Admin | Edit Profil & Portofolio | Static URL tidak hilang saat edit tanpa upload baru |
+| DB Fresh | migrations 0011–0021 | Lolos |
+| DB Upgrade | data existing | User/project/contact existing tetap terjaga |
+

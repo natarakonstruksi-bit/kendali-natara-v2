@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.14 — QC Team + PM Finding PIC
+ * Nara System V3.4.15 — Public Information Website
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.14";
+const APP_VERSION = "APP-V3.4.15";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -2057,7 +2057,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.14"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.15"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2220,12 +2220,15 @@ async function allRows(env, collection) {
 function publicPortfolioPayload(row, includeDescription=false) {
   const d=row?.data||{};
   const galleryIds=Array.isArray(d.galleryDocumentIds)?d.galleryDocumentIds.map(String).filter(Boolean):[];
+  const staticGallery=Array.isArray(d.galleryUrls)?d.galleryUrls.map(String).filter(Boolean):[];
+  const documentGallery=galleryIds.map(id=>`/api/public/media/${encodeURIComponent(id)}`);
+  const coverUrl=d.coverDocumentId?`/api/public/media/${encodeURIComponent(d.coverDocumentId)}`:String(d.coverUrl||'');
   const out={
     id:String(row.id||''),slug:String(d.slug||publicSlug(d.title||row.id)),title:String(d.title||'Portofolio Natara'),
     category:String(d.category||'Konstruksi'),location:String(d.location||''),year:String(d.year||''),summary:String(d.summary||''),
-    featured:truthy(d.featured),coverDocumentId:String(d.coverDocumentId||''),
-    coverUrl:d.coverDocumentId?`/api/public/media/${encodeURIComponent(d.coverDocumentId)}`:'',
-    galleryCount:galleryIds.length,galleryUrls:galleryIds.map(id=>`/api/public/media/${encodeURIComponent(id)}`)
+    featured:truthy(d.featured),coverDocumentId:String(d.coverDocumentId||''),coverUrl,
+    galleryCount:documentGallery.length+staticGallery.length,galleryUrls:[...documentGallery,...staticGallery],
+    specs:(d.specs&&typeof d.specs==='object'&&!Array.isArray(d.specs))?d.specs:{}
   };
   if(includeDescription) out.description=String(d.description||'');
   return out;
@@ -2234,12 +2237,41 @@ function publicPortfolioPayload(row, includeDescription=false) {
 async function publicSiteHandler(env) {
   const row=await getRecord(env,'public_site_settings','main');
   const d=row?.data||{};
+  const asList=(v,fallback=[])=>Array.isArray(v)?v:fallback;
   return json({ok:true,site:{
     title:String(d.title||'Natara Konstruksi'),
-    tagline:String(d.tagline||'Membangun dengan kontrol, mutu, dan tanggung jawab.'),
-    about:String(d.about||'Natara Konstruksi adalah pelaksana konstruksi yang berfokus pada pengendalian pelaksanaan, mutu, progres, dan dokumentasi proyek secara terintegrasi.'),
-    services:Array.isArray(d.services)?d.services:String(d.services||'Pembangunan, Renovasi, Pelaksanaan Konstruksi').split(',').map(x=>x.trim()).filter(Boolean),
-    portfolioIntro:String(d.portfolioIntro||'Pilihan proyek Natara Konstruksi dari berbagai jenis pekerjaan.'),
+    tagline:String(d.tagline||'Membangun dengan Arah.'),
+    about:String(d.about||'Natara Konstruksi adalah perusahaan jasa konstruksi yang berfokus pada pembangunan yang terencana, terarah, dan bertanggung jawab. Kami hadir sebagai mitra pembangunan bagi klien yang menghargai proses, kejelasan kerja, dan kualitas jangka panjang.'),
+    philosophy:String(d.philosophy||'Menata pembangunan dengan arah yang jelas dan tanggung jawab penuh.'),
+    vision:String(d.vision||'Menjadi perusahaan konstruksi yang terpercaya dan berkelanjutan melalui sistem kerja yang terarah, profesional, dan bertanggung jawab.'),
+    mission:asList(d.mission,[
+      'Menyediakan layanan konstruksi yang terencana, terukur, dan sesuai standar teknis.',
+      'Menjaga amanah klien melalui transparansi biaya, waktu, dan proses kerja.',
+      'Mengedepankan pengawasan dan pengendalian mutu di setiap proyek.',
+      'Membangun hubungan jangka panjang dengan klien dan mitra kerja.'
+    ]),
+    values:asList(d.values,[
+      {title:'Amanah',description:'Menjalankan setiap proyek dengan kejujuran dan tanggung jawab.'},
+      {title:'Terstruktur',description:'Bekerja dengan sistem, perencanaan, dan alur kerja yang jelas.'},
+      {title:'Profesional',description:'Didukung oleh tim dan proses yang rapi serta berorientasi pada kualitas.'},
+      {title:'Berkelanjutan',description:'Fokus pada hasil jangka panjang, bukan sekadar penyelesaian cepat.'}
+    ]),
+    serviceGroups:asList(d.serviceGroups,[
+      {title:'Jasa Konstruksi',items:['Pembangunan rumah tinggal','Bangunan komersial & usaha','Bangunan pendukung lainnya']},
+      {title:'Renovasi & Pengembangan',items:['Renovasi bangunan eksisting','Pengembangan fungsi dan kualitas bangunan']},
+      {title:'Manajemen Proyek',items:['Perencanaan dan pengendalian proyek','Pengawasan pelaksanaan di lapangan','Koordinasi dengan konsultan dan klien']}
+    ]),
+    approach:asList(d.approach,[
+      {title:'Perencanaan',description:'Analisis kebutuhan, penyusunan konsep, dan perhitungan teknis.'},
+      {title:'Penataan & Persiapan',description:'Penyusunan anggaran, timeline, dan metode kerja.'},
+      {title:'Pelaksanaan & Pengawasan',description:'Pekerjaan lapangan dengan kontrol mutu dan progres yang ketat.'},
+      {title:'Evaluasi & Serah Terima',description:'Pemeriksaan hasil akhir dan penyelesaian proyek secara bertanggung jawab.'}
+    ]),
+    advantages:asList(d.advantages,['Proses kerja jelas dan terstruktur','Fokus pada perencanaan dan pengawasan','Transparansi dalam komunikasi dan anggaran','Komitmen terhadap amanah dan kualitas']),
+    audience:asList(d.audience,['Ingin membangun dengan tenang','Menghargai proses dan kejelasan kerja','Berorientasi pada kualitas jangka panjang']),
+    closing:String(d.closing||'Natara Konstruksi hadir untuk menjawab kebutuhan pembangunan yang tidak hanya kuat secara fisik, tetapi juga dapat dipertanggungjawabkan secara proses dan nilai.'),
+    services:Array.isArray(d.services)?d.services:String(d.services||'Jasa Konstruksi, Renovasi & Pengembangan, Manajemen Proyek').split(',').map(x=>x.trim()).filter(Boolean),
+    portfolioIntro:String(d.portfolioIntro||'Portofolio karya Natara Konstruksi dari hunian, usaha, hingga proyek pengembangan bangunan.'),
     contactLabel:String(d.contactLabel||'Hubungi Natara'),contactUrl:String(d.contactUrl||''),instagramUrl:String(d.instagramUrl||''),address:String(d.address||'')
   }});
 }
@@ -2293,7 +2325,7 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.14-qc-team-pm-pic"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.15-public-information-website"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -2604,7 +2636,7 @@ export default {
 
 
 /* ========================================================================== */
-/* NARA SYSTEM V3.4.14 — QC TEAM + PM FINDING PIC                               */
+/* NARA SYSTEM V3.4.15 — PUBLIC INFORMATION WEBSITE                               */
 /* ========================================================================== */
 function clampPercent(v){ return Math.max(0,Math.min(100,num(v))); }
 function normalizeAsBuiltProgress(data,oldStatus=""){

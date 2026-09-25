@@ -1,3 +1,13 @@
+## V3.4.15
+
+- Sistem Informasi Publik `/info` diubah menjadi website company profile Natara yang lengkap.
+- Menambahkan section Tentang, Filosofi, Visi/Misi, Nilai Perusahaan, Layanan, Pendekatan Kerja, Keunggulan, Segmentasi Klien, Portofolio, dan Kontak.
+- Mengimpor 7 portofolio dari Company Profile: Rumah Losari, Rumah Espana, Kost Samata, YD Cafe, Rumah Nordic, Rumah Amirullah, dan RD House.
+- Mengimpor dan mengoptimalkan 33 visual company profile sebagai static WebP assets.
+- Public portfolio API mendukung `coverUrl`, `galleryUrls`, dan `specs` selain media R2.
+- Admin `Profil & Portofolio` dapat mengedit konten company profile dan tetap mempertahankan static portfolio assets.
+- Migration baru: `0021_public_company_profile_seed.sql`.
+
 ## V3.4.14
 - Hapus assignment satu QC dari Master Proyek dan kolom QC pada Daftar Proyek.
 - QC menjadi team-wide: seluruh user role QC dan Head of Supporting dapat inspeksi lintas proyek.

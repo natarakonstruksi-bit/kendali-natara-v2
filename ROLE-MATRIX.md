@@ -1,4 +1,4 @@
-# Role Matrix — Nara System V3.4.14
+# Role Matrix — Nara System V3.4.15
 
 ## Hierarki utama
 
@@ -67,3 +67,8 @@ Tidak ada role Procurement sebagai tahap wajib pada workflow aktif.
 - **Head of Supporting** tetap memiliki kontrol inspeksi, edit/hapus, dan verifikasi QC.
 - **Project Manager** adalah PIC Temuan QC otomatis untuk proyeknya dan menerima Tugas Saya untuk tindak lanjut.
 - **Pelaksana Lapangan** dapat membaca Temuan QC proyek yang ditugaskan, tetapi tidak menjadi PIC dan tidak mengubah workflow Temuan.
+
+
+## Pengelolaan Informasi Publik
+
+Akses edit profil/portofolio tetap mengikuti capability koleksi `public_site_settings` dan `public_portfolio`. Website `/info` bersifat read-only untuk publik dan tidak memberi akses ke API internal yang memerlukan login.
