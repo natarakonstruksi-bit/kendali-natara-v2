@@ -1,3 +1,15 @@
+# Nara System V3.4.16 — Rute Kunjungan QC
+
+V3.4.16 menambahkan **Rute Kunjungan QC** di bagian atas QC Dashboard. Rute adalah jadwal kunjungan **mingguan yang berulang terus** (Senin–Minggu) sampai diedit, dinonaktifkan, atau dihapus — tidak perlu dibuat ulang setiap minggu.
+
+- **Satu titik rute** = satu proyek + hari kunjungan (bisa lebih dari satu hari) + jam + nomor urut + perkiraan durasi + petugas QC (atau "Tim QC") + fokus pemeriksaan + catatan lokasi.
+- **Rute hari ini** tampil otomatis sesuai hari berjalan, diurutkan nomor urut lalu jam. Titik yang proyeknya sudah ada aktivitas inspeksi hari ini ditandai hijau.
+- Tombol **Mulai / Lanjutkan Inspeksi** pada rute hari ini langsung membuka catatan Continuous QC Inspection proyek tersebut.
+- **Jadwal mingguan** menampilkan 7 hari; filter per petugas dan opsi tampilkan titik nonaktif.
+- **Tambah / Edit / Nonaktifkan / Hapus**: QC, Head of Supporting, Head of Operational, dan manajemen. Project Manager dan Pelaksana Lapangan hanya melihat rute untuk proyek yang ditugaskan kepadanya.
+- Validasi backend: proyek wajib ada, minimal satu hari, format jam HH:MM, petugas wajib role QC/Head of Supporting.
+- Data disimpan di collection `qc_visit_routes`. Migration baru: `0022_qc_visit_routes.sql` (additive, hanya index + schema_meta).
+
 # Nara System V3.4.15 — Public Information Website
 
 V3.4.15 memasukkan konten **Company Profile Natara Konstruksi** ke Sistem Informasi Publik `/info`. Website publik sekarang memuat Tentang Natara, Filosofi, Visi & Misi, Nilai Perusahaan, Layanan, Pendekatan Kerja, Keunggulan, Segmentasi Klien, Penutup, serta Portofolio lengkap dengan galeri. Konten dan visual portofolio diimpor dari company profile yang diberikan pengguna.

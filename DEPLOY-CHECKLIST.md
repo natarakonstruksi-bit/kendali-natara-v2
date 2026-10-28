@@ -9,7 +9,7 @@ npm run build
 python scripts/db-smoke.py
 ```
 
-4. Terapkan migration baru `0021_public_company_profile_seed.sql`:
+4. Terapkan migration baru `0021_public_company_profile_seed.sql` dan `0022_qc_visit_routes.sql` (V3.4.16 — Rute Kunjungan QC, additive):
 
 ```bash
 npx wrangler d1 migrations apply DB --remote

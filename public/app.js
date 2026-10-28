@@ -1195,3 +1195,74 @@ const v3412PrevRenderView=renderView;
 renderView=async function(){if(state.view==='asbuilt'){const meta=TITLES.asbuilt;$('#pageTitle').textContent=meta[0];$('#pageSubtitle').textContent=meta[1];$('#content').innerHTML='<div class="loading"><div class="spinner"></div>Memuat As-Built…</div>';try{await renderAsBuilt();await refreshTaskBadge();}catch(e){$('#content').innerHTML=`<div class="card"><div class="card-body"><b>Gagal memuat As-Built</b><p class="muted">${esc(e.message)}</p></div></div>`;}return;}return v3412PrevRenderView();};
 
 if(globalThis.KENDALI_TEST_MODE&&globalThis.__kendaliQa)Object.assign(globalThis.__kendaliQa,{renderAsBuilt,asBuiltBar,asBuiltOverall,asBuiltActionButtons,openAsBuiltForm});
+
+/* ------------------------------------------------------------------ */
+/* V3.4.16 — Rute Kunjungan QC (jadwal mingguan berulang)             */
+/* Berlaku terus setiap minggu sampai diedit, dinonaktifkan, dihapus. */
+/* ------------------------------------------------------------------ */
+const QC_ROUTE_DAYS=['','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+const QC_ROUTE_DAYS_SHORT=['','Sen','Sel','Rab','Kam','Jum','Sab','Min'];
+function qcRouteLocalDate(d=new Date()){const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10);}
+function qcRouteTodayDow(){const g=new Date().getDay();return g===0?7:g;}
+function qcRouteDays(r){const raw=Array.isArray(r?.data?.days)?r.data.days:String(r?.data?.days??'').split(/[,;\s]+/);return [...new Set(raw.map(Number).filter(x=>Number.isInteger(x)&&x>=1&&x<=7))].sort((a,b)=>a-b);}
+function qcRouteActive(r){return String(r?.data?.status||'ACTIVE').toUpperCase()!=='INACTIVE';}
+function qcRouteSort(a,b){const ta=String(a.data.time||'99:99'),tb=String(b.data.time||'99:99');return num(a.data.order)-num(b.data.order)||ta.localeCompare(tb)||projectName(a.data.projectId).localeCompare(projectName(b.data.projectId));}
+function qcRouteOfficer(r){return r.data.qcUserId?employeeName(r.data.qcUserId):'Tim QC';}
+function qcRouteVisitedToday(projectId){const today=qcRouteLocalDate();return (state.qcRouteSessions||[]).some(s=>String(s.data.projectId||'')===String(projectId)&&[s.data.startDate,s.data.updatedAt?qcRouteLocalDate(new Date(s.data.updatedAt)):'',s.updated_at?qcRouteLocalDate(new Date(String(s.updated_at).replace(' ','T')+(String(s.updated_at).includes('Z')||String(s.updated_at).includes('+')?'':'Z'))):''].includes(today));}
+function qcRouteFiltered(){const f=state.qcRouteFilter||{};return (state.qcRoutes||[]).filter(r=>(f.showInactive||qcRouteActive(r))&&(!f.officer||(f.officer==='__team'?!r.data.qcUserId:r.data.qcUserId===f.officer)));}
+function qcRouteStopHtml(r,i,{today=false}={}){
+  const d=r.data,active=qcRouteActive(r),visited=today&&active&&qcRouteVisitedToday(d.projectId);
+  let a='';
+  if(today&&active&&cap('qcInspect'))a+=`<button class="btn small primary" data-qc-route-inspect="${esc(r.id)}" type="button">${visited?'Lanjutkan Inspeksi':'Mulai Inspeksi'}</button>`;
+  if(cap('qcRouteManage')){a+=`<button class="btn small" data-qc-route-edit="${esc(r.id)}" type="button">Edit</button><button class="btn small" data-qc-route-toggle="${esc(r.id)}" type="button">${active?'Nonaktifkan':'Aktifkan'}</button><button class="btn small danger" data-qc-route-delete="${esc(r.id)}" type="button">Hapus</button>`;}
+  return `<div class="qc-route-stop ${active?'':'inactive'} ${visited?'visited':''}"><div class="qc-route-num">${i+1}</div><div class="qc-route-stop-body"><div class="qc-route-stop-top">${d.time?`<span class="qc-route-time">${esc(d.time)}${num(d.durationMin)?` · ${fmtNum(d.durationMin,0)} mnt`:''}</span>`:'<span class="qc-route-time muted">Jam fleksibel</span>'}${!active?'<span class="pill gray">NONAKTIF</span>':''}${visited?'<span class="pill green">ADA INSPEKSI HARI INI</span>':''}</div><b class="qc-route-project">${esc(projectName(d.projectId))}</b><div class="qc-route-meta">Petugas: ${esc(qcRouteOfficer(r))}</div>${d.focus?`<div class="qc-route-focus">Fokus: ${esc(d.focus)}</div>`:''}${d.notes?`<div class="qc-route-notes">${esc(d.notes)}</div>`:''}${a?`<div class="qc-route-actions">${a}</div>`:''}</div></div>`;
+}
+function qcRouteSectionHtml(){
+  const rows=qcRouteFiltered(),dow=qcRouteTodayDow(),f=state.qcRouteFilter||{};
+  const byDay=d=>rows.filter(r=>qcRouteDays(r).includes(d)).sort(qcRouteSort);
+  const todayStops=byDay(dow).filter(qcRouteActive);const visited=todayStops.filter(r=>qcRouteVisitedToday(r.data.projectId)).length;
+  const activeAll=(state.qcRoutes||[]).filter(qcRouteActive);const projectsCovered=new Set(activeAll.map(r=>r.data.projectId)).size;const weeklyVisits=activeAll.reduce((a,r)=>a+qcRouteDays(r).length,0);
+  const officers=v31RoleEmployees(['qc','koordinator_supporting']);
+  const filterHtml=`<select id="qcRouteOfficer" class="qc-route-filter" aria-label="Filter petugas"><option value="">Semua petugas</option><option value="__team" ${f.officer==='__team'?'selected':''}>Tim QC (tanpa petugas khusus)</option>${officers.map(e=>`<option value="${esc(e.id)}" ${f.officer===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select><label class="check-line qc-route-inactive"><input type="checkbox" id="qcRouteShowInactive" ${f.showInactive?'checked':''}> Tampilkan nonaktif</label>`;
+  const week=[1,2,3,4,5,6,7].map(d=>{const list=byDay(d);return `<div class="qc-route-day ${d===dow?'today':''} ${list.length?'':'is-empty'}"><div class="qc-route-day-head"><b>${QC_ROUTE_DAYS[d]}</b>${d===dow?'<span class="pill blue">HARI INI</span>':''}<span class="qc-route-day-count">${list.filter(qcRouteActive).length} kunjungan</span></div><div class="qc-route-day-body">${list.map((r,i)=>qcRouteStopHtml(r,i)).join('')||'<div class="qc-route-empty">Tidak ada kunjungan</div>'}</div></div>`;}).join('');
+  return `<div class="card qc-route-card" id="qcRouteCard"><div class="card-head"><div><h3>Rute Kunjungan QC</h3><p>Jadwal kunjungan tetap mingguan — berulang setiap minggu sampai diedit, dinonaktifkan, atau dihapus.</p></div><div class="card-actions">${filterHtml}${cap('qcRouteManage')?'<button class="btn primary" id="qcRouteAdd" type="button">+ Tambah Kunjungan</button>':''}</div></div><div class="qc-route-summary"><div><b>${activeAll.length}</b><span>Titik rute aktif</span></div><div><b>${projectsCovered}</b><span>Proyek tercakup</span></div><div><b>${weeklyVisits}</b><span>Kunjungan / minggu</span></div><div><b>${visited}/${todayStops.length}</b><span>Hari ini sudah ada inspeksi</span></div></div><div class="qc-route-today"><div class="qc-route-today-head"><b>Rute hari ini · ${QC_ROUTE_DAYS[dow]}, ${fmtDate(qcRouteLocalDate())}</b><span class="muted">Urutan mengikuti nomor urut lalu jam.</span></div>${todayStops.length?`<div class="qc-route-path">${todayStops.map((r,i)=>qcRouteStopHtml(r,i,{today:true})).join('')}</div>`:'<div class="qc-route-empty">Tidak ada kunjungan QC terjadwal hari ini.</div>'}</div><div class="qc-route-week-label">Jadwal mingguan</div><div class="qc-route-week">${week}</div></div>`;
+}
+function openQcRouteForm(row=null){
+  const d=row?.data||{},days=row?qcRouteDays(row):[qcRouteTodayDow()],officers=v31RoleEmployees(['qc','koordinator_supporting']);
+  const html=`<div class="form-grid"><label class="span-2">Proyek tujuan<select name="projectId" required><option value="">Pilih proyek</option>${v31ProjectOptions(d.projectId||state.selectedProjectId||'')}</select></label><div class="span-2"><label>Hari kunjungan (berulang setiap minggu)</label><div class="qc-route-daypick">${[1,2,3,4,5,6,7].map(x=>`<label class="qc-route-daychip"><input type="checkbox" name="day" value="${x}" ${days.includes(x)?'checked':''}><span>${QC_ROUTE_DAYS_SHORT[x]}</span></label>`).join('')}</div></div><label>Jam kunjungan<input type="time" name="time" value="${esc(d.time||'')}"></label><label>Nomor urut di rute<input type="number" name="order" min="1" max="99" value="${esc(d.order||1)}" required></label><label>Perkiraan durasi (menit)<input type="number" name="durationMin" min="0" max="600" step="15" value="${esc(d.durationMin||'')}" placeholder="Opsional"></label><label>Petugas QC<select name="qcUserId"><option value="">Tim QC (siapa saja)</option>${officers.map(e=>`<option value="${esc(e.id)}" ${e.id===d.qcUserId?'selected':''}>${esc(e.name)} — ${esc(e.jabatan||e.role)}</option>`).join('')}</select></label><label class="span-2">Fokus pemeriksaan<input name="focus" value="${esc(d.focus||'')}" maxlength="300" placeholder="Contoh: Pembesian kolom lt.2, kerapian pasangan bata"></label><label class="span-2">Catatan / petunjuk lokasi<textarea name="notes" maxlength="1000" placeholder="Opsional">${esc(d.notes||'')}</textarea></label><label>Status<select name="status"><option value="ACTIVE" ${qcRouteActive(row||{data:{}})?'selected':''}>Aktif — berlaku terus</option><option value="INACTIVE" ${row&&!qcRouteActive(row)?'selected':''}>Nonaktif — disimpan, tidak tampil di rute</option></select></label></div>`;
+  openModal(row?'Edit Kunjungan QC':'Tambah Kunjungan QC','Titik rute berlaku setiap minggu pada hari yang dipilih.',html,async form=>{
+    const daysSel=[...form.querySelectorAll('input[name="day"]:checked')].map(x=>Number(x.value));
+    if(!daysSel.length)throw new Error('Pilih minimal satu hari kunjungan.');
+    const body={projectId:form.projectId.value,days:daysSel,time:form.time.value,order:Number(form.order.value)||1,durationMin:Number(form.durationMin.value)||0,qcUserId:form.qcUserId.value,focus:form.focus.value,notes:form.notes.value,status:form.status.value};
+    if(row)await api(`/api/records/qc_visit_routes/${encodeURIComponent(row.id)}`,{method:'PUT',body});else await api('/api/records/qc_visit_routes',{method:'POST',body});
+    toast(row?'Kunjungan QC diperbarui.':'Kunjungan QC ditambahkan ke rute.');state.cache.clear();setTimeout(()=>renderQc(),30);
+  });
+}
+async function toggleQcRoute(row){try{await api(`/api/records/qc_visit_routes/${encodeURIComponent(row.id)}`,{method:'PUT',body:{...row.data,status:qcRouteActive(row)?'INACTIVE':'ACTIVE'}});toast(qcRouteActive(row)?'Kunjungan dinonaktifkan.':'Kunjungan diaktifkan kembali.');state.cache.clear();await renderQc();}catch(e){toast(e.message,'err');}}
+async function deleteQcRoute(row){if(!row)return;const ok=await confirmAsk(`Hapus kunjungan QC ke ${projectName(row.data.projectId)} (${qcRouteDays(row).map(x=>QC_ROUTE_DAYS[x]).join(', ')})? Jika hanya ingin berhenti sementara, gunakan Nonaktifkan.`);if(!ok)return;try{await api(`/api/records/qc_visit_routes/${encodeURIComponent(row.id)}`,{method:'DELETE'});toast('Kunjungan QC dihapus dari rute.');state.cache.clear();await renderQc();}catch(e){toast(e.message,'err');}}
+async function startQcFromRoute(row){try{const r=await api('/api/qc/sessions',{method:'POST',body:{projectId:row.data.projectId,date:qcRouteLocalDate(),note:row.data.focus?`Kunjungan rute QC — fokus: ${row.data.focus}`:'Kunjungan rute QC'}});toast(r.continued?'Melanjutkan catatan inspeksi proyek ini.':'Catatan inspeksi QC dibuat dari rute.');await openQcContinuousSession(r.id);}catch(e){toast(e.message,'err');}}
+function bindQcRouteSection(){
+  const find=id=>(state.qcRoutes||[]).find(x=>x.id===id);
+  const rerender=()=>{const el=$('#qcRouteCard');if(!el)return;el.outerHTML=qcRouteSectionHtml();bindQcRouteSection();};
+  if($('#qcRouteAdd'))$('#qcRouteAdd').onclick=()=>openQcRouteForm();
+  if($('#qcRouteOfficer'))$('#qcRouteOfficer').onchange=e=>{state.qcRouteFilter={...(state.qcRouteFilter||{}),officer:e.target.value};rerender();};
+  if($('#qcRouteShowInactive'))$('#qcRouteShowInactive').onchange=e=>{state.qcRouteFilter={...(state.qcRouteFilter||{}),showInactive:e.target.checked};rerender();};
+  $$('[data-qc-route-edit]').forEach(b=>b.onclick=()=>openQcRouteForm(find(b.dataset.qcRouteEdit)));
+  $$('[data-qc-route-toggle]').forEach(b=>b.onclick=()=>toggleQcRoute(find(b.dataset.qcRouteToggle)));
+  $$('[data-qc-route-delete]').forEach(b=>b.onclick=()=>deleteQcRoute(find(b.dataset.qcRouteDelete)));
+  $$('[data-qc-route-inspect]').forEach(b=>b.onclick=()=>startQcFromRoute(find(b.dataset.qcRouteInspect)));
+}
+const v3416PrevRenderQc=renderQc;
+renderQc=async function(){
+  await v3416PrevRenderQc();
+  if(!canCollection('qc_visit_routes','read'))return;
+  try{
+    const projectQuery=state.selectedProjectId?`?projectId=${encodeURIComponent(state.selectedProjectId)}`:'';
+    const [routes,sessionRes]=await Promise.all([loadCollection('qc_visit_routes',Boolean(state.selectedProjectId)),api(`/api/qc/sessions${projectQuery}`).catch(()=>({rows:[]}))]);
+    state.qcRoutes=routes;state.qcRouteSessions=sessionRes.rows||[];
+    const anchor=$('#content .card');const html=`<div class="section-separator"><span>RUTE KUNJUNGAN QC</span></div>${qcRouteSectionHtml()}<div class="section-separator"><span>INSPEKSI QC</span></div>`;
+    if(anchor)anchor.insertAdjacentHTML('beforebegin',html);else $('#content').insertAdjacentHTML('afterbegin',html);
+    bindQcRouteSection();
+  }catch(e){$('#content').insertAdjacentHTML('afterbegin',`<div class="notice"><b>Rute Kunjungan QC gagal dimuat:</b> ${esc(e.message)}</div>`);}
+};
+if(globalThis.KENDALI_TEST_MODE&&globalThis.__kendaliQa)Object.assign(globalThis.__kendaliQa,{qcRouteSectionHtml,qcRouteDays,qcRouteTodayDow,openQcRouteForm});

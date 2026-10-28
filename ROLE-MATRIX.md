@@ -72,3 +72,12 @@ Tidak ada role Procurement sebagai tahap wajib pada workflow aktif.
 ## Pengelolaan Informasi Publik
 
 Akses edit profil/portofolio tetap mengikuti capability koleksi `public_site_settings` dan `public_portfolio`. Website `/info` bersifat read-only untuk publik dan tidak memberi akses ke API internal yang memerlukan login.
+
+## Rute Kunjungan QC (V3.4.16)
+
+| Role | Lihat | Tambah / Edit / Nonaktifkan / Hapus |
+|---|---|---|
+| Administrator, Direktur, Head Unit Bisnis | Semua | Ya |
+| Head of Operational, Head of Supporting, QC | Semua | Ya |
+| Head of Engineering, Admin Teknik, QS, MEP | Semua | Tidak |
+| Project Manager, Pelaksana Lapangan | Hanya proyek yang ditugaskan | Tidak |

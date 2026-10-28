@@ -1,3 +1,12 @@
+## V3.4.16 — Rute Kunjungan QC
+
+- Kartu baru **Rute Kunjungan QC** di QC Dashboard: rute hari ini + jadwal mingguan berulang.
+- CRUD titik rute (Tambah/Edit/Nonaktifkan/Hapus) untuk QC, Head of Supporting, Head of Operational, manajemen; PM/Pelaksana read-only sesuai proyeknya.
+- Tombol Mulai/Lanjutkan Inspeksi dari rute hari ini membuka Continuous QC Inspection proyek.
+- Penanda "Ada inspeksi hari ini" berdasarkan aktivitas catatan inspeksi proyek.
+- Collection `qc_visit_routes`, capability `qcRouteManage`, validasi `normalizeQcVisitRoute`.
+- Migration `0022_qc_visit_routes.sql`; smoke test `scripts/qc-visit-route-smoke.mjs`.
+
 ## V3.4.15
 
 - Sistem Informasi Publik `/info` diubah menjadi website company profile Natara yang lengkap.

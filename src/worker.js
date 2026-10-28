@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.15 — Public Information Website
+ * Nara System V3.4.16 — Rute Kunjungan QC
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.15";
+const APP_VERSION = "APP-V3.4.16";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -23,13 +23,13 @@ const COLLECTIONS = new Set([
   "milestones", "retention", "closeout", "project_documents", "issues", "schedule", "procurement",
   "qc_work_items", "qc_inspection_sessions", "qc_inspection_items", "qc_work_groups", "daily_workers", "qc_actions", "qc_verifications", "ati_assessments", "ati_work_requests", "ati_field_issues", "ati_issue_evaluations",
   "public_project_settings", "public_updates", "public_site_settings", "public_portfolio",
-  "qc_reports", "ati_reports", "workflow_tasks", "as_built_progress"
+  "qc_reports", "ati_reports", "workflow_tasks", "as_built_progress", "qc_visit_routes"
 ]);
 
 const PROJECT_SCOPED_COLLECTIONS = new Set([
   "projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests",
   "daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones",
-  "retention","closeout","project_documents","issues","schedule","procurement","as_built_progress","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks"
+  "retention","closeout","project_documents","issues","schedule","procurement","as_built_progress","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks","qc_visit_routes"
 ]);
 
 const DOC_CORE = ["CONTRACT", "RAB_BASELINE", "DED_FINAL", "TIME_SCHEDULE"];
@@ -235,6 +235,7 @@ function collectionPermission(user, collection) {
   if (collection === "as_built_progress") return allow(["manager_operasional","koordinator_engineering","admin_teknik","project_manager","drafter"],["koordinator_engineering","admin_teknik","drafter"],["koordinator_engineering","admin_teknik"]);
   if (collection === "qc_work_items") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","qc"],["manager_operasional","koordinator_supporting","qc"]);
   if (collection === "qc_work_groups") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","admin_teknik","qc"],["manager_operasional","koordinator_supporting"]);
+  if (collection === "qc_visit_routes") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","qc"],["manager_operasional","koordinator_supporting","qc"]);
   if (collection === "qc_inspection_sessions") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],[],[]);
   if (collection === "qc_inspection_items") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc","mep_engineer"],[],[]);
   if (collection === "qc_inspections") return allow(["manager_operasional","koordinator_supporting","admin_teknik","project_manager","pelaksana_lapangan","qs","qc"],["manager_operasional","koordinator_supporting","qc"],["manager_operasional","koordinator_supporting","qc"]);
@@ -289,6 +290,7 @@ function buildAccess(user) {
       qcVerify: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
       qcCloseSession: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting"]),
       qcDeleteSession: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
+      qcRouteManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
       qcDeleteFinding: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc","project_manager"]),
       atiManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","kepala_ati","instruktur_ati"]),
       managePublicInfo: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
@@ -1920,11 +1922,32 @@ async function normalizeOperationalResponsibility(env,collection,data) {
   }
   if (collection === "po" && d.picUserId && !["project_manager","procurement"].includes(await employeeRoleKey(env,d.picUserId))) throw new Error("PIC PO/SPK wajib Project Manager proyek (atau role logistik lama untuk kompatibilitas data). ");
   if (collection === "cco" && d.requestedByUserId) { const rk=await employeeRoleKey(env,d.requestedByUserId); if(!["project_manager","pelaksana_lapangan"].includes(rk)) throw new Error("Pengaju lapangan CCO wajib Project Manager atau Pelaksana Lapangan."); }
+  if (collection === "qc_visit_routes") Object.assign(d,await normalizeQcVisitRoute(env,d));
   if (collection === "surat" && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "admin_teknik") throw new Error("PIC administrasi surat wajib Admin Teknik.");
   if (collection === "aset" && d.picUserId) { const rk=await employeeRoleKey(env,d.picUserId); if(!["procurement","admin_teknik"].includes(rk)) throw new Error("PIC aset wajib Logistik/Procurement atau Admin Teknik."); }
   if (collection === "retention" && d.picUserId) { const rk=await employeeRoleKey(env,d.picUserId); if(!["finance","admin_teknik","manager_operasional"].includes(rk)) throw new Error("PIC retensi wajib Finance/Admin Teknik/Manager Operasional."); }
   if (collection === "closeout" && d.ownerUserId) { const rk=await employeeRoleKey(env,d.ownerUserId); if(!["admin_teknik","manager_operasional","project_manager"].includes(rk)) throw new Error("PIC close-out wajib Admin Teknik/Manager Operasional/Project Manager."); }
   return d;
+}
+
+/* V3.4.16 — Rute Kunjungan QC: jadwal mingguan berulang (berlaku terus sampai diubah/dinonaktifkan). */
+const QC_ROUTE_DAY_LABELS = ["","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"];
+async function normalizeQcVisitRoute(env,d) {
+  const projectId=String(d.projectId||"").trim();
+  if (!projectId) throw new Error("Proyek tujuan kunjungan QC wajib dipilih.");
+  const project=await getRecord(env,"projects",projectId);
+  if (!project) throw new Error("Proyek tujuan kunjungan QC tidak ditemukan.");
+  const rawDays=Array.isArray(d.days)?d.days:String(d.days??"").split(/[,;\s]+/);
+  const days=[...new Set(rawDays.map(x=>Number(x)).filter(x=>Number.isInteger(x)&&x>=1&&x<=7))].sort((a,b)=>a-b);
+  if (!days.length) throw new Error("Pilih minimal satu hari kunjungan QC.");
+  const time=String(d.time||"").trim();
+  if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error("Format jam kunjungan harus HH:MM.");
+  const order=Math.max(1,Math.min(99,Math.round(Number(d.order)||1)));
+  const qcUserId=String(d.qcUserId||"").trim();
+  if (qcUserId) { const rk=await employeeRoleKey(env,qcUserId); if(!["qc","koordinator_supporting","manager_operasional"].includes(rk)) throw new Error("Petugas kunjungan wajib QC atau Head of Supporting."); }
+  const status=String(d.status||"ACTIVE").toUpperCase()==="INACTIVE"?"INACTIVE":"ACTIVE";
+  const durationMin=Math.max(0,Math.min(600,Math.round(Number(d.durationMin)||0)));
+  return {projectId,days,dayLabels:days.map(x=>QC_ROUTE_DAY_LABELS[x]),time,order,durationMin,qcUserId,focus:String(d.focus||"").trim().slice(0,300),notes:String(d.notes||"").trim().slice(0,1000),status,recurrence:"WEEKLY"};
 }
 
 function normalizePrArrays(d) {
@@ -2057,7 +2080,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.15"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.16"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2325,7 +2348,7 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.15-public-information-website"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.16-qc-visit-route"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
