@@ -1,9 +1,9 @@
-# Role Matrix — Nara System V3.4.15
+# Role Matrix — Nara System V3.4.17
 
 ## Hierarki utama
 
 1. Head Unit Bisnis
-2. Head of Operational
+2. Head of Operational → **Site Manager**, **Admin Logistik** (Divisi Operational)
 3. Head of Engineering
 4. Head of Supporting
 
@@ -17,8 +17,8 @@ Administrator/Direktur adalah akses sistem/manajemen dan bukan urutan operasiona
 | Head of Operational | Semua proyek operasional | Review progress, approval operasional/fund/vendor, eksekusi proyek |
 | Head of Engineering | Engineering | Review QS, CCO teknis, baseline teknis, approval As-Built |
 | **Head of Supporting** | Semua fungsi supporting/QC | **Input inspeksi QC, edit/hapus data QC, terbitkan temuan, verifikasi, laporan QC** |
-| Project Manager | Proyek ditugaskan | Kontrol proyek, review progress, PR + pembanding vendor, baca QC |
-| Pelaksana Lapangan | Proyek ditugaskan | Progress, pekerjaan lapangan, perbaikan Temuan QC, bantu draft kebutuhan |
+| **Site Manager** (V3.4.17, menggantikan PM + Pelaksana) | Proyek ditugaskan | Laporan harian/progress ke Head of Operational, issue, PIC & perbaikan Temuan QC, CCO, PR + pembanding vendor, tindak lanjut SPK/PO, pengajuan dana & tenaga ATI |
+| **Admin Logistik** (Divisi Operational) | Semua proyek (baca) | Monitoring logistik/material, PR/Vendor & PO, pengajuan dana |
 | QS / Quantity Surveyor | Proyek sesuai akses | Volume RAB vs Volume Realisasi, RAB CCO |
 | Drafter / BIM | Proyek ditugaskan | Progress As-Built Arsitektur/Struktur/MEP, upload/ganti file, submit approval |
 | **QC** | Proyek sesuai akses | **Inspeksi, edit/hapus QC, temuan, verifikasi, laporan QC** |
@@ -80,4 +80,4 @@ Akses edit profil/portofolio tetap mengikuti capability koleksi `public_site_set
 | Administrator, Direktur, Head Unit Bisnis | Semua | Ya |
 | Head of Operational, Head of Supporting, QC | Semua | Ya |
 | Head of Engineering, Admin Teknik, QS, MEP | Semua | Tidak |
-| Project Manager, Pelaksana Lapangan | Hanya proyek yang ditugaskan | Tidak |
+| Site Manager | Hanya proyek yang ditugaskan | Tidak |

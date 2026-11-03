@@ -1,0 +1,33 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const root=path.resolve(import.meta.dirname,'..');
+const worker=fs.readFileSync(path.join(root,'src/worker.js'),'utf8');
+const app=fs.readFileSync(path.join(root,'public/app.js'),'utf8');
+const mig=path.join(root,'migrations/0023_site_manager_restructure.sql');
+const must=(c,m)=>{if(!c)throw new Error(m)};
+const tmp=path.join(os.tmpdir(),`nara-sm-${process.pid}.mjs`);
+fs.writeFileSync(tmp,worker+'\nexport { normalizeRole, buildAccess, collectionPermission, ROLE_LABELS, ROLE_VIEWS, projectAssignedToUser, projectSiteManagerId, PROGRESS_WAITING_OPERATIONAL };\n');
+try{
+  const m=await import(pathToFileURL(tmp).href+'?v=3417');
+  for(const legacy of ['Project Manager','PM','Pelaksana Lapangan','Pelaksana','Pengawas Lapangan','Superintendent','Site Manager']) must(m.normalizeRole(legacy)==='site_manager',`${legacy} harus menjadi Site Manager`);
+  for(const legacy of ['Admin Logistik','Staf Logistik','Manager Logistik']) must(m.normalizeRole(legacy)==='procurement',`${legacy} harus menjadi Admin Logistik`);
+  must(m.ROLE_LABELS.site_manager==='Site Manager'&&m.ROLE_LABELS.procurement==='Admin Logistik','Label role belum sesuai');
+  must(!('project_manager' in m.ROLE_VIEWS)&&!('pelaksana_lapangan' in m.ROLE_VIEWS),'Role PM/Pelaksana lama masih ada');
+  must(!/["']project_manager["']|["']pelaksana_lapangan["']/.test(worker),'Backend masih memakai key project_manager/pelaksana_lapangan');
+  must(!/["']project_manager["']|["']pelaksana_lapangan["']/.test(app),'Frontend masih memakai key project_manager/pelaksana_lapangan');
+  const sm={id:'U1',username:'sm1',role:'Site Manager'};
+  must(m.projectAssignedToUser({siteManagerUserId:'U1'},sm),'SM harus mengakses proyek yang ditugaskan');
+  must(m.projectAssignedToUser({pmUserId:'U1'},sm),'Data lama pmUserId tetap terbaca sebagai Site Manager');
+  must(!m.projectAssignedToUser({siteManagerUserId:'U2',pelaksanaUserId:'U1'},sm),'Field Pelaksana lama tidak lagi memberi akses');
+  must(m.projectSiteManagerId({siteManagerUserId:'A',pmUserId:'B'})==='A','siteManagerUserId menjadi sumber utama');
+  for(const st of ['SUBMITTED_TO_OPERATIONAL','SUBMITTED_TO_PM','PM_APPROVED']) must(m.PROGRESS_WAITING_OPERATIONAL.includes(st),`${st} harus menunggu Head of Operational`);
+  for(const mk of ['"Kirim ke Head of Operational"','"ISSUE_REVIEW","Review Corrective Action", "Head of Operational','Penanggung jawab proyek wajib karyawan dengan posisi Site Manager']) must(worker.includes(mk),`Backend marker hilang: ${mk}`);
+  for(const mk of ["employeeField('siteManagerUserId','Site Manager'","['Divisi Operational',['Site Manager','Admin Logistik']]",'Kirim ke Head of Operational','Kembalikan ke Site Manager','progressStatusPill']) must(app.includes(mk),`Frontend marker hilang: ${mk}`);
+  must(!app.includes("employeeField('pelaksanaUserId'"),'Form proyek masih meminta Pelaksana');
+  must(fs.existsSync(mig),'Migration 0023 hilang');
+  const sql=fs.readFileSync(mig,'utf8');
+  for(const mk of ["'$.role','Site Manager'","'$.role','Admin Logistik'","'Divisi Operational'","'$.siteManagerUserId'","SUBMITTED_TO_OPERATIONAL","legacyPelaksanaUserId"]) must(sql.includes(mk),`Migration marker hilang: ${mk}`);
+  console.log('Site Manager smoke OK — PM + Pelaksana => Site Manager under Head of Operational; Admin Logistik in Divisi Operational; legacy data migrated.');
+} finally { try{fs.unlinkSync(tmp)}catch{} }

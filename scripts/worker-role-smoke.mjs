@@ -13,7 +13,7 @@ try{
     ['Head Operational','manager_operasional'],['Head of Operational','manager_operasional'],
     ['Koordinator Engineering','koordinator_engineering'],['Head of Engineering','koordinator_engineering'],
     ['Koordinator Supporting','koordinator_supporting'],['Head of Supporting','koordinator_supporting'],
-    ['Senior QC','qc'],['QC Interior','qc'],['Site Manager','project_manager'],['Superintendent','project_manager'],['Pengawas Lapangan','pelaksana_lapangan'],['Site Supervisor','pelaksana_lapangan'],['Manager Logistik','procurement'],['Procurement / Purchasing','procurement']
+    ['Senior QC','qc'],['QC Interior','qc'],['Site Manager','site_manager'],['Project Manager','site_manager'],['Pelaksana Lapangan','site_manager'],['Superintendent','site_manager'],['Pengawas Lapangan','site_manager'],['Site Supervisor','site_manager'],['Manager Logistik','procurement'],['Admin Logistik','procurement'],['Procurement / Purchasing','procurement']
   ];
   for(const [label,want] of cases){const got=m.normalizeRole(label);if(got!==want)throw new Error(`${label} => ${got}; expected ${want}`);}
   const hu=m.buildAccess({id:'hu',role:'Head Unit Bisnis'});
@@ -26,14 +26,16 @@ try{
   if(!sup.views.includes('qc')||!sup.capabilities.qcCloseSession||!sup.capabilities.qcDeleteSession||!sup.capabilities.qcDeleteFinding||!sup.capabilities.qcInspect||!sup.capabilities.qcVerify)throw new Error('Head of Supporting access mismatch');
   const supDef=m.collectionPermission({id:'sup',role:'Head of Supporting'},'defects'); if(!supDef.read||!supDef.create||!supDef.update||!supDef.delete)throw new Error('Head of Supporting QC CRUD mismatch');
   const qc=m.buildAccess({id:'qc',role:'QC'}); if(!qc.capabilities.qcInspect||!qc.capabilities.qcVerify||!qc.capabilities.qcDeleteSession||!qc.capabilities.qcDeleteFinding)throw new Error('QC full control mismatch');
-  const pm=m.buildAccess({id:'pm',role:'Project Manager'});
-  if(!pm.views.includes('tasks')||pm.views.includes('finance'))throw new Error('Project Manager view mismatch');
-  const pel=m.buildAccess({id:'pel',role:'Pelaksana Lapangan'});
-  if(!pel.views.includes('progress')||!pel.views.includes('procurement')||!pel.views.includes('qc')||pel.views.includes('employees'))throw new Error('Pelaksana Lapangan view mismatch');
-  const pelPr=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'procurement');
-  const pelQc=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'defects');
-  if(!pelPr.read||!pelPr.create||!pelPr.update)throw new Error('Pelaksana harus dapat membuat/mengubah Purchase Request.');
-  if(!pelQc.read||pelQc.create||pelQc.update||pelQc.delete)throw new Error('Pelaksana hanya boleh melihat temuan QC; PIC/workflow temuan adalah Project Manager.');
+  if(m.ROLE_LABELS.project_manager||m.ROLE_LABELS.pelaksana_lapangan||m.ROLE_VIEWS.project_manager||m.ROLE_VIEWS.pelaksana_lapangan)throw new Error('Role PM/Pelaksana lama masih aktif.');
+  const sm=m.buildAccess({id:'sm',role:'Site Manager'});
+  if(!sm.views.includes('tasks')||!sm.views.includes('progress')||!sm.views.includes('procurement')||!sm.views.includes('qc')||sm.views.includes('finance')||sm.views.includes('employees'))throw new Error('Site Manager view mismatch');
+  const smPr=m.collectionPermission({id:'sm',role:'Site Manager'},'procurement');
+  const smQc=m.collectionPermission({id:'sm',role:'Site Manager'},'defects');
+  const smDaily=m.collectionPermission({id:'sm',role:'Site Manager'},'daily_progress');
+  if(!smPr.read||!smPr.create||!smPr.update)throw new Error('Site Manager harus dapat membuat/mengubah Purchase Request.');
+  if(!smQc.read||!smQc.create||!smQc.update||!smQc.delete)throw new Error('Site Manager adalah PIC temuan QC proyek.');
+  if(!smDaily.read||!smDaily.create||!smDaily.update)throw new Error('Site Manager membuat laporan harian.');
+  if(m.ROLE_LABELS.procurement!=='Admin Logistik')throw new Error('Label Admin Logistik belum aktif.');
   console.log('Worker RBAC smoke OK — role aliases, hierarchy, permissions');
 } finally {
   try{fs.unlinkSync(tmp);}catch{}

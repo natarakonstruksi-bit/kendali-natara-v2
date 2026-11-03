@@ -4,16 +4,16 @@ const root=path.resolve(import.meta.dirname,'..');
 const worker=fs.readFileSync(path.join(root,'src/worker.js'),'utf8');
 const app=fs.readFileSync(path.join(root,'public/app.js'),'utf8');
 const checks=[
-  [worker,'Project Manager wajib menambahkan minimal satu pembanding vendor sebelum PR dikirim ke Head.'],
+  [worker,'Site Manager wajib menambahkan minimal satu pembanding vendor sebelum PR dikirim ke Head.'],
   [worker,'next="READY_FOR_APPROVAL"; d.submittedByUserId=user.id'],
   [worker,'PR_PM_VENDOR'],
-  [worker,'Project Manager menindaklanjuti SPK/PO'],
-  [worker,'procurementOrder: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","project_manager"])'],
-  [app,'Pembanding Vendor — Project Manager'],
+  [worker,'Site Manager menindaklanjuti SPK/PO'],
+  [worker,'procurementOrder: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","site_manager"])'],
+  [app,'Pembanding Vendor — Site Manager'],
   [app,'Ketik nama vendor'],
   [app,"vendorId:'',vendorName:$('.pv-vendor-name',r).value.trim()"],
   [app,'Kebutuhan + Pembanding Vendor'],
-  [app,'Tugas PR diteruskan kembali ke Project Manager.'],
+  [app,'Tugas PR diteruskan kembali ke Site Manager.'],
   [app,'Penanggung Jawab Vendor']
 ];
 for(const [text,needle] of checks) if(!text.includes(needle)) throw new Error(`PM vendor flow marker missing: ${needle}`);

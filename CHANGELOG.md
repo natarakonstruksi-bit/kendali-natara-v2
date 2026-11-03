@@ -1,3 +1,14 @@
+## V3.4.17 — Site Manager & Divisi Operational
+
+- Role `project_manager` dan `pelaksana_lapangan` dilebur menjadi `site_manager` (label **Site Manager**), langsung di bawah Head of Operational.
+- Master Proyek: satu field `siteManagerUserId`; `pmUserId`/`projectManagerUserId` disinkronkan otomatis untuk kompatibilitas; field Pelaksana dikosongkan.
+- Progress harian/mingguan: status baru `SUBMITTED_TO_OPERATIONAL`; tahap Review PM dihapus. Status lama `SUBMITTED_TO_PM`/`PM_APPROVED` tetap diterima sebagai menunggu Head of Operational.
+- Issue: review/penutupan oleh Head of Operational.
+- Tabel Laporan Harian: kolom Status + tombol workflow.
+- Logistik → **Admin Logistik** di grup **Divisi Operational**.
+- Validasi: penanggung jawab proyek, PIC progress, dan pengaju CCO wajib Site Manager.
+- Migration `0023_site_manager_restructure.sql`; tes baru `scripts/site-manager-smoke.mjs`; tes lama diperbarui.
+
 ## V3.4.16 — Rute Kunjungan QC
 
 - Kartu baru **Rute Kunjungan QC** di QC Dashboard: rute hari ini + jadwal mingguan berulang.

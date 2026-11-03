@@ -2,7 +2,7 @@
 
 ## 1. Proyek masuk
 
-Head Unit Bisnis/Admin berwenang membuat proyek dan menetapkan Project Manager, Pelaksana Lapangan, QS, QC, serta PIC teknis lain. Project Manager dan Pelaksana dibatasi ke proyek yang ditugaskan.
+Head Unit Bisnis/Admin berwenang membuat proyek dan menetapkan **Site Manager**, QS, serta PIC teknis lain. Site Manager (V3.4.17, menggantikan Project Manager + Pelaksana Lapangan) dibatasi ke proyek yang ditugaskan dan melapor langsung ke Head of Operational.
 
 ## 2. Persiapan / Engineering
 
@@ -10,13 +10,13 @@ Head of Engineering mengawal baseline teknis: DED/gambar, RAB/HPP, schedule, dan
 
 ## 3. Eksekusi / Progress
 
-Pelaksana Lapangan menginput progress aktual, foto, kendala, dan tenaga kerja. Laporan berpindah ke Project Manager untuk review lalu Head of Operational untuk review akhir sesuai workflow.
+Site Manager menginput progress aktual, foto, kendala, dan tenaga kerja, lalu mengirim laporan langsung ke **Head of Operational** untuk review (Disetujui atau Dikembalikan ke Site Manager).
 
 ## 4. PR Vendor
 
-`Project Manager → Head of Operational / Head Unit Bisnis → Admin Teknik → Project Manager`
+`Site Manager → Head of Operational / Head Unit Bisnis → Admin Teknik → Site Manager`
 
-Project Manager mengisi kebutuhan pekerjaan/material/jasa, HPP detail, pembanding vendor, quotation, term, lead time, dan Conflict of Interest. Head memilih vendor. Admin Teknik membuat SPK/PO. Setelah SPK/PO terbentuk, tugas kembali ke PM untuk tindak lanjut/order dan konfirmasi penerimaan.
+Site Manager mengisi kebutuhan pekerjaan/material/jasa, HPP detail, pembanding vendor, quotation, term, lead time, dan Conflict of Interest. Head memilih vendor. Admin Teknik membuat SPK/PO. Setelah SPK/PO terbentuk, tugas kembali ke Site Manager untuk tindak lanjut/order dan konfirmasi penerimaan.
 
 ## 5. QC — Continuous Inspection
 
@@ -32,14 +32,14 @@ QC atau Head of Supporting membuka satu catatan inspeksi berjalan untuk proyek. 
 Head of Supporting mempunyai fungsi input dan kontrol QC yang sama dengan QC untuk kebutuhan supervisi.
 
 ### Menjadi temuan
-Item `TIDAK SESUAI` dapat diterbitkan sebagai Temuan QC. PIC otomatis diarahkan ke Pelaksana Lapangan proyek. Tugas masuk ke `Tugas Saya` Pelaksana.
+Item `TIDAK SESUAI` dapat diterbitkan sebagai Temuan QC. PIC otomatis diarahkan ke Site Manager proyek. Tugas masuk ke `Tugas Saya` Site Manager.
 
 ### Perbaikan
-Pelaksana menekan **Mulai**:
+Site Manager menekan **Mulai**:
 
 `OPEN / REVISION REQUIRED → ON PROGRESS`
 
-Setelah perbaikan selesai, Pelaksana mengirim uraian + bukti after:
+Setelah perbaikan selesai, Site Manager mengirim uraian + bukti after:
 
 `ON PROGRESS → WAITING QC CHECK`
 
@@ -47,7 +47,7 @@ Setelah perbaikan selesai, Pelaksana mengirim uraian + bukti after:
 QC/Head of Supporting memverifikasi:
 
 - Sesuai → `CLOSED`.
-- Tidak Sesuai → `REVISION REQUIRED`, dan tugas kembali ke Pelaksana.
+- Tidak Sesuai → `REVISION REQUIRED`, dan tugas kembali ke Site Manager.
 
 Status workflow tidak dapat dipindahkan dengan Edit biasa. Ini menjaga task routing dan histori tetap konsisten.
 
@@ -56,7 +56,7 @@ Jika record yang dihapus mempunyai data turunan yang memang melekat pada record 
 
 ## 6. CCO / Addendum
 
-Pelaksana/PM mengajukan → Admin Teknik memeriksa/routing → QS menghitung volume/RAB → tahap approval/escalation → client → addendum → closed. Setiap tahap menampilkan next action yang sesuai role.
+Site Manager mengajukan → Admin Teknik memeriksa/routing → QS menghitung volume/RAB → tahap approval/escalation → client → addendum → closed. Setiap tahap menampilkan next action yang sesuai role.
 
 ## 7. QS / Volume
 
@@ -84,9 +84,9 @@ Nara System mengevaluasi tahap proyek dari SETUP/PRECON/MOBILIZATION/EXECUTION s
 
 
 ## Alur QC V3.4.14
-**Tim QC / Head of Supporting → inspeksi lintas proyek → Tidak Sesuai → Temuan QC → PIC otomatis Project Manager → PM tindak lanjut + foto After → Tim QC / Head of Supporting verifikasi → Closed / Revision Required.**
+**Tim QC / Head of Supporting → inspeksi lintas proyek → Tidak Sesuai → Temuan QC → PIC otomatis Site Manager → Site Manager tindak lanjut + foto After → Tim QC / Head of Supporting verifikasi → Closed / Revision Required.**
 
-Pelaksana Lapangan dapat melihat Temuan pada proyek assignment-nya sebagai informasi lapangan. Tidak ada lagi field assignment satu QC pada Master Proyek.
+Tidak ada lagi field assignment satu QC pada Master Proyek.
 
 
 ## Sistem Informasi Publik V3.4.15

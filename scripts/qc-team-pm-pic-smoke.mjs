@@ -16,16 +16,16 @@ try{
     must(a.capabilities.qcVerify,`${role} harus tetap dapat verifikasi QC`);
   }
   const pm=m.buildAccess({id:'pm',role:'Project Manager'});
-  must(pm.views.includes('qc'),'Project Manager harus melihat QC Dashboard');
-  must(!pm.capabilities.qcInspect,'Project Manager bukan inspector QC');
-  must(pm.capabilities.qcFindingManage,'Project Manager harus dapat mengisi/edit Temuan QC');
+  must(pm.views.includes('qc'),'Site Manager harus melihat QC Dashboard');
+  must(!pm.capabilities.qcInspect,'Site Manager bukan inspector QC');
+  must(pm.capabilities.qcFindingManage,'Site Manager harus dapat mengisi/edit Temuan QC');
   const pmDef=m.collectionPermission({id:'pm',role:'Project Manager'},'defects');
-  must(pmDef.read&&pmDef.create&&pmDef.update&&pmDef.delete,'Project Manager harus CRUD Temuan QC pada proyeknya');
-  const pelDef=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'defects');
-  must(pelDef.read&&!pelDef.create&&!pelDef.update&&!pelDef.delete,'Pelaksana hanya boleh melihat Temuan QC');
+  must(pmDef.read&&pmDef.create&&pmDef.update&&pmDef.delete,'Site Manager harus CRUD Temuan QC pada proyeknya');
+  const pelDef=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'defects'); // V3.4.17: alias lama => Site Manager (PIC temuan)
+  must(pelDef.read&&pelDef.create&&pelDef.update&&pelDef.delete,'Jabatan lama Pelaksana kini Site Manager dan mengelola Temuan QC proyeknya');
   must(!app.includes("employeeField('qcUserId','QC',['qc'],false)"),'Master Proyek tidak boleh meminta satu QC per proyek');
   must(!app.includes('<th>QS</th><th>QC</th><th>Kontrak</th>'),'Kolom QC assignment harus hilang dari daftar proyek');
-  for(const marker of ['PIC Temuan — Project Manager','PIC otomatis Project Manager proyek','Pelaksana Lapangan tetap dapat melihat seluruh temuan','qcFindingManage']) must(app.includes(marker)||worker.includes(marker),`Marker hilang: ${marker}`);
+  for(const marker of ['PIC Temuan — Site Manager','PIC otomatis Site Manager proyek','qcFindingManage']) must(app.includes(marker)||worker.includes(marker),`Marker hilang: ${marker}`);
   for(const marker of ['QC_PM_FOLLOWUP','Tindak Lanjut Temuan QC','projectAssignment(env,session.data.projectId,"pm")','const assigned=await projectAssignment(env,d.projectId,"pm")']) must(worker.includes(marker),`Backend PIC PM hilang: ${marker}`);
-  console.log('QC team + PM PIC smoke OK — QC is team-wide, PM owns findings, Pelaksana read-only.');
+  console.log('QC team + PM PIC smoke OK — QC is team-wide, Site Manager owns findings.');
 } finally { try{fs.unlinkSync(tmp)}catch{} }

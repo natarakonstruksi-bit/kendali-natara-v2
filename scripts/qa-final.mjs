@@ -10,9 +10,9 @@ const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 function must(cond,msg){ if(!cond) throw new Error(msg); }
 function has(text,needle,msg=needle){ must(text.includes(needle),`QA marker hilang: ${msg}`); }
 
-must(pkg.version==='3.4.16','Versi package harus 3.4.16');
-has(worker,'APP-V3.4.16','APP version 3.4.16');
-has(html,'Natara Konstruksi • V3.4.16','label frontend 3.4.16');
+must(pkg.version==='3.4.17','Versi package harus 3.4.17');
+has(worker,'APP-V3.4.17','APP version 3.4.17');
+has(html,'Natara Konstruksi • V3.4.17','label frontend 3.4.17');
 has(html,'NARA SYSTEM','branding Nara System');
 has(html,'Masuk ke Nara System','login branding Nara System');
 has(worker,'const SERVICE_NAME = "Nara System";','service branding Nara System');
@@ -24,20 +24,21 @@ has(app,"'head operational':'Head of Operational'",'normalisasi legacy display')
 has(worker,'["head operational","manager_operasional"]','backend alias legacy role');
 
 
-// Field role merge: Superintendent/Site Manager => Project Manager; Pengawas => Pelaksana Lapangan.
-must(!app.includes("'Project Manager','Site Manager','Pelaksana Lapangan','Pengawas Lapangan'"),'Role lapangan lama masih muncul sebagai pilihan aktif.');
-has(app,"['Operasional Proyek',['Project Manager','Pelaksana Lapangan']]",'role operasional proyek sudah digabung');
-has(app,"'site manager':'Project Manager'",'display alias Site Manager => Project Manager');
-has(app,"'pengawas lapangan':'Pelaksana Lapangan'",'display alias Pengawas => Pelaksana');
-has(worker,'["site manager","project_manager"]','backend alias Site Manager => Project Manager');
-has(worker,'["superintendent","project_manager"]','backend alias Superintendent => Project Manager');
-has(worker,'["pengawas lapangan","pelaksana_lapangan"]','backend alias Pengawas => Pelaksana');
+// V3.4.17: Project Manager + Pelaksana Lapangan => Site Manager (di bawah Head of Operational); Admin Logistik di Divisi Operational.
+must(!app.includes("'Project Manager','Pelaksana Lapangan',"),'Role PM/Pelaksana lama masih muncul sebagai pilihan aktif.');
+has(app,"['Divisi Operational',['Site Manager','Admin Logistik']]",'Divisi Operational berisi Site Manager + Admin Logistik');
+has(app,"'project manager':'Site Manager'",'display alias Project Manager => Site Manager');
+has(app,"'pengawas lapangan':'Site Manager'",'display alias Pengawas => Site Manager');
+has(worker,'["project manager","site_manager"]','backend alias Project Manager => Site Manager');
+has(worker,'["pelaksana lapangan","site_manager"]','backend alias Pelaksana => Site Manager');
+has(worker,'["superintendent","site_manager"]','backend alias Superintendent => Site Manager');
+has(worker,'SUBMITTED_TO_OPERATIONAL','progress Site Manager langsung ke Head of Operational');
 has(app,'Pengaju PR','PR menampilkan pengaju');
-has(worker,'PR hanya dapat disubmit oleh Project Manager proyek','Project Manager adalah pengaju formal PR');
+has(worker,'PR hanya dapat disubmit oleh Site Manager proyek','Site Manager adalah pengaju formal PR');
 
 // Role QC aktif disederhanakan menjadi satu posisi: QC.
 has(app,"['Supporting / QC',['QC']]",'kelompok Supporting hanya memakai role QC');
-must(app.includes(`'QC',\n  'Finance'`),'QC harus tersedia sebagai pilihan posisi aktif.');
+must(app.includes(`'QC',\n  'Admin Logistik',\n  'Finance'`),'QC harus tersedia sebagai pilihan posisi aktif.');
 must(!app.includes("'Senior QC','QC / Quality Control','QC Arsitektur','QC Interior','QC MEP'"),'Role QC terpisah masih muncul di pilihan aktif.');
 has(worker,'qc: "QC"','label akses QC canonical');
 
@@ -119,12 +120,12 @@ for(const m of [
   'procurementSpkCreate'
 ]) has(worker,m,`PR-SPK backend ${m}`);
 for(const m of [
-  'PR digunakan jika pekerjaan membutuhkan vendor','pengaju formal dan pihak yang submit adalah Project Manager',
+  'PR digunakan jika pekerjaan membutuhkan vendor','Draft dan pengajuan formal dilakukan oleh <b>Site Manager</b>',
   'Kebutuhan + Pembanding Vendor','Buat SPK / PO','SPK/PO dibuat dan masuk register PO/SPK'
 ]) has(app,m,`PR-SPK frontend ${m}`);
 
-for(const m of ['Project Manager wajib menambahkan minimal satu pembanding vendor','PR dan pembanding vendor harus dikirim Project Manager ke Head','PR_PM_VENDOR']) has(worker,m,`PM vendor backend ${m}`);
-for(const m of ['Pembanding Vendor — Project Manager','Project Manager mengisi kebutuhan, HPP, dan pembanding/quotation vendor sekaligus','Tugas PR diteruskan kembali ke Project Manager']) has(app,m,`PM vendor frontend ${m}`);
+for(const m of ['Site Manager wajib menambahkan minimal satu pembanding vendor','PR dan pembanding vendor harus dikirim Site Manager ke Head','PR_PM_VENDOR']) has(worker,m,`PM vendor backend ${m}`);
+for(const m of ['Pembanding Vendor — Site Manager','Site Manager mengisi kebutuhan, HPP, dan pembanding/quotation vendor sekaligus','Tugas PR diteruskan kembali ke Site Manager']) has(app,m,`PM vendor frontend ${m}`);
 for(const m of ['as_built_progress','ASBUILT_DRAFTER','ASBUILT_ENGINEERING','READY FOR APPROVAL','asBuiltActionHandler']) has(worker,m,`As-Built backend ${m}`);
 for(const m of ['QS / Volume','Volume RAB','Volume Realisasi','As-Built / Drafter','Overall Progress','Kirim Approval']) has(app,m,`QS/As-Built frontend ${m}`);
 console.log('QA static wiring OK — roles, buttons, workflow endpoints, QC controls, QS volume, As-Built Drafter');

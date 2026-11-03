@@ -30,8 +30,8 @@ try{
   must(pm.views.includes('qc')&&!pm.capabilities.qcInspect&&pm.capabilities.qcFindingManage,'PM harus bisa membaca/mengelola Temuan QC tetapi tidak menjadi inspector QC.');
   const pmDef=m.collectionPermission({id:'pm',role:'Project Manager'},'defects');
   must(pmDef.read&&pmDef.create&&pmDef.update&&pmDef.delete,'PM harus dapat CRUD Temuan QC pada proyeknya.');
-  const pelDef=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'defects');
-  must(pelDef.read&&!pelDef.create&&!pelDef.update&&!pelDef.delete,'Pelaksana hanya melihat Temuan QC.');
+  const pelDef=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'defects'); // V3.4.17: alias lama => Site Manager (PIC temuan)
+  must(pelDef.read&&pelDef.create&&pelDef.update&&pelDef.delete,'Jabatan lama Pelaksana kini Site Manager dan mengelola Temuan QC proyeknya.');
   for(const marker of [
     'async function qcSessionUpdateHandler','async function qcFindingUpdateHandler','async function qcFindingDeleteHandler',
     'async function deleteQcFindingData','QC_SESSION_EDIT','QC_FINDING_EDIT','QC_FINDING_DELETE',
@@ -42,5 +42,5 @@ try{
     'data-qc-session-edit','data-qc-session-delete','data-qc-item-edit','data-qc-item-delete',
     'data-qc-finding-edit','data-qc-finding-delete','qcEditSession'
   ]) must(app.includes(marker),`Frontend QC marker hilang: ${marker}`);
-  console.log('QC control smoke OK — Head of Supporting/QC full input, edit/delete, evidence access, PM manages findings, Pelaksana read-only');
+  console.log('QC control smoke OK — Head of Supporting/QC full input, edit/delete, evidence access, Site Manager manages findings');
 } finally { try{fs.unlinkSync(tmp)}catch{} }

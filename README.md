@@ -1,3 +1,28 @@
+# Nara System V3.4.17 — Restrukturisasi Operational: Site Manager
+
+Struktur operasional proyek disederhanakan:
+
+```
+Head Unit Bisnis
+└── Head of Operational
+    ├── Site Manager      (menggantikan Project Manager + Pelaksana Lapangan)
+    └── Admin Logistik    (dipindahkan ke Divisi Operational)
+```
+
+- **Site Manager** adalah satu-satunya penanggung jawab proyek di lapangan. Master Proyek hanya punya satu field **Site Manager** (field PM dan Pelaksana dihapus dari form).
+- Site Manager mengerjakan semua yang dulu dikerjakan PM dan Pelaksana: laporan harian/mingguan, issue & corrective action, PIC Temuan QC, CCO, PR vendor (pengaju formal), konfirmasi SPK/PO & penerimaan, pengajuan dana, dan pengajuan tenaga ATI.
+- **Laporan progress**: `Site Manager → Head of Operational → Disetujui` (atau dikembalikan ke Site Manager). Tahap "Review PM" dihapus. Tabel Laporan Harian sekarang punya kolom Status dan tombol Kirim / Review & Setujui / Kembalikan.
+- **Issue / corrective action**: Site Manager mengerjakan → Head of Operational menutup atau mengembalikan.
+- **PR vendor**: Site Manager → Head of Operational memilih vendor → Admin Teknik buat SPK/PO → Site Manager tindak lanjut.
+- **Admin Logistik** (dulu Logistik / Staf Logistik / Manager Logistik) berada di Divisi Operational. Hak akses tetap: PR/Vendor, PO, pengajuan dana, dokumen.
+- Jabatan lama (Project Manager, PM, Pelaksana Lapangan, Pengawas, Superintendent) otomatis dibaca sebagai Site Manager, jadi akun lama tetap bisa login.
+
+Migration baru `0023_site_manager_restructure.sql`:
+- akun PM/Pelaksana → `Site Manager`, akun Logistik → `Admin Logistik`, keduanya `departemen = Divisi Operational` (jabatan lama disimpan di `legacyPosition`);
+- Site Manager proyek = PM lama; kalau proyek belum punya PM, memakai Pelaksana lama (nilai lama disimpan di `legacyPmUserId` / `legacyPelaksanaUserId`);
+- laporan progress yang menunggu review PM dipindah ke antrean Head of Operational; PIC laporan/temuan/issue/PR yang masih berjalan dipindah ke Site Manager proyek;
+- Tugas Saya lama untuk PM/Pelaksana ditutup dan dibuat ulang otomatis sesuai alur baru.
+
 # Nara System V3.4.16 — Rute Kunjungan QC
 
 V3.4.16 menambahkan **Rute Kunjungan QC** di bagian atas QC Dashboard. Rute adalah jadwal kunjungan **mingguan yang berulang terus** (Senin–Minggu) sampai diedit, dinonaktifkan, atau dihapus — tidak perlu dibuat ulang setiap minggu.
