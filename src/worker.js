@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.17 — Site Manager Restructure
+ * Nara System V3.4.18 — Performance & Stability
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.17";
+const APP_VERSION = "APP-V3.4.18";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -65,8 +65,8 @@ const ROLE_VIEWS = {
   mep_engineer: ["dashboard","tasks","projects","progress","qc","documents","flow"],
   finance: ["dashboard","tasks","projects","finance","fund_requests","procurement","documents","flow","closeout"],
   procurement: ["dashboard","tasks","projects","fund_requests","procurement","documents","flow"],
-  kepala_ati: ["dashboard","tasks","ati","progress","documents","master"],
-  instruktur_ati: ["dashboard","tasks","ati","documents","master"],
+  kepala_ati: ["dashboard","tasks","ati","progress","master"],
+  instruktur_ati: ["dashboard","tasks","ati","master"],
   viewer: ["dashboard","projects","documents","flow"]
 };
 
@@ -211,7 +211,7 @@ function collectionPermission(user, collection) {
   if (["public_project_settings","public_updates","public_site_settings","public_portfolio"].includes(collection)) return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
   if (collection === "qc_reports") return allow(["manager_operasional","koordinator_supporting","admin_teknik","qc"],[],[]);
   if (collection === "ati_reports") return allow(["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],[],[]);
-  if (collection === "projects") return allow(projectReaders,["manager_operasional","admin_teknik"]);
+  if (collection === "projects") return allow([...projectReaders,"kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik"]); // ATI perlu nama proyek (baca saja)
   if (["cash_in","cash_out","receivables","payables"].includes(collection)) return allow(["finance","manager_operasional","admin_teknik"],["finance"]);
   if (collection === "project_budget") return allow(["finance","manager_operasional","koordinator_engineering","admin_teknik","estimator","qs","site_manager"],["finance","estimator","qs","manager_operasional","koordinator_engineering","admin_teknik"]);
   if (collection === "payment_requests") return allow(["finance","manager_operasional","admin_teknik","site_manager","qs","qc","procurement"],["finance","manager_operasional","admin_teknik","site_manager","qs","qc","procurement"],["finance","manager_operasional"]);
@@ -931,10 +931,17 @@ async function loadControlRows(env,user=null) {
   return rows;
 }
 
+// V3.4.18: kelompokkan data per proyek sekali (O(n)), bukan memfilter seluruh data untuk setiap proyek (O(proyek × n)).
+function groupRowsByProject(all) {
+  const groups=new Map();
+  for (const r of all) { const pid=recordProjectId(r.collection,r.id,r.data); if(!pid) continue; if(!groups.has(pid)) groups.set(pid,[]); groups.get(pid).push(r); }
+  return groups;
+}
 async function dashboardHandler(env,user=null) {
   const all = await loadControlRows(env,user);
   const projects = all.filter(r => r.collection === "projects");
-  const rows = projects.map(p => ({...computeProjectMetrics(p,all), evaluatedStatus:evaluateProject(p,all).status, progressSeries:progressSeriesFor(p.id,all,p.data)}));
+  const groups = groupRowsByProject(all);
+  const rows = projects.map(p => { const g=groups.get(String(p.id))||[]; return {...computeProjectMetrics(p,g), evaluatedStatus:evaluateProject(p,g).status, progressSeries:progressSeriesFor(p.id,g,p.data)}; });
   const sum = key => rows.reduce((s,r)=>s+num(r[key]),0);
   const financeVisible = canSeeFinanceModule(user);
   const totals = {
@@ -1138,20 +1145,20 @@ function workflowActiveStatus(status) { return ["OPEN","IN_PROGRESS"].includes(S
 function workflowSourceView(collection) {
   return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt"})[collection] || "dashboard";
 }
-async function projectRoleUser(env, projectId, roleKey) {
+async function projectRoleUser(env, projectId, roleKey, ctx=null) {
   if (!projectId) return "";
-  const p=await getRecord(env,"projects",String(projectId)); if(!p) return "";
+  const p=ctx?.projects ? ctx.projects.get(String(projectId)) : await getRecord(env,"projects",String(projectId)); if(!p) return "";
   if(["site_manager"].includes(roleKey)) return projectSiteManagerId(p.data);
   const map={qs:["qsUserId"],admin_teknik:["adminUserId"],estimator:["estimatorUserId"],drafter:["drafterUserId"],mep_engineer:["mepUserId"]};
   for(const k of (map[roleKey]||[])) if(p.data[k]) return String(p.data[k]);
   return "";
 }
-async function workflowTaskSpec(env, collection, id, d={}) {
+async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
   const status=String(d.status||"DRAFT").toUpperCase();
   const projectId=recordProjectId(collection,id,d);
   const base={projectId,sourceCollection:collection,sourceId:id,targetView:workflowSourceView(collection),priority:"NORMAL",dueDate:String(d.deadline||d.dueDate||d.neededDate||d.releaseDate||"")};
-  const sm=projectId?await projectRoleUser(env,projectId,"site_manager"):"";
-  const qs=projectId?await projectRoleUser(env,projectId,"qs"):"";
+  const sm=projectId?await projectRoleUser(env,projectId,"site_manager",ctx):"";
+  const qs=projectId?await projectRoleUser(env,projectId,"qs",ctx):"";
   const mk=(stage,title,waitingFor,actionLabel,assigneeUserId="",assigneeRole="",extra={})=>({...base,stage,title,waitingFor,actionLabel,assigneeUserId:String(assigneeUserId||""),assigneeRole:String(assigneeRole||""),assigneeRoleLabel:workflowRoleLabel(assigneeRole),...extra});
   if(collection==="daily_progress"||collection==="weekly_progress"){
     const label=collection==="daily_progress"?"Laporan Progress Harian":"Laporan Progress Mingguan";
@@ -1166,7 +1173,7 @@ async function workflowTaskSpec(env, collection, id, d={}) {
     return null;
   }
   if(collection==="as_built_progress"){
-    const drafter=projectId?await projectRoleUser(env,projectId,"drafter"):"";
+    const drafter=projectId?await projectRoleUser(env,projectId,"drafter",ctx):"";
     if(["NOT STARTED","IN PROGRESS","REVISION REQUIRED","DRAFT"].includes(status)) return mk("ASBUILT_DRAFTER","Progress As-Built", "Drafter memperbarui progres Arsitektur/Struktur/MEP dan file As-Built","Update As-Built",d.drafterUserId||drafter,"drafter");
     if(status==="READY FOR APPROVAL") return mk("ASBUILT_ENGINEERING","Review As-Built", "Head of Engineering memeriksa file final As-Built","Approve / Revisi","","koordinator_engineering",{priority:"HIGH"});
     return null;
@@ -1257,21 +1264,46 @@ async function cancelWorkflowTasks(env, collection, sourceId, actor=null) {
   const current=await activeWorkflowTasksForSource(env,collection,sourceId); const now=new Date().toISOString();
   for(const t of current) await upsertRecord(env,"workflow_tasks",t.id,{...t.data,status:"CANCELLED",completedAt:now,completedByUserId:actor?.id||""},actor||{id:"system",name:"Nara System Workflow",username:"system"});
 }
-async function backfillWorkflowTasks(env,user) {
-  const cols=[...WORKFLOW_SOURCE_COLLECTIONS]; const marks=cols.map(()=>'?').join(',');
-  const res=await env.DB.prepare(`SELECT collection,id,data_json FROM app_records WHERE collection IN (${marks}) ORDER BY updated_at DESC LIMIT 2500`).bind(...cols).all();
-  for(const r of (res.results||[])){
-    const d=safeJsonParse(r.data_json,{}); const pid=recordProjectId(r.collection,r.id,d);
-    if(pid && !(await userCanAccessProject(env,user,pid)) && !isTopRole(user) && !buildAccess(user).capabilities.workflowOversight) continue;
-    await syncWorkflowTask(env,r.collection,r.id,d,null);
+// V3.4.18 — Sinkronisasi Tugas Saya dibuat massal (3 query baca + batch tulis) dan dibatasi frekuensinya.
+// Setiap perubahan data sudah memanggil syncWorkflowTask secara langsung; backfill hanya jaring pengaman
+// untuk data lama/migrasi, sehingga tidak perlu berjalan setiap kali Tugas Saya dibuka.
+const WORKFLOW_BACKFILL_INTERVAL_MS = 10 * 60 * 1000;
+const WORKFLOW_BACKFILL_KEY = "workflow_backfill_at";
+async function backfillWorkflowTasks(env,user,{force=false}={}) {
+  const nowMs=Date.now(); const nowIso=new Date(nowMs).toISOString();
+  if(!force){
+    try{ const last=await env.DB.prepare(`SELECT value FROM schema_meta WHERE key=?`).bind(WORKFLOW_BACKFILL_KEY).first(); if(last && nowMs-Date.parse(last.value)<WORKFLOW_BACKFILL_INTERVAL_MS) return {skipped:true}; }catch(_){}
   }
+  try{ await env.DB.prepare(`INSERT INTO schema_meta(key,value,updated_at) VALUES(?,?,datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`).bind(WORKFLOW_BACKFILL_KEY,nowIso).run(); }catch(_){}
+  const cols=[...WORKFLOW_SOURCE_COLLECTIONS]; const marks=cols.map(()=>'?').join(',');
+  const [src,projects,tasks]=await Promise.all([
+    env.DB.prepare(`SELECT collection,id,data_json FROM app_records WHERE collection IN (${marks}) ORDER BY updated_at DESC LIMIT 10000`).bind(...cols).all(),
+    env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='projects'`).all(),
+    env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='workflow_tasks' AND upper(COALESCE(json_extract(data_json,'$.status'),'OPEN')) IN ('OPEN','IN_PROGRESS')`).all()
+  ]);
+  const ctx={projects:new Map((projects.results||[]).map(r=>[String(r.id),{id:r.id,data:safeJsonParse(r.data_json,{})}]))};
+  const active=new Map();
+  for(const r of (tasks.results||[])){ const d=safeJsonParse(r.data_json,{}); const k=`${d.sourceCollection}|${d.sourceId}`; if(!active.has(k)) active.set(k,[]); active.get(k).push({id:r.id,data:d}); }
+  const stmts=[]; const actor="Nara System Workflow";
+  const put=(id,data)=>stmts.push(env.DB.prepare(`INSERT INTO app_records(collection,id,data_json,updated_at) VALUES('workflow_tasks',?,?,?) ON CONFLICT(collection,id) DO UPDATE SET data_json=excluded.data_json, updated_at=excluded.updated_at`).bind(id,JSON.stringify(data),nowIso));
+  for(const r of (src.results||[])){
+    const d=safeJsonParse(r.data_json,{}); const current=active.get(`${r.collection}|${r.id}`)||[];
+    const spec=await workflowTaskSpec(env,r.collection,r.id,d,ctx);
+    const same=spec?current.find(t=>t.data.stage===spec.stage && String(t.data.assigneeUserId||"")===String(spec.assigneeUserId||"") && String(t.data.assigneeRole||"")===String(spec.assigneeRole||"")):null;
+    if(same || (!spec && !current.length)) continue;
+    for(const t of current) put(t.id,{...t.data,status:"DONE",completedAt:nowIso,completedByUserId:"",completedByName:actor,completionNote:`Tahap berpindah dari ${t.data.stage||""}`,updatedAt:nowIso,updatedBy:actor});
+    if(spec) put(crypto.randomUUID(),{...spec,status:"OPEN",fromUserId:"",fromUserName:"Nara System",assignedAt:nowIso,startedAt:"",createdAt:nowIso,createdBy:actor,updatedAt:nowIso,updatedBy:actor});
+  }
+  for(let k=0;k<stmts.length;k+=100) await env.DB.batch(stmts.slice(k,k+100));
+  return {written:stmts.length};
 }
+
 function taskVisibleToUser(task,user) {
   const d=task.data||{}; const role=normalizeRole(user);
   return String(d.assigneeUserId||"")===String(user.id||"") || (!d.assigneeUserId && String(d.assigneeRole||"")===role);
 }
 async function listWorkflowTasks(env,user,url) {
-  await backfillWorkflowTasks(env,user);
+  await backfillWorkflowTasks(env,user,{force:truthy(url.searchParams.get('resync'))});
   const scope=String(url.searchParams.get('scope')||'mine').toLowerCase(); const includeDone=truthy(url.searchParams.get('includeDone')); const projectId=String(url.searchParams.get('projectId')||'');
   if(projectId && !(await userCanAccessProject(env,user,projectId))) return [];
   const res=await env.DB.prepare(`SELECT id,data_json,updated_at FROM app_records WHERE collection='workflow_tasks' ORDER BY CASE upper(json_extract(data_json,'$.priority')) WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 ELSE 2 END, COALESCE(json_extract(data_json,'$.dueDate'),'9999-12-31'), updated_at DESC LIMIT 2000`).all();
@@ -1284,6 +1316,14 @@ async function listWorkflowTasks(env,user,url) {
   else rows=rows.filter(r=>taskVisibleToUser(r,user));
   if(isProjectScopedRole(user)){ const ids=await accessibleProjectIds(env,user); rows=rows.filter(r=>!r.data.projectId||ids.has(String(r.data.projectId))); }
   return rows;
+}
+// V3.4.18 — Hitung badge Tugas Saya dengan satu query ringan (tanpa sinkronisasi).
+async function countMyWorkflowTasks(env,user) {
+  const role=normalizeRole(user);
+  const res=await env.DB.prepare(`SELECT json_extract(data_json,'$.projectId') AS projectId FROM app_records WHERE collection='workflow_tasks' AND upper(COALESCE(json_extract(data_json,'$.status'),'OPEN')) IN ('OPEN','IN_PROGRESS') AND (COALESCE(json_extract(data_json,'$.assigneeUserId'),'')=? OR (COALESCE(json_extract(data_json,'$.assigneeUserId'),'')='' AND COALESCE(json_extract(data_json,'$.assigneeRole'),'')=?))`).bind(String(user.id||""),role).all();
+  let rows=res.results||[];
+  if(isProjectScopedRole(user)){ const ids=await accessibleProjectIds(env,user); rows=rows.filter(r=>!r.projectId||ids.has(String(r.projectId))); }
+  return rows.length;
 }
 async function taskActionHandler(request,env,user,id){
   const task=await getRecord(env,'workflow_tasks',id); if(!task) return json({ok:false,message:'Tugas tidak ditemukan.'},404);
@@ -1593,10 +1633,11 @@ async function qcSessionListHandler(env,user,url) {
   const projectId=String(url.searchParams.get("projectId")||"").trim();
   const q=await env.DB.prepare(`SELECT id,data_json,updated_at FROM app_records WHERE collection='qc_inspection_sessions' ORDER BY COALESCE(json_extract(data_json,'$.startDate'),updated_at) DESC`).all();
   const rows=[];
+  const scopeIds=isProjectScopedRole(user)?await accessibleProjectIds(env,user):null; // satu query, bukan per baris
   for (const r of (q.results||[])) {
     const data=safeJsonParse(r.data_json,{});
     if (projectId && String(data.projectId||"")!==projectId) continue;
-    if (!(await recordAllowedByProjectScope(env,user,"qc_inspection_sessions",r.id,data))) continue;
+    if (scopeIds && !scopeIds.has(String(data.projectId||""))) continue;
     rows.push({id:r.id,data,updated_at:r.updated_at});
   }
   return json({ok:true,rows});
@@ -2075,7 +2116,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.17"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.18"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2343,7 +2384,7 @@ export default {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.17-site-manager"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.18-performance"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -2375,6 +2416,7 @@ export default {
     if (reportManageMatch && request.method === "PATCH") return updateDivisionReport(request,env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));
     if (reportManageMatch && request.method === "DELETE") return deleteDivisionReport(env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));
 
+    if (path === "/api/tasks/count" && request.method === "GET") return json({ok:true,count:await countMyWorkflowTasks(env,auth.user)});
     if (path === "/api/tasks/my" && request.method === "GET") return json({ok:true,rows:await listWorkflowTasks(env,auth.user,url)});
     const taskProjectMatch=path.match(/^\/api\/tasks\/project\/([^/]+)$/);
     if(taskProjectMatch && request.method==="GET"){const pid=decodeURIComponent(taskProjectMatch[1]);const denied=await requireProjectAccess(env,auth.user,pid);if(denied)return denied;const u=new URL(request.url);u.searchParams.set('scope','project');u.searchParams.set('projectId',pid);if(!u.searchParams.has('includeDone'))u.searchParams.set('includeDone','true');return json({ok:true,rows:await listWorkflowTasks(env,auth.user,u)});}

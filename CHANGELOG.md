@@ -1,3 +1,11 @@
+## V3.4.18 — Performa & Stabilitas
+
+- Tugas Saya: backfill massal + throttle 10 menit; endpoint `/api/tasks/count`; badge non-blocking.
+- Dashboard O(n) via `groupRowsByProject`; daftar sesi QC tanpa N+1.
+- Frontend: `loadCollection` aman terhadap hak baca + dedupe request; batas render 200 baris; asset berversi.
+- Bug: tugas lama hilang karena limit 2500; Progress error untuk QC; ATI error untuk Site Manager; menu Dokumen ATI; "undefined" di log ATI.
+- Tes baru `scripts/performance-smoke.mjs`. Tidak ada migration baru.
+
 ## V3.4.17 — Site Manager & Divisi Operational
 
 - Role `project_manager` dan `pelaksana_lapangan` dilebur menjadi `site_manager` (label **Site Manager**), langsung di bawah Head of Operational.

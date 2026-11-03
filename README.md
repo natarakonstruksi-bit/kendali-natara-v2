@@ -1,3 +1,31 @@
+# Nara System V3.4.18 — Performa & Stabilitas
+
+Diuji dengan data simulasi ±12.000 record (30 proyek, 27 akun, 18 jabatan) pada Wrangler lokal.
+
+| Bagian | Sebelum | Sesudah |
+|---|---|---|
+| Buka **Tugas Saya** | 7–21 detik | 0,03–0,4 detik |
+| Badge Tugas Saya (dipanggil setiap pindah menu) | 7–21 detik, **menahan** perpindahan menu | 0,01 detik, tidak menahan menu |
+| Dashboard | 0,20 detik | 0,05–0,14 detik (hasil identik) |
+| Halaman Progress (pimpinan, semua proyek) | 1,0–1,4 detik | 0,3–0,4 detik |
+| Daftar sesi QC (Site Manager) | N+1 query | 1 query |
+
+Perubahan:
+- **Tugas Saya**: sinkronisasi tugas dibuat massal (3 query baca + batch tulis) dan hanya berjalan maksimal tiap 10 menit sebagai jaring pengaman; setiap perubahan data tetap menyinkronkan tugas secara langsung. Tambah `?resync=1` untuk memaksa sinkron.
+- **Endpoint baru `/api/tasks/count`** untuk badge (satu query); badge diperbarui di latar belakang dengan debounce.
+- **Dashboard**: data dikelompokkan per proyek sekali (O(n)), bukan difilter ulang untuk setiap proyek.
+- **Frontend**: koleksi yang tidak boleh dibaca role aktif tidak lagi membuat halaman error; request identik yang bersamaan digabung; tabel besar dibatasi 200 baris terbaru saat melihat semua proyek (pilih satu proyek untuk melihat semuanya).
+- Asset `app.js`/`styles.css` diberi versi agar browser langsung memakai file terbaru setelah deploy.
+
+Bug yang diperbaiki:
+- Tugas Saya hanya membaca 2.500 data terbaru — PR, pengajuan dana, issue, dan temuan lama **tidak pernah muncul** di Tugas Saya bila data laporan sudah banyak (di simulasi: 503 tugas hilang). Sekarang semua muncul.
+- Halaman **Progress** error untuk role QC (tidak berhak membaca data tukang).
+- Halaman **ATI** error untuk Site Manager (data pelatihan/evaluasi).
+- Menu **Dokumen** tampil untuk Kepala/Instruktur ATI padahal aksesnya ditolak; nama proyek di halaman ATI tidak terbaca → ATI kini dapat membaca daftar proyek (baca saja) dan menu Dokumen disembunyikan.
+- Log kehadiran ATI menampilkan "undefined" bila status kehadiran kosong.
+
+Tidak ada migration baru.
+
 # Nara System V3.4.17 — Restrukturisasi Operational: Site Manager
 
 Struktur operasional proyek disederhanakan:
