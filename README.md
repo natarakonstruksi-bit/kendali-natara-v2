@@ -1,3 +1,17 @@
+# Nara System V3.4.19 — Notifikasi Email Tugas
+
+Setiap tugas baru yang masuk ke **Tugas Saya** seseorang kini juga dikirim ke **email** orang tersebut (atau ke semua karyawan dengan jabatan antrean, mis. Head of Operational / Finance). Email berisi nama tugas, proyek, apa yang perlu dilakukan, prioritas, deadline, pengirim, dan tombol **Buka Tugas Saya**.
+
+- Email disimpan di outbox lalu dikirim di latar belakang → aksi di aplikasi tetap cepat.
+- Gagal kirim dicoba ulang otomatis (Cron 5 menit, maks. 5 kali); bisa juga *Kirim Ulang yang Gagal* manual.
+- Pilihan pengiriman: **Google Apps Script (Gmail Natara, tanpa domain)**, **Brevo**, atau **Resend**.
+- Per karyawan: kolom Email + opsi *Kirim notifikasi tugas baru ke email*.
+- Panel **Karyawan & Akses → Notifikasi Email Tugas**: status konfigurasi, jumlah terkirim/gagal, log 40 email terakhir, daftar karyawan tanpa email, tombol *Kirim Email Uji*.
+- Tidak ada email untuk tugas yang dibuat oleh diri sendiri, akun nonaktif, atau karyawan yang mematikan opsi.
+
+**Aktivasi:** ikuti `EMAIL-SETUP.md` (±10 menit). Sebelum diaktifkan sistem tetap jalan normal.
+Tidak ada migration baru. File baru: `email-relay/Code.gs`, `EMAIL-SETUP.md`, `scripts/email-notification-smoke.mjs`.
+
 # Nara System V3.4.18 — Performa & Stabilitas
 
 Diuji dengan data simulasi ±12.000 record (30 proyek, 27 akun, 18 jabatan) pada Wrangler lokal.

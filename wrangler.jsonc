@@ -26,6 +26,16 @@
       "migrations_dir": "migrations"
     }
   ],
+  // V3.4.19 — Cron untuk kirim ulang email notifikasi yang gagal/tertahan (setiap 5 menit).
+  "triggers": { "crons": ["*/5 * * * *"] },
+  // Konfigurasi notifikasi email (non-rahasia). Rahasia diisi lewat: npx wrangler secret put EMAIL_GAS_SECRET / EMAIL_API_KEY
+  "vars": {
+    "EMAIL_PROVIDER": "",
+    "EMAIL_GAS_URL": "",
+    "EMAIL_FROM": "",
+    "EMAIL_FROM_NAME": "Nara System — Natara Konstruksi",
+    "APP_BASE_URL": "https://kendali-natara-v2.natarakonstruksi.workers.dev"
+  },
   "r2_buckets": [
     {
       "binding": "FILES",

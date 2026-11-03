@@ -1,3 +1,11 @@
+## V3.4.19 — Notifikasi Email Tugas
+
+- Outbox `email_outbox` + pengiriman latar belakang (`ctx.waitUntil`) + Cron `*/5 * * * *` untuk retry (maks 5).
+- Provider: `gas` (Apps Script relay Gmail), `brevo`, `resend` via vars/secrets.
+- Endpoint: `GET /api/notifications/email`, `POST /api/notifications/email/test`, `POST /api/notifications/email/retry` (pimpinan).
+- Karyawan: opsi `emailNotifications`; deep link `/?view=tasks`.
+- Tidak ada migration baru.
+
 ## V3.4.18 — Performa & Stabilitas
 
 - Tugas Saya: backfill massal + throttle 10 menit; endpoint `/api/tasks/count`; badge non-blocking.

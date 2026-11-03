@@ -27,3 +27,10 @@ npx wrangler deploy
 9. Regression check internal: Dashboard, Tugas Saya, QC, PR/Vendor, QS/Volume, As-Built, CCO, ATI tetap dapat dibuka.
 
 Catatan: migration memakai `json_patch`, sehingga field kontak/alamat existing pada `public_site_settings/main` dipertahankan.
+
+
+## V3.4.19 — Notifikasi email
+1. Isi email karyawan di Karyawan & Akses.
+2. Ikuti `EMAIL-SETUP.md` (pilih Apps Script / Brevo / Resend), isi `vars` di `wrangler.jsonc` dan `npx wrangler secret put ...`.
+3. `npm run deploy` (Cron 5 menit ikut terpasang).
+4. Karyawan & Akses → **Kirim Email Uji**.

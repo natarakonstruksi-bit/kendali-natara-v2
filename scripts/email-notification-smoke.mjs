@@ -1,0 +1,30 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const root=path.resolve(import.meta.dirname,'..');
+const worker=fs.readFileSync(path.join(root,'src/worker.js'),'utf8');
+const app=fs.readFileSync(path.join(root,'public/app.js'),'utf8');
+const cfgText=fs.readFileSync(path.join(root,'wrangler.jsonc'),'utf8');
+const must=(c,m)=>{if(!c)throw new Error(m)};
+const tmp=path.join(os.tmpdir(),`nara-email-${process.pid}.mjs`);
+fs.writeFileSync(tmp,worker+'\nexport { emailConfig, taskEmailContent, validEmail, userWantsEmail, sendEmailViaProvider };\n');
+try{
+  const m=await import(pathToFileURL(tmp).href+'?v=3419');
+  must(!m.emailConfig({}).ready,'Tanpa konfigurasi, email harus nonaktif (aplikasi tetap jalan)');
+  must(m.emailConfig({EMAIL_PROVIDER:'gas',EMAIL_GAS_URL:'https://x',EMAIL_GAS_SECRET:'s'}).ready,'Konfigurasi Apps Script lengkap harus siap');
+  must(!m.emailConfig({EMAIL_PROVIDER:'brevo',EMAIL_API_KEY:'k'}).ready,'Brevo tanpa EMAIL_FROM harus belum siap');
+  must(m.emailConfig({EMAIL_PROVIDER:'resend',EMAIL_API_KEY:'k',EMAIL_FROM:'a@b.co'}).ready,'Resend lengkap harus siap');
+  must(m.validEmail('a@natara.co.id')&&!m.validEmail('bukan-email')&&!m.validEmail(''),'Validasi email salah');
+  must(m.userWantsEmail({})&&!m.userWantsEmail({emailNotifications:false})&&!m.userWantsEmail({emailNotifications:'false'}),'Opsi notifikasi per karyawan salah');
+  const c=m.taskEmailContent({title:'Review <Laporan>',waitingFor:'x',priority:'HIGH',fromUserName:'Budi'},{data:{name:'Ani'}},'Proyek A','https://app.test');
+  must(c.subject.includes('[HIGH]')&&c.subject.includes('Proyek A'),'Subjek email kurang informatif');
+  must(c.html.includes('Review &lt;Laporan&gt;')&&!c.html.includes('<Laporan>'),'Isi email wajib di-escape');
+  must(c.html.includes('https://app.test/?view=tasks'),'Tombol Buka Tugas Saya hilang');
+  let threw=false;try{await m.sendEmailViaProvider({provider:''},{})}catch{threw=true} must(threw,'Provider kosong harus ditolak');
+  for(const mk of ['enqueueTaskEmails(env,taskId,payload,actor)','actor.id!=="system"','ctx.waitUntil(job)','async scheduled(event, env, ctx)','json_extract(data_json,\'$.status\')=\'PENDING\'`).bind(new Date().toISOString(),EMAIL_OUTBOX,r.id)','"/api/notifications/email/test"','EMAIL_MAX_ATTEMPTS']) must(worker.includes(mk),`Backend marker hilang: ${mk}`);
+  must(cfgText.includes('"crons": ["*/5 * * * *"]'),'Cron retry email belum ada di wrangler.jsonc');
+  for(const mk of ['name="emailNotifications"','emailNotifications:form.elements.emailNotifications.checked','renderEmailNotificationCard','/api/notifications/email/test',"get('view')"]) must(app.includes(mk),`Frontend marker hilang: ${mk}`);
+  must(fs.existsSync(path.join(root,'email-relay/Code.gs'))&&fs.existsSync(path.join(root,'EMAIL-SETUP.md')),'Relay Apps Script / panduan hilang');
+  console.log('Email notification smoke OK — outbox + background send, gas/brevo/resend, per-user opt-out, cron retry, admin panel, deep link.');
+} finally { try{fs.unlinkSync(tmp)}catch{} }

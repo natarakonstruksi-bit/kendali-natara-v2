@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.18 — Performance & Stability
+ * Nara System V3.4.19 — Email Notifikasi Tugas
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.18";
+const APP_VERSION = "APP-V3.4.19";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -1258,7 +1258,10 @@ async function syncWorkflowTask(env, collection, sourceId, sourceData, actor=nul
   }
   if(!spec) return;
   const payload={...spec,status:"OPEN",fromUserId:actor?.id||"",fromUserName:actor?.name||actor?.username||"Nara System",assignedAt:now,startedAt:""};
-  await upsertRecord(env,"workflow_tasks",crypto.randomUUID(),payload,actor||{id:"system",name:"Nara System Workflow",username:"system"});
+  const taskId=crypto.randomUUID();
+  await upsertRecord(env,"workflow_tasks",taskId,payload,actor||{id:"system",name:"Nara System Workflow",username:"system"});
+  // V3.4.19: tugas baru hasil tindakan pengguna → email ke penerima (backfill sistem tidak mengirim email).
+  if(actor && actor.id && actor.id!=="system") { try { await enqueueTaskEmails(env,taskId,payload,actor); } catch(e) { console.log("enqueueTaskEmails",e?.message||e); } }
 }
 async function cancelWorkflowTasks(env, collection, sourceId, actor=null) {
   const current=await activeWorkflowTasksForSource(env,collection,sourceId); const now=new Date().toISOString();
@@ -2116,7 +2119,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.18"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.19"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2378,13 +2381,194 @@ async function serveAssets(request, env) {
   return env.ASSETS.fetch(indexReq);
 }
 
+
+/* ============================================================================
+ * V3.4.19 — NOTIFIKASI EMAIL TUGAS
+ * Setiap tugas baru (Tugas Saya) yang terbentuk dari tindakan pengguna dikirim
+ * ke email penerima. Email disimpan dulu di outbox (collection email_outbox),
+ * lalu dikirim di latar belakang (ctx.waitUntil) sehingga tidak memperlambat
+ * aplikasi. Gagal kirim dicoba ulang otomatis oleh Cron setiap 5 menit.
+ *
+ * Konfigurasi (wrangler vars / secrets):
+ *   EMAIL_PROVIDER   = "gas" | "brevo" | "resend"   (kosong = notifikasi nonaktif)
+ *   EMAIL_GAS_URL    = URL Web App Google Apps Script (provider gas)
+ *   EMAIL_GAS_SECRET = kunci rahasia bersama Apps Script (secret)
+ *   EMAIL_API_KEY    = API key Brevo / Resend (secret)
+ *   EMAIL_FROM       = alamat pengirim terverifikasi (brevo/resend)
+ *   EMAIL_FROM_NAME  = nama pengirim
+ *   APP_BASE_URL     = alamat aplikasi untuk tombol "Buka Tugas Saya"
+ * ==========================================================================*/
+const EMAIL_OUTBOX = "email_outbox";
+const EMAIL_MAX_ATTEMPTS = 5;
+const EMAIL_FLUSH_BATCH = 25;
+let EMAIL_PENDING_FLUSH = false;
+let REQUEST_ORIGIN = "";
+
+function emailConfig(env) {
+  const provider=String(env.EMAIL_PROVIDER||"").trim().toLowerCase();
+  const cfg={provider,fromName:String(env.EMAIL_FROM_NAME||"Nara System — Natara Konstruksi"),from:String(env.EMAIL_FROM||"").trim(),apiKey:String(env.EMAIL_API_KEY||""),gasUrl:String(env.EMAIL_GAS_URL||"").trim(),gasSecret:String(env.EMAIL_GAS_SECRET||""),baseUrl:String(env.APP_BASE_URL||REQUEST_ORIGIN||"").replace(/\/+$/,"")};
+  let ready=false,missing=[];
+  if(provider==="gas"){ if(!cfg.gasUrl) missing.push("EMAIL_GAS_URL"); if(!cfg.gasSecret) missing.push("EMAIL_GAS_SECRET"); }
+  else if(provider==="brevo"||provider==="resend"){ if(!cfg.apiKey) missing.push("EMAIL_API_KEY"); if(!cfg.from) missing.push("EMAIL_FROM"); }
+  else if(provider) missing.push("EMAIL_PROVIDER tidak dikenal (gas/brevo/resend)");
+  else missing.push("EMAIL_PROVIDER");
+  ready=missing.length===0;
+  return {...cfg,ready,missing};
+}
+function validEmail(v){ return /^[^\s@<>()]+@[^\s@<>()]+\.[^\s@<>()]{2,}$/.test(String(v||"").trim()); }
+function userWantsEmail(d){ const v=d?.emailNotifications; return !(v===false || String(v).toLowerCase()==="false" || String(v)==="0"); }
+function userActive(d){ return !["nonaktif","inactive","disabled"].includes(String(d?.status||"").toLowerCase()); }
+
+async function taskEmailRecipients(env,task,actor) {
+  const res=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='users'`).all();
+  const users=(res.results||[]).map(r=>({id:String(r.id),data:safeJsonParse(r.data_json,{})}));
+  let targets=[];
+  if(task.assigneeUserId) targets=users.filter(u=>u.id===String(task.assigneeUserId));
+  else if(task.assigneeRole) {
+    targets=users.filter(u=>normalizeRole(u.data)===task.assigneeRole);
+    // Antrean role yang terikat proyek (mis. Site Manager) hanya ke yang ditugaskan di proyek tsb.
+    if(task.projectId && isProjectScopedRole({role:task.assigneeRole})){
+      const p=await getRecord(env,"projects",String(task.projectId));
+      targets=targets.filter(u=>p && projectAssignedToUser(p.data,{...u.data,id:u.id,username:u.data.username,role:task.assigneeRole}));
+    }
+  }
+  return targets.filter(u=>u.id!==String(actor?.id||"") && userActive(u.data) && userWantsEmail(u.data) && validEmail(u.data.email));
+}
+
+function taskEmailContent(task,recipient,projectNameText,baseUrl) {
+  const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const prio=String(task.priority||"NORMAL").toUpperCase();
+  const prioColor={CRITICAL:"#b42318",HIGH:"#c4320a"}[prio]||"#475467";
+  const link=baseUrl?`${baseUrl}/?view=tasks`:"";
+  const deadline=task.dueDate?new Date(task.dueDate).toLocaleDateString("id-ID",{day:"2-digit",month:"long",year:"numeric",timeZone:"Asia/Makassar"}):"-";
+  const subject=`[Nara System] ${prio!=="NORMAL"?`[${prio}] `:""}${task.title||"Tugas baru"}${projectNameText?` — ${projectNameText}`:""}`;
+  const rows=[["Tugas",task.title],["Proyek",projectNameText||"-"],["Yang perlu dilakukan",task.waitingFor],["Tindakan",task.actionLabel],["Prioritas",prio],["Deadline",deadline],["Dari",task.fromUserName||"Nara System"]];
+  const html=`<!doctype html><html><body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;color:#101828">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;padding:24px 12px"><tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden">
+<tr><td style="background:#101828;padding:18px 24px;color:#ffffff"><div style="font-size:11px;letter-spacing:2px;color:#f97316;font-weight:bold">NARA SYSTEM · NATARA KONSTRUKSI</div><div style="font-size:18px;font-weight:bold;margin-top:6px">Tugas baru untuk Anda</div></td></tr>
+<tr><td style="padding:20px 24px 8px;font-size:14px;line-height:1.5">Halo <b>${esc(recipient.data.name||recipient.data.username||"")}</b>,<br>ada tugas yang menunggu tindakan Anda di Nara System.</td></tr>
+<tr><td style="padding:8px 24px"><table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;border-collapse:collapse">
+${rows.map(([k,v])=>`<tr><td style="padding:8px 0;border-bottom:1px solid #f2f4f7;color:#667085;width:42%;vertical-align:top">${esc(k)}</td><td style="padding:8px 0;border-bottom:1px solid #f2f4f7;font-weight:bold;${k==="Prioritas"?`color:${prioColor}`:""}">${esc(v||"-")}</td></tr>`).join("")}
+</table></td></tr>
+${link?`<tr><td style="padding:18px 24px 6px"><a href="${esc(link)}" style="display:inline-block;background:#f97316;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:11px 18px;border-radius:8px">Buka Tugas Saya</a></td></tr>`:""}
+<tr><td style="padding:14px 24px 22px;font-size:11px;color:#98a2b3;line-height:1.5">Email ini dikirim otomatis oleh Nara System. Selesaikan tugas melalui tombol workflow di aplikasi agar tahap berikutnya otomatis diteruskan.</td></tr>
+</table></td></tr></table></body></html>`;
+  const text=`Tugas baru untuk Anda — Nara System\n\n${rows.map(([k,v])=>`${k}: ${v||"-"}`).join("\n")}\n${link?`\nBuka Tugas Saya: ${link}\n`:""}`;
+  return {subject,html,text};
+}
+
+async function enqueueTaskEmails(env,taskId,task,actor) {
+  const recipients=await taskEmailRecipients(env,task,actor);
+  if(!recipients.length) return 0;
+  let projectNameText="";
+  if(task.projectId){ const p=await getRecord(env,"projects",String(task.projectId)); projectNameText=String(p?.data?.name||p?.data?.projectName||p?.data?.namaProyek||""); }
+  const cfg=emailConfig(env); const now=new Date().toISOString();
+  for(const r of recipients){
+    const c=taskEmailContent(task,r,projectNameText,cfg.baseUrl);
+    const id=`MAIL-${taskId}-${r.id}`.slice(0,120);
+    await env.DB.prepare(`INSERT INTO app_records(collection,id,data_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(collection,id) DO NOTHING`).bind(EMAIL_OUTBOX,id,JSON.stringify({
+      kind:"TASK",taskId,projectId:task.projectId||"",stage:task.stage||"",userId:r.id,to:String(r.data.email).trim(),toName:r.data.name||r.data.username||"",
+      subject:c.subject,html:c.html,text:c.text,status:cfg.ready?"PENDING":"NOT_CONFIGURED",attempts:0,createdAt:now,createdBy:actor?.name||actor?.username||""
+    }),now).run();
+  }
+  if(cfg.ready) EMAIL_PENDING_FLUSH=true;
+  return recipients.length;
+}
+
+async function sendEmailViaProvider(cfg,mail) {
+  let res;
+  if(cfg.provider==="gas"){
+    res=await fetch(cfg.gasUrl,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({secret:cfg.gasSecret,to:mail.to,toName:mail.toName,subject:mail.subject,html:mail.html,text:mail.text,fromName:cfg.fromName}),redirect:"follow"});
+    const body=await res.text(); let out=null; try{out=JSON.parse(body);}catch(_){}
+    if(!res.ok || !out || out.ok!==true) throw new Error(`Apps Script: ${out?.message||body.slice(0,180)||res.status}`);
+    return out.id||"gas";
+  }
+  if(cfg.provider==="brevo"){
+    res=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"content-type":"application/json","accept":"application/json","api-key":cfg.apiKey},body:JSON.stringify({sender:{name:cfg.fromName,email:cfg.from},to:[{email:mail.to,name:mail.toName||mail.to}],subject:mail.subject,htmlContent:mail.html,textContent:mail.text})});
+    const out=await res.json().catch(()=>({})); if(!res.ok) throw new Error(`Brevo ${res.status}: ${out.message||out.code||""}`); return out.messageId||"brevo";
+  }
+  if(cfg.provider==="resend"){
+    res=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"content-type":"application/json","authorization":`Bearer ${cfg.apiKey}`},body:JSON.stringify({from:`${cfg.fromName} <${cfg.from}>`,to:[mail.to],subject:mail.subject,html:mail.html,text:mail.text})});
+    const out=await res.json().catch(()=>({})); if(!res.ok) throw new Error(`Resend ${res.status}: ${out.message||out.name||""}`); return out.id||"resend";
+  }
+  throw new Error("Provider email belum dikonfigurasi.");
+}
+
+async function flushEmailOutbox(env,{retry=false,limit=EMAIL_FLUSH_BATCH}={}) {
+  const cfg=emailConfig(env); if(!cfg.ready) return {sent:0,failed:0,skipped:"not-configured"};
+  const nowIso=new Date().toISOString();
+  if(retry){
+    // pulihkan yang macet di SENDING > 10 menit, dan antrekan ulang yang gagal (maks EMAIL_MAX_ATTEMPTS)
+    await env.DB.prepare(`UPDATE app_records SET data_json=json_set(data_json,'$.status','PENDING'), updated_at=? WHERE collection=? AND json_extract(data_json,'$.status')='SENDING' AND updated_at < ?`).bind(nowIso,EMAIL_OUTBOX,new Date(Date.now()-10*60000).toISOString()).run();
+    await env.DB.prepare(`UPDATE app_records SET data_json=json_set(data_json,'$.status','PENDING'), updated_at=? WHERE collection=? AND json_extract(data_json,'$.status') IN ('FAILED','NOT_CONFIGURED') AND COALESCE(json_extract(data_json,'$.attempts'),0) < ?`).bind(nowIso,EMAIL_OUTBOX,EMAIL_MAX_ATTEMPTS).run();
+  }
+  const q=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection=? AND json_extract(data_json,'$.status')='PENDING' ORDER BY updated_at ASC LIMIT ?`).bind(EMAIL_OUTBOX,limit).all();
+  let sent=0,failed=0;
+  for(const r of (q.results||[])){
+    const claim=await env.DB.prepare(`UPDATE app_records SET data_json=json_set(data_json,'$.status','SENDING'), updated_at=? WHERE collection=? AND id=? AND json_extract(data_json,'$.status')='PENDING'`).bind(new Date().toISOString(),EMAIL_OUTBOX,r.id).run();
+    if(!(claim?.meta?.changes>0)) continue; // sudah diambil proses lain → hindari email ganda
+    const d=safeJsonParse(r.data_json,{}); const attempts=num(d.attempts)+1;
+    try{
+      const providerId=await sendEmailViaProvider(cfg,d);
+      await env.DB.prepare(`UPDATE app_records SET data_json=json_set(data_json,'$.status','SENT','$.attempts',?,'$.sentAt',?,'$.providerId',?,'$.provider',?,'$.lastError',''), updated_at=? WHERE collection=? AND id=?`).bind(attempts,new Date().toISOString(),String(providerId),cfg.provider,new Date().toISOString(),EMAIL_OUTBOX,r.id).run();
+      sent++;
+    }catch(e){
+      await env.DB.prepare(`UPDATE app_records SET data_json=json_set(data_json,'$.status','FAILED','$.attempts',?,'$.lastError',?,'$.provider',?), updated_at=? WHERE collection=? AND id=?`).bind(attempts,String(e?.message||e).slice(0,400),cfg.provider,new Date().toISOString(),EMAIL_OUTBOX,r.id).run();
+      failed++;
+    }
+  }
+  return {sent,failed};
+}
+
+async function emailStatusHandler(env,user) {
+  if(!isTopRole(user)) return json({ok:false,message:"Hanya Administrator/Direktur/Head Unit Bisnis."},403);
+  const cfg=emailConfig(env);
+  const counts=await env.DB.prepare(`SELECT json_extract(data_json,'$.status') AS status, count(*) AS n FROM app_records WHERE collection=? GROUP BY 1`).bind(EMAIL_OUTBOX).all();
+  const recent=await env.DB.prepare(`SELECT id,data_json,updated_at FROM app_records WHERE collection=? ORDER BY updated_at DESC LIMIT 40`).bind(EMAIL_OUTBOX).all();
+  const users=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='users'`).all();
+  const noEmail=(users.results||[]).map(r=>({id:r.id,d:safeJsonParse(r.data_json,{})})).filter(u=>userActive(u.d)&&!validEmail(u.d.email)).map(u=>u.d.name||u.d.username||u.id);
+  return json({ok:true,config:{provider:cfg.provider||"",ready:cfg.ready,missing:cfg.missing,from:cfg.provider==="gas"?"Akun Google pemilik Apps Script":cfg.from,fromName:cfg.fromName,baseUrl:cfg.baseUrl},
+    counts:Object.fromEntries((counts.results||[]).map(r=>[r.status||"-",r.n])),usersWithoutEmail:noEmail,
+    recent:(recent.results||[]).map(r=>{const d=safeJsonParse(r.data_json,{});return {id:r.id,to:d.to,toName:d.toName,subject:d.subject,status:d.status,attempts:d.attempts||0,lastError:d.lastError||"",createdAt:d.createdAt,sentAt:d.sentAt||"",updated_at:r.updated_at};})});
+}
+async function emailTestHandler(request,env,user) {
+  if(!isTopRole(user)) return json({ok:false,message:"Hanya Administrator/Direktur/Head Unit Bisnis."},403);
+  const cfg=emailConfig(env); if(!cfg.ready) return json({ok:false,message:`Notifikasi email belum dikonfigurasi: ${cfg.missing.join(", ")}`},400);
+  const body=await parseJson(request)||{}; const to=String(body.to||user.email||"").trim();
+  if(!validEmail(to)) return json({ok:false,message:"Alamat email tujuan tidak valid."},400);
+  const task={title:"Email uji Nara System",waitingFor:"Jika email ini sampai, notifikasi Tugas Saya sudah berfungsi.",actionLabel:"Tidak perlu tindakan",priority:"NORMAL",fromUserName:user.name||user.username};
+  const c=taskEmailContent(task,{data:{name:user.name||user.username}},"",cfg.baseUrl);
+  try{ const id=await sendEmailViaProvider(cfg,{to,toName:"",subject:c.subject,html:c.html,text:c.text}); await audit(env,user,"EMAIL_TEST",EMAIL_OUTBOX,"","",{to,provider:cfg.provider}); return json({ok:true,message:`Email uji terkirim ke ${to} via ${cfg.provider}.`,providerId:id}); }
+  catch(e){ return json({ok:false,message:`Gagal kirim: ${e?.message||e}`},502); }
+}
+async function emailRetryHandler(env,user) {
+  if(!isTopRole(user)) return json({ok:false,message:"Hanya Administrator/Direktur/Head Unit Bisnis."},403);
+  const nowIso=new Date().toISOString();
+  await env.DB.prepare(`UPDATE app_records SET data_json=json_set(data_json,'$.status','PENDING','$.attempts',0), updated_at=? WHERE collection=? AND json_extract(data_json,'$.status') IN ('FAILED','NOT_CONFIGURED')`).bind(nowIso,EMAIL_OUTBOX).run();
+  const r=await flushEmailOutbox(env,{limit:50});
+  return json({ok:true,...r});
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
+    REQUEST_ORIGIN = new URL(request.url).origin;
+    const response = await handleRequest(request, env);
+    if (EMAIL_PENDING_FLUSH) { EMAIL_PENDING_FLUSH=false; const job=flushEmailOutbox(env).catch(e=>console.log("flushEmailOutbox",e?.message||e)); if (ctx?.waitUntil) ctx.waitUntil(job); else await job; }
+    return response;
+  },
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(flushEmailOutbox(env,{retry:true,limit:100}).catch(e=>console.log("scheduled email",e?.message||e)));
+  }
+};
+
+async function handleRequest(request, env) {
+  {
     const url = new URL(request.url);
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.18-performance"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.19-email-notification"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -2416,6 +2600,9 @@ export default {
     if (reportManageMatch && request.method === "PATCH") return updateDivisionReport(request,env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));
     if (reportManageMatch && request.method === "DELETE") return deleteDivisionReport(env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));
 
+    if (path === "/api/notifications/email" && request.method === "GET") return emailStatusHandler(env,auth.user);
+    if (path === "/api/notifications/email/test" && request.method === "POST") return emailTestHandler(request,env,auth.user);
+    if (path === "/api/notifications/email/retry" && request.method === "POST") return emailRetryHandler(env,auth.user);
     if (path === "/api/tasks/count" && request.method === "GET") return json({ok:true,count:await countMyWorkflowTasks(env,auth.user)});
     if (path === "/api/tasks/my" && request.method === "GET") return json({ok:true,rows:await listWorkflowTasks(env,auth.user,url)});
     const taskProjectMatch=path.match(/^\/api\/tasks\/project\/([^/]+)$/);
