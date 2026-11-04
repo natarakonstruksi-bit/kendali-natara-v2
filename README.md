@@ -1,3 +1,15 @@
+# Nara System V3.4.21 — Alur Konfirmasi QC
+
+Sub-pekerjaan **Butuh konfirmasi** sekarang menjadi tugas yang dikirim ke pihak yang bisa menjawab:
+
+1. **QC bertanya** — memilih Butuh konfirmasi, menulis apa yang perlu dikonfirmasi, dan memilih penjawab: **Site Manager** proyek (bawaan) atau **Head of Engineering**. Batas jawaban 3 hari.
+2. **Penjawab menerima tugas** di Tugas Saya + email → tombol **Jawab** (teks + lampiran foto/hasil uji/gambar). "Buka & Proses" dari Tugas Saya langsung membuka form jawab.
+3. **QC menerima tugas Putuskan Hasil** + email → pilih **Sesuai**, **Tidak sesuai** (catatan inspeksi terbuka untuk terbitkan temuan), atau **Minta jawaban ulang** (boleh dialihkan ke penjawab lain; batas baru 3 hari).
+4. **Lewat batas tanpa jawaban** → otomatis (Cron 5 menit) dieskalasi ke **Head of Operational** dengan prioritas tinggi + email; Head of Operational dapat menjawab langsung.
+
+Riwayat tanya-jawab tersimpan per sub-pekerjaan. Kartu **Menunggu Konfirmasi** di QC Dashboard menampilkan penjawab, batas, status, jawaban, dan tombol Jawab/Putuskan sesuai jabatan.
+Tidak ada migration baru.
+
 # Nara System V3.4.20 — QC: Butuh Konfirmasi
 
 Sub-pekerjaan inspeksi QC kini punya tiga hasil: **Sesuai**, **Tidak sesuai**, dan **Butuh konfirmasi** (untuk pekerjaan yang belum bisa diputuskan di lapangan).

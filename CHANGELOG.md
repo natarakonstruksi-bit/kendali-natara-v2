@@ -1,3 +1,11 @@
+## V3.4.21 — Alur Konfirmasi QC
+
+- `qc_inspection_items` masuk workflow: tahap `QC_CONFIRM_ANSWER` (Site Manager / Head of Engineering), `QC_CONFIRM_DECIDE` (QC penanya), `QC_CONFIRM_ESCALATED` (Head of Operational).
+- Field: `confirmTarget`, `confirmStatus`, `confirmDueDate` (+3 hari WITA), `confirmAnswer*`, `confirmEscalated*`, `confirmHistory`.
+- Endpoint: `POST /api/qc/session-items/:id/confirm-answer` (multipart), `POST /api/qc/session-items/:id/confirm-reask`.
+- Cron: `escalateOverdueQcConfirmations` sebelum flush email.
+- Frontend: pilih penjawab, form Jawab/Putuskan, deep-open dari Tugas Saya. Tidak ada migration baru.
+
 ## V3.4.20 — QC Butuh Konfirmasi
 
 - Hasil ketiga `BUTUH KONFIRMASI` pada sub-pekerjaan inspeksi (keterangan wajib; jejak `confirmationRequestedAt/ResolvedAt/Resolution`).

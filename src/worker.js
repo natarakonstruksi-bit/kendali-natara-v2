@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.20 — QC Butuh Konfirmasi
+ * Nara System V3.4.21 — Alur Konfirmasi QC
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.20";
+const APP_VERSION = "APP-V3.4.21";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -1138,12 +1138,12 @@ async function getProjectBudgetValue(env, projectId) {
 }
 
 
-const WORKFLOW_SOURCE_COLLECTIONS = new Set(["daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress"]);
+const WORKFLOW_SOURCE_COLLECTIONS = new Set(["daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items"]);
 
 function workflowRoleLabel(role) { return ROLE_LABELS[role] || role || ""; }
 function workflowActiveStatus(status) { return ["OPEN","IN_PROGRESS"].includes(String(status||"").toUpperCase()); }
 function workflowSourceView(collection) {
-  return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt"})[collection] || "dashboard";
+  return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc"})[collection] || "dashboard";
 }
 async function projectRoleUser(env, projectId, roleKey, ctx=null) {
   if (!projectId) return "";
@@ -1233,6 +1233,16 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
     if(["OPEN","IN PROGRESS"].includes(status)) return mk("ATI_ISSUE_ACTION","Masalah Lapangan ATI", "PIC menangani masalah tenaga/operasional ATI","Tangani Masalah",d.picUserId,"kepala_ati",{priority:"HIGH"});
     if(status==="WAITING EVALUATION") return mk("ATI_ISSUE_EVAL","Evaluasi Masalah ATI", "Kepala ATI melakukan evaluasi dan menutup masalah","Evaluasi Masalah","","kepala_ati");
     return null;
+  }
+  if(collection==="qc_inspection_items"){
+    // V3.4.21 — alur Butuh Konfirmasi: QC tanya → Site Manager / Head of Engineering jawab → QC putuskan; lewat batas → Head of Operational.
+    if(normalizeContinuousQcResult(d.result)!=="BUTUH KONFIRMASI") return null;
+    const st=String(d.confirmStatus||"MENUNGGU_JAWABAN").toUpperCase(); const q=String(d.confirmationNote||d.note||"").slice(0,240);
+    const ex={dueDate:String(d.confirmDueDate||""),title:"Konfirmasi QC"};
+    if(st==="DIJAWAB") return mk("QC_CONFIRM_DECIDE","Putuskan Hasil Konfirmasi QC",`Jawaban sudah masuk untuk "${d.item||"-"}". QC memutuskan Sesuai atau Tidak sesuai.`,"Putuskan Hasil",d.confirmationRequestedBy||d.inspectorUserId||"","qc",{dueDate:"",priority:"HIGH"});
+    if(truthy(d.confirmEscalated)) return mk("QC_CONFIRM_ESCALATED","Eskalasi Konfirmasi QC",`Konfirmasi "${d.item||"-"}" belum dijawab melewati batas waktu. Pertanyaan QC: ${q}`,"Jawab / Tindak Lanjuti","","manager_operasional",{dueDate:ex.dueDate,priority:"HIGH"});
+    if(String(d.confirmTarget||"")==="koordinator_engineering") return mk("QC_CONFIRM_ANSWER","Jawab Konfirmasi QC",`QC butuh konfirmasi untuk "${d.item||"-"}": ${q}`,"Jawab Konfirmasi","","koordinator_engineering",{dueDate:ex.dueDate});
+    return mk("QC_CONFIRM_ANSWER","Jawab Konfirmasi QC",`QC butuh konfirmasi untuk "${d.item||"-"}": ${q}`,"Jawab Konfirmasi",sm,"site_manager",{dueDate:ex.dueDate});
   }
   if(collection==="qc_reports"||collection==="ati_reports"){
     if(status==="SUBMITTED") return mk(collection==="qc_reports"?"QC_REPORT_REVIEW":"ATI_REPORT_REVIEW",collection==="qc_reports"?"Review Laporan QC":"Review Laporan ATI", "Head Unit Bisnis mereview laporan mingguan/bulanan","Review Laporan","","head_unit_bisnis");
@@ -1592,6 +1602,14 @@ function normalizeContinuousQcResult(value) {
   return "";
 }
 
+const QC_CONFIRM_DAYS = 3;
+const QC_CONFIRM_TARGETS = {site_manager:"Site Manager",koordinator_engineering:"Head of Engineering"};
+function witaToday(offsetDays=0){ return new Date(Date.now()+8*3600e3+offsetDays*864e5).toISOString().slice(0,10); }
+function qcConfirmFields(target,note,user){
+  const t=QC_CONFIRM_TARGETS[String(target||"")]?String(target):"site_manager";
+  return {confirmTarget:t,confirmStatus:"MENUNGGU_JAWABAN",confirmDueDate:witaToday(QC_CONFIRM_DAYS),confirmEscalated:false,confirmEscalatedAt:"",confirmAnswer:"",confirmAnswerDocId:"",confirmAnsweredAt:"",confirmAnsweredBy:"",confirmationRequestedAt:new Date().toISOString(),confirmationRequestedBy:user.id,confirmationNote:String(note||"")};
+}
+
 async function qcWorkGroups(env) {
   const q=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='qc_work_groups'`).all();
   const rows=(q.results||[]).map(r=>({id:r.id,data:safeJsonParse(r.data_json,{})}))
@@ -1709,8 +1727,9 @@ async function qcSessionAddItemHandler(request,env,user,sessionId) {
     const doc=await storeEvidenceDocument(env,user,file,{projectId:session.data.projectId,category:"QC_EVIDENCE",title:`QC ${workGroup} - ${item} - ${date}`,notes:note,relatedCollection:"qc_inspection_items",relatedId:id});
     evidenceDocumentId=doc.id;
   }
-  const rec=await upsertRecord(env,"qc_inspection_items",id,{sessionId,projectId:session.data.projectId,workGroup,item,result,note,date,inspectorUserId:user.id,evidenceDocumentId,findingId:"",createdAt:new Date().toISOString(),...(result==="BUTUH KONFIRMASI"?{confirmationRequestedAt:new Date().toISOString(),confirmationRequestedBy:user.id,confirmationNote:note}:{})},user);
+  const rec=await upsertRecord(env,"qc_inspection_items",id,{sessionId,projectId:session.data.projectId,workGroup,item,result,note,date,inspectorUserId:user.id,evidenceDocumentId,findingId:"",createdAt:new Date().toISOString(),...(result==="BUTUH KONFIRMASI"?qcConfirmFields(fd.get("confirmTarget"),note,user):{})},user);
   await recomputeQcSession(env,user,sessionId);
+  if (result==="BUTUH KONFIRMASI") await syncWorkflowTask(env,"qc_inspection_items",id,rec.data,user);
   await audit(env,user,"QC_SESSION_ITEM_ADD","qc_inspection_items",id,session.data.projectId,{sessionId,workGroup,result});
   return json({ok:true,row:rec});
 }
@@ -1731,9 +1750,12 @@ async function qcSessionUpdateItemHandler(request,env,user,id) {
     const prev=normalizeContinuousQcResult(item.data.result); const noteNow=String(body.note!==undefined?body.note:item.data.note||"");
     if (r==="BUTUH KONFIRMASI" && prev!=="BUTUH KONFIRMASI") {
       if (!noteNow.trim()) return json({ok:false,message:"Tuliskan dulu di Keterangan apa yang perlu dikonfirmasi, lalu pilih Butuh konfirmasi."},400);
-      next.confirmationRequestedAt=new Date().toISOString(); next.confirmationRequestedBy=user.id; next.confirmationNote=noteNow; next.confirmationResolvedAt=""; next.confirmationResolution="";
+      Object.assign(next,qcConfirmFields(body.confirmTarget,noteNow,user)); next.confirmationResolvedAt=""; next.confirmationResolution="";
     }
-    if (prev==="BUTUH KONFIRMASI" && r!=="BUTUH KONFIRMASI") { next.confirmationResolvedAt=new Date().toISOString(); next.confirmationResolvedBy=user.id; next.confirmationResolution=r; }
+    if (r==="BUTUH KONFIRMASI" && prev==="BUTUH KONFIRMASI" && body.confirmTarget && QC_CONFIRM_TARGETS[body.confirmTarget] && body.confirmTarget!==item.data.confirmTarget) {
+      Object.assign(next,qcConfirmFields(body.confirmTarget,noteNow,user)); // ganti penjawab → pertanyaan dikirim ulang
+    }
+    if (prev==="BUTUH KONFIRMASI" && r!=="BUTUH KONFIRMASI") { next.confirmationResolvedAt=new Date().toISOString(); next.confirmationResolvedBy=user.id; next.confirmationResolution=r; next.confirmStatus="SELESAI"; }
     next.result=r;
   }
   if (body.note!==undefined) next.note=String(body.note||"");
@@ -1741,6 +1763,7 @@ async function qcSessionUpdateItemHandler(request,env,user,id) {
   if (body.date!==undefined) next.date=String(body.date||next.date);
   const rec=await upsertRecord(env,"qc_inspection_items",id,{...next,updatedAt:new Date().toISOString()},user);
   await recomputeQcSession(env,user,item.data.sessionId);
+  await syncWorkflowTask(env,"qc_inspection_items",id,rec.data,user);
   return json({ok:true,row:rec});
 }
 
@@ -1759,6 +1782,66 @@ async function qcSessionItemPhotoHandler(request,env,user,id) {
   return json({ok:true,row:rec,document:doc});
 }
 
+// V3.4.21 — Jawab konfirmasi (Site Manager proyek / Head of Engineering / Head of Operational / manajemen)
+async function qcConfirmAnswerHandler(request,env,user,id) {
+  const item=await getRecord(env,"qc_inspection_items",id);
+  if (!item) return json({ok:false,message:"Sub-pekerjaan QC tidak ditemukan."},404);
+  const d={...item.data};
+  if (normalizeContinuousQcResult(d.result)!=="BUTUH KONFIRMASI") return json({ok:false,message:"Sub-pekerjaan ini tidak sedang menunggu konfirmasi."},409);
+  if (String(d.confirmStatus||"MENUNGGU_JAWABAN").toUpperCase()==="DIJAWAB") return json({ok:false,message:"Konfirmasi ini sudah dijawab dan menunggu keputusan QC."},409);
+  const denied=await requireProjectAccess(env,user,d.projectId); if (denied) return denied;
+  const role=normalizeRole(user); const target=String(d.confirmTarget||"site_manager");
+  const sm=await projectAssignment(env,d.projectId,"site_manager");
+  const allowed=isManagementRole(user) || (target==="site_manager" && role==="site_manager" && String(sm)===String(user.id)) || (target==="koordinator_engineering" && role==="koordinator_engineering");
+  if (!allowed) return json({ok:false,message:`Konfirmasi ini ditujukan ke ${QC_CONFIRM_TARGETS[target]||"Site Manager"} proyek. Head of Operational dapat menjawab bila perlu.`},403);
+  let fd; try { fd=await request.formData(); } catch { return json({ok:false,message:"Form jawaban tidak valid."},400); }
+  const answer=String(fd.get("answer")||"").trim(); const file=fd.get("file");
+  if (!answer) return json({ok:false,message:"Jawaban konfirmasi wajib diisi."},400);
+  if (file instanceof File && file.size>0) {
+    const doc=await storeEvidenceDocument(env,user,file,{projectId:d.projectId,category:"QC_EVIDENCE",title:`Jawaban konfirmasi QC - ${d.item||id}`,notes:answer,relatedCollection:"qc_inspection_items",relatedId:id});
+    d.confirmAnswerDocId=doc.id; d.confirmAnswerDocName=file.name;
+  }
+  const history=Array.isArray(d.confirmHistory)?d.confirmHistory:[];
+  history.push({at:new Date().toISOString(),by:user.id,byName:user.name||user.username||"",type:"JAWAB",text:answer,docId:d.confirmAnswerDocId||""});
+  Object.assign(d,{confirmStatus:"DIJAWAB",confirmAnswer:answer,confirmAnsweredAt:new Date().toISOString(),confirmAnsweredBy:user.id,confirmAnsweredByName:user.name||user.username||"",confirmHistory:history.slice(-20),updatedAt:new Date().toISOString()});
+  const rec=await upsertRecord(env,"qc_inspection_items",id,d,user);
+  await syncWorkflowTask(env,"qc_inspection_items",id,d,user);
+  await audit(env,user,"QC_CONFIRM_ANSWER","qc_inspection_items",id,d.projectId,{target});
+  return json({ok:true,row:rec});
+}
+// V3.4.21 — QC meminta jawaban ulang (jawaban belum cukup) → kembali ke penjawab dengan batas baru
+async function qcConfirmReaskHandler(request,env,user,id) {
+  if (!buildAccess(user).capabilities.qcInspect) return json({ok:false,message:"Hanya QC/Head of Supporting yang dapat meminta jawaban ulang."},403);
+  const item=await getRecord(env,"qc_inspection_items",id);
+  if (!item) return json({ok:false,message:"Sub-pekerjaan QC tidak ditemukan."},404);
+  const denied=await requireProjectAccess(env,user,item.data.projectId); if (denied) return denied;
+  if (normalizeContinuousQcResult(item.data.result)!=="BUTUH KONFIRMASI") return json({ok:false,message:"Sub-pekerjaan ini tidak sedang menunggu konfirmasi."},409);
+  const body=await parseJson(request)||{}; const note=String(body.note||"").trim();
+  if (!note) return json({ok:false,message:"Tuliskan apa yang masih kurang dari jawaban."},400);
+  const d={...item.data}; const history=Array.isArray(d.confirmHistory)?d.confirmHistory:[];
+  history.push({at:new Date().toISOString(),by:user.id,byName:user.name||user.username||"",type:"MINTA_ULANG",text:note});
+  const target=QC_CONFIRM_TARGETS[body.confirmTarget]?body.confirmTarget:(d.confirmTarget||"site_manager");
+  Object.assign(d,{confirmTarget:target,confirmStatus:"MENUNGGU_JAWABAN",confirmDueDate:witaToday(QC_CONFIRM_DAYS),confirmEscalated:false,confirmEscalatedAt:"",confirmationNote:`${d.confirmationNote||d.note||""}\nTambahan QC: ${note}`.trim(),confirmHistory:history.slice(-20),updatedAt:new Date().toISOString()});
+  const rec=await upsertRecord(env,"qc_inspection_items",id,d,user);
+  await syncWorkflowTask(env,"qc_inspection_items",id,d,user);
+  await audit(env,user,"QC_CONFIRM_REASK","qc_inspection_items",id,d.projectId,{target});
+  return json({ok:true,row:rec});
+}
+// V3.4.21 — eskalasi otomatis (dipanggil Cron): konfirmasi lewat batas & belum dijawab → Head of Operational
+const QC_ESCALATION_ACTOR = {id:"system-escalation",name:"Nara System (eskalasi otomatis)",username:"system-escalation"};
+async function escalateOverdueQcConfirmations(env) {
+  const today=witaToday(0);
+  const q=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='qc_inspection_items' AND upper(COALESCE(json_extract(data_json,'$.result'),''))='BUTUH KONFIRMASI' AND upper(COALESCE(json_extract(data_json,'$.confirmStatus'),'MENUNGGU_JAWABAN'))='MENUNGGU_JAWABAN' AND COALESCE(json_extract(data_json,'$.confirmEscalated'),0) IN (0,'false','') AND ( (COALESCE(json_extract(data_json,'$.confirmDueDate'),'')<>'' AND json_extract(data_json,'$.confirmDueDate') < ?) OR (COALESCE(json_extract(data_json,'$.confirmDueDate'),'')='' AND date(json_extract(data_json,'$.confirmationRequestedAt'),'+${QC_CONFIRM_DAYS} days') < ?) )`).bind(today,today).all();
+  let n=0;
+  for (const r of (q.results||[])) {
+    const d={...safeJsonParse(r.data_json,{}),confirmEscalated:true,confirmEscalatedAt:new Date().toISOString()};
+    await upsertRecord(env,"qc_inspection_items",r.id,d,QC_ESCALATION_ACTOR);
+    await syncWorkflowTask(env,"qc_inspection_items",r.id,d,QC_ESCALATION_ACTOR);
+    n++;
+  }
+  return n;
+}
+
 async function qcSessionDeleteItemHandler(env,user,id) {
   if (!buildAccess(user).capabilities.qcInspect) return json({ok:false,message:"Role ini tidak dapat menghapus sub-pekerjaan QC."},403);
   const item=await getRecord(env,"qc_inspection_items",id);
@@ -1770,6 +1853,7 @@ async function qcSessionDeleteItemHandler(env,user,id) {
   const denied=await requireProjectAccess(env,user,item.data.projectId); if (denied) return denied;
   if (linkedFindingId) await deleteQcFindingData(env,user,linkedFindingId,{checkAccess:false});
   await deleteRelatedDocuments(env,user,"qc_inspection_items",id);
+  await cancelWorkflowTasks(env,"qc_inspection_items",id,user);
   await deleteRecord(env,"qc_inspection_items",id,user);
   await recomputeQcSession(env,user,item.data.sessionId);
   return json({ok:true});
@@ -1864,7 +1948,7 @@ async function qcSessionDeleteHandler(env,user,id) {
   const items=await qcSessionItems(env,id);
   const findingIds=[...new Set(items.map(x=>String(x.data.findingId||"")).filter(Boolean))];
   for (const fid of findingIds) await deleteQcFindingData(env,user,fid,{checkAccess:false});
-  for (const it of items) { await deleteRelatedDocuments(env,user,"qc_inspection_items",it.id); await deleteRecord(env,"qc_inspection_items",it.id,user); }
+  for (const it of items) { await deleteRelatedDocuments(env,user,"qc_inspection_items",it.id); await cancelWorkflowTasks(env,"qc_inspection_items",it.id,user); await deleteRecord(env,"qc_inspection_items",it.id,user); }
   await deleteRelatedDocuments(env,user,"qc_inspection_sessions",id);
   await deleteRecord(env,"qc_inspection_sessions",id,user);
   await audit(env,user,"QC_SESSION_DELETE","qc_inspection_sessions",id,session.data.projectId,{items:items.length,findings:findingIds.length});
@@ -2131,7 +2215,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.20"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.21"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2571,7 +2655,10 @@ export default {
     return response;
   },
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(flushEmailOutbox(env,{retry:true,limit:100}).catch(e=>console.log("scheduled email",e?.message||e)));
+    ctx.waitUntil((async()=>{
+      try { await escalateOverdueQcConfirmations(env); } catch(e) { console.log("qc escalation",e?.message||e); }
+      await flushEmailOutbox(env,{retry:true,limit:100}).catch(e=>console.log("scheduled email",e?.message||e));
+    })());
   }
 };
 
@@ -2581,7 +2668,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.20-qc-butuh-konfirmasi"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.21-qc-confirm-workflow"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -2656,6 +2743,8 @@ async function handleRequest(request, env) {
     const qcSessionItemMatch = path.match(/^\/api\/qc\/session-items\/([^/]+)$/);
     if (qcSessionItemMatch && request.method === "PATCH") return qcSessionUpdateItemHandler(request,env,auth.user,decodeURIComponent(qcSessionItemMatch[1]));
     if (qcSessionItemMatch && request.method === "DELETE") return qcSessionDeleteItemHandler(env,auth.user,decodeURIComponent(qcSessionItemMatch[1]));
+    const qcConfirmMatch = path.match(/^\/api\/qc\/session-items\/([^/]+)\/confirm-(answer|reask)$/);
+    if (qcConfirmMatch && request.method === "POST") return qcConfirmMatch[2]==="answer" ? qcConfirmAnswerHandler(request,env,auth.user,decodeURIComponent(qcConfirmMatch[1])) : qcConfirmReaskHandler(request,env,auth.user,decodeURIComponent(qcConfirmMatch[1]));
     const qcSessionPhotoMatch = path.match(/^\/api\/qc\/session-items\/([^/]+)\/photo$/);
     if (qcSessionPhotoMatch && request.method === "POST") return qcSessionItemPhotoHandler(request,env,auth.user,decodeURIComponent(qcSessionPhotoMatch[1]));
     const qcFindingMatch = path.match(/^\/api\/qc\/findings\/([^/]+)$/);
