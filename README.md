@@ -1,3 +1,16 @@
+# Nara System V3.4.20 — QC: Butuh Konfirmasi
+
+Sub-pekerjaan inspeksi QC kini punya tiga hasil: **Sesuai**, **Tidak sesuai**, dan **Butuh konfirmasi** (untuk pekerjaan yang belum bisa diputuskan di lapangan).
+
+- Butuh konfirmasi **wajib** disertai keterangan apa yang perlu dikonfirmasi.
+- Item ditandai kuning dengan umur tunggu; tampil di kartu baru **Menunggu Konfirmasi** di QC Dashboard (lebih dari 3 hari = merah) dan KPI **Butuh Konfirmasi**.
+- Setelah ada kepastian, QC mengubah hasilnya menjadi Sesuai atau Tidak sesuai; tanggal dan hasil konfirmasi tercatat. Tidak sesuai → terbitkan temuan seperti biasa.
+- Kesesuaian (%) dihitung dari item yang sudah diputuskan saja.
+- Catatan inspeksi tidak bisa ditutup dan gate PHO tidak lolos selama masih ada item Butuh konfirmasi.
+- Laporan QC mingguan/bulanan memuat jumlah Butuh konfirmasi.
+
+Tidak ada migration baru.
+
 # Nara System V3.4.19 — Notifikasi Email Tugas
 
 Setiap tugas baru yang masuk ke **Tugas Saya** seseorang kini juga dikirim ke **email** orang tersebut (atau ke semua karyawan dengan jabatan antrean, mis. Head of Operational / Finance). Email berisi nama tugas, proyek, apa yang perlu dilakukan, prioritas, deadline, pengirim, dan tombol **Buka Tugas Saya**.

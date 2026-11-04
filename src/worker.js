@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.19 — Email Notifikasi Tugas
+ * Nara System V3.4.20 — QC Butuh Konfirmasi
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.19";
+const APP_VERSION = "APP-V3.4.20";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -787,7 +787,7 @@ function qcStatusCounts(projectId, all) {
   const sessions=all.filter(r=>r.collection==='qc_inspection_sessions' && String(r.data.projectId||'')===projectId);
   if(continuousItems.length || sessions.length){
     const total=continuousItems.length;
-    const nonPass=continuousItems.filter(r=>String(r.data.result||'').toUpperCase()==='TIDAK SESUAI').length;
+    const nonPass=continuousItems.filter(r=>['TIDAK SESUAI','BUTUH KONFIRMASI'].includes(String(r.data.result||'').toUpperCase())).length; // konfirmasi belum selesai = belum lolos
     return {open:nonPass,nonPass,uninspected:0,total};
   }
   const inspections = all.filter(r => r.collection === "qc_inspections" && String(r.data.projectId || "") === projectId);
@@ -1588,6 +1588,7 @@ function normalizeContinuousQcResult(value) {
   const v=String(value||"").trim().toUpperCase();
   if (["SESUAI","PASS","OK"].includes(v)) return "SESUAI";
   if (["TIDAK SESUAI","NG","FAIL","NOT OK"].includes(v)) return "TIDAK SESUAI";
+  if (["BUTUH KONFIRMASI","BUTUH_KONFIRMASI","PERLU KONFIRMASI","KONFIRMASI","HOLD"].includes(v)) return "BUTUH KONFIRMASI"; // V3.4.20
   return "";
 }
 
@@ -1611,9 +1612,11 @@ async function recomputeQcSession(env,user,sessionId) {
   const items=await qcSessionItems(env,sessionId);
   const sesuai=items.filter(x=>normalizeContinuousQcResult(x.data.result)==="SESUAI").length;
   const tidak=items.filter(x=>normalizeContinuousQcResult(x.data.result)==="TIDAK SESUAI").length;
-  const total=sesuai+tidak;
-  const score=total?Math.round(sesuai/total*100):0;
-  return upsertRecord(env,"qc_inspection_sessions",sessionId,{...session.data,total,sesuai,tidak,score,updatedAt:new Date().toISOString()},user);
+  const konfirmasi=items.filter(x=>normalizeContinuousQcResult(x.data.result)==="BUTUH KONFIRMASI").length;
+  const total=sesuai+tidak+konfirmasi;
+  const decided=sesuai+tidak; // kesesuaian hanya dari item yang sudah diputuskan
+  const score=decided?Math.round(sesuai/decided*100):0;
+  return upsertRecord(env,"qc_inspection_sessions",sessionId,{...session.data,total,sesuai,tidak,konfirmasi,score,updatedAt:new Date().toISOString()},user);
 }
 
 async function qcSessionDetail(env,user,id) {
@@ -1698,6 +1701,7 @@ async function qcSessionAddItemHandler(request,env,user,sessionId) {
   const file=fd.get("file");
   if (!workGroup) return json({ok:false,message:"Item pekerjaan wajib dipilih."},400);
   if (!item) return json({ok:false,message:"Uraian sub-pekerjaan wajib diisi."},400);
+  if (result==="BUTUH KONFIRMASI" && !note.trim()) return json({ok:false,message:"Tuliskan di Keterangan apa yang perlu dikonfirmasi (mis. menunggu hasil uji slump / gambar revisi)."},400);
   if (!result) return json({ok:false,message:"Pilih dulu Sesuai atau Tidak sesuai."},400);
   const id=crypto.randomUUID();
   let evidenceDocumentId="";
@@ -1705,7 +1709,7 @@ async function qcSessionAddItemHandler(request,env,user,sessionId) {
     const doc=await storeEvidenceDocument(env,user,file,{projectId:session.data.projectId,category:"QC_EVIDENCE",title:`QC ${workGroup} - ${item} - ${date}`,notes:note,relatedCollection:"qc_inspection_items",relatedId:id});
     evidenceDocumentId=doc.id;
   }
-  const rec=await upsertRecord(env,"qc_inspection_items",id,{sessionId,projectId:session.data.projectId,workGroup,item,result,note,date,inspectorUserId:user.id,evidenceDocumentId,findingId:"",createdAt:new Date().toISOString()},user);
+  const rec=await upsertRecord(env,"qc_inspection_items",id,{sessionId,projectId:session.data.projectId,workGroup,item,result,note,date,inspectorUserId:user.id,evidenceDocumentId,findingId:"",createdAt:new Date().toISOString(),...(result==="BUTUH KONFIRMASI"?{confirmationRequestedAt:new Date().toISOString(),confirmationRequestedBy:user.id,confirmationNote:note}:{})},user);
   await recomputeQcSession(env,user,sessionId);
   await audit(env,user,"QC_SESSION_ITEM_ADD","qc_inspection_items",id,session.data.projectId,{sessionId,workGroup,result});
   return json({ok:true,row:rec});
@@ -1722,8 +1726,14 @@ async function qcSessionUpdateItemHandler(request,env,user,id) {
   const body=await parseJson(request)||{};
   const next={...item.data};
   if (body.result!==undefined) {
-    const r=normalizeContinuousQcResult(body.result); if(!r) return json({ok:false,message:"Hasil harus Sesuai atau Tidak sesuai."},400);
-    if (item.data.findingId && r==="SESUAI") return json({ok:false,message:"Sub-pekerjaan ini sudah diterbitkan menjadi temuan. Tutup lewat alur verifikasi, jangan ubah menjadi Sesuai di inspeksi."},409);
+    const r=normalizeContinuousQcResult(body.result); if(!r) return json({ok:false,message:"Hasil harus Sesuai, Tidak sesuai, atau Butuh konfirmasi."},400);
+    if (item.data.findingId && r!=="TIDAK SESUAI") return json({ok:false,message:"Sub-pekerjaan ini sudah diterbitkan menjadi temuan. Tutup lewat alur verifikasi, jangan ubah hasilnya di inspeksi."},409);
+    const prev=normalizeContinuousQcResult(item.data.result); const noteNow=String(body.note!==undefined?body.note:item.data.note||"");
+    if (r==="BUTUH KONFIRMASI" && prev!=="BUTUH KONFIRMASI") {
+      if (!noteNow.trim()) return json({ok:false,message:"Tuliskan dulu di Keterangan apa yang perlu dikonfirmasi, lalu pilih Butuh konfirmasi."},400);
+      next.confirmationRequestedAt=new Date().toISOString(); next.confirmationRequestedBy=user.id; next.confirmationNote=noteNow; next.confirmationResolvedAt=""; next.confirmationResolution="";
+    }
+    if (prev==="BUTUH KONFIRMASI" && r!=="BUTUH KONFIRMASI") { next.confirmationResolvedAt=new Date().toISOString(); next.confirmationResolvedBy=user.id; next.confirmationResolution=r; }
     next.result=r;
   }
   if (body.note!==undefined) next.note=String(body.note||"");
@@ -1799,6 +1809,8 @@ async function qcSessionCloseHandler(env,user,id) {
   if (!items.length) return json({ok:false,message:"Belum ada sub-pekerjaan. Tambahkan minimal satu sebelum catatan ditutup."},409);
   const pending=items.filter(x=>normalizeContinuousQcResult(x.data.result)==="TIDAK SESUAI"&&!x.data.findingId);
   if (pending.length) return json({ok:false,message:`Masih ada ${pending.length} sub-pekerjaan Tidak sesuai yang belum diterbitkan menjadi temuan.`},409);
+  const waitingConfirm=items.filter(x=>normalizeContinuousQcResult(x.data.result)==="BUTUH KONFIRMASI");
+  if (waitingConfirm.length) return json({ok:false,message:`Masih ada ${waitingConfirm.length} sub-pekerjaan Butuh konfirmasi. Putuskan dulu menjadi Sesuai atau Tidak sesuai sebelum catatan ditutup.`},409);
   const rec=await upsertRecord(env,"qc_inspection_sessions",id,{...session.data,status:"CLOSED",closedAt:new Date().toISOString(),closedByUserId:user.id},user);
   await audit(env,user,"QC_SESSION_CLOSE","qc_inspection_sessions",id,session.data.projectId,{total:items.length});
   return json({ok:true,row:rec});
@@ -2119,7 +2131,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.19"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.20"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2179,6 +2191,7 @@ async function buildQcReportSnapshot(env, range) {
   const allOpen=findings.filter(r=>String(r.data.status||"OPEN").toUpperCase()!=="CLOSED");
   const sesuai=periodItems.filter(r=>String(r.data.result||"").toUpperCase()==="SESUAI").length;
   const tidak=periodItems.filter(r=>String(r.data.result||"").toUpperCase()==="TIDAK SESUAI").length;
+  const konfirmasi=periodItems.filter(r=>String(r.data.result||"").toUpperCase()==="BUTUH KONFIRMASI").length;
   const total=periodItems.length;
   const waiting=periodFindings.filter(r=>String(r.data.status||"").toUpperCase()==="WAITING QC CHECK").length;
   const closedRows=periodFindings.filter(r=>String(r.data.status||"").toUpperCase()==="CLOSED");
@@ -2186,9 +2199,9 @@ async function buildQcReportSnapshot(env, range) {
   const today=new Date().toISOString().slice(0,10);
   const overdue=allOpen.filter(r=>r.data.deadline&&reportDay(r.data.deadline)<today).length;
   const perGroup={};
-  for(const r of periodItems){const g=String(r.data.workGroup||"Tanpa Kelompok");if(!perGroup[g])perGroup[g]={workGroup:g,total:0,sesuai:0,tidak:0};perGroup[g].total++;if(String(r.data.result).toUpperCase()==="SESUAI")perGroup[g].sesuai++;else perGroup[g].tidak++;}
+  for(const r of periodItems){const g=String(r.data.workGroup||"Tanpa Kelompok");if(!perGroup[g])perGroup[g]={workGroup:g,total:0,sesuai:0,tidak:0,konfirmasi:0};perGroup[g].total++;const rr=String(r.data.result).toUpperCase();if(rr==="SESUAI")perGroup[g].sesuai++;else if(rr==="BUTUH KONFIRMASI")perGroup[g].konfirmasi++;else perGroup[g].tidak++;}
   return {
-    metrics:{catatanInspeksi:periodSessions.length,subPekerjaan:total,sesuai,tidakSesuai:tidak,kesesuaian:total?Math.round(sesuai/total*100):0,totalTemuan:periodFindings.length,openPerbaikan:periodFindings.filter(r=>String(r.data.status||"").toUpperCase()!=="CLOSED").length,menungguVerifikasi:waiting,closedOnTime,overdue,qcScore:qcSnapshotScore(periodFindings)},
+    metrics:{catatanInspeksi:periodSessions.length,subPekerjaan:total,sesuai,tidakSesuai:tidak,butuhKonfirmasi:konfirmasi,kesesuaian:(sesuai+tidak)?Math.round(sesuai/(sesuai+tidak)*100):0,totalTemuan:periodFindings.length,openPerbaikan:periodFindings.filter(r=>String(r.data.status||"").toUpperCase()!=="CLOSED").length,menungguVerifikasi:waiting,closedOnTime,overdue,qcScore:qcSnapshotScore(periodFindings)},
     groups:Object.values(perGroup).sort((a,b)=>a.workGroup.localeCompare(b.workGroup,"id")),
     inspections:periodItems.slice().sort((a,b)=>String(b.data.date||"").localeCompare(String(a.data.date||""))).map(r=>({date:r.data.date,projectId:r.data.projectId,project:projects[r.data.projectId]||r.data.projectId||"-",workGroup:r.data.workGroup||"-",item:r.data.item||"-",result:r.data.result||"-",note:r.data.note||"",inspector:employees[r.data.inspectorUserId]||r.data.inspectorUserId||"-",findingId:r.data.findingId||""})).slice(0,500),
     findings:periodFindings.slice().sort((a,b)=>String(b.data.date||"").localeCompare(String(a.data.date||""))).map(r=>({id:r.id,date:r.data.date,projectId:r.data.projectId,project:projects[r.data.projectId]||r.data.projectId||"-",area:r.data.area||r.data.item||"-",category:r.data.category||"-",description:r.data.description||r.data.notes||"-",severity:r.data.severity||"-",pic:employees[r.data.picUserId]||r.data.picUserId||"-",deadline:r.data.deadline||"",status:r.data.status||"OPEN"})).slice(0,300),
@@ -2568,7 +2581,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.19-email-notification"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.20-qc-butuh-konfirmasi"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);

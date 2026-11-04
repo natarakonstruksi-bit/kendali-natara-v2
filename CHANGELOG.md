@@ -1,3 +1,10 @@
+## V3.4.20 — QC Butuh Konfirmasi
+
+- Hasil ketiga `BUTUH KONFIRMASI` pada sub-pekerjaan inspeksi (keterangan wajib; jejak `confirmationRequestedAt/ResolvedAt/Resolution`).
+- Sesi: field `konfirmasi`; skor kesesuaian dari item yang sudah diputuskan; tutup catatan diblokir bila masih ada konfirmasi.
+- QC Dashboard: KPI dan kartu Menunggu Konfirmasi; gate PHO menghitung konfirmasi sebagai belum lolos; laporan QC `butuhKonfirmasi`.
+- Tes `scripts/qc-konfirmasi-smoke.mjs`. Tidak ada migration baru.
+
 ## V3.4.19 — Notifikasi Email Tugas
 
 - Outbox `email_outbox` + pengiriman latar belakang (`ctx.waitUntil`) + Cron `*/5 * * * *` untuk retry (maks 5).

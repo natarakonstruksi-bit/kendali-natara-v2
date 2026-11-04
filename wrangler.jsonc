@@ -30,8 +30,8 @@
   "triggers": { "crons": ["*/5 * * * *"] },
   // Konfigurasi notifikasi email (non-rahasia). Rahasia diisi lewat: npx wrangler secret put EMAIL_GAS_SECRET / EMAIL_API_KEY
   "vars": {
-    "EMAIL_PROVIDER": "",
-    "EMAIL_GAS_URL": "",
+    "EMAIL_PROVIDER": "gas",
+    "EMAIL_GAS_URL": "https://script.google.com/macros/s/AKfycbyu8pj7RSKlnmQ2JI8H-m3hdyNY0F2LUcqACty7ZoAV06UuXnQ4GI6V__M-3UjLscV_8A/exec",
     "EMAIL_FROM": "",
     "EMAIL_FROM_NAME": "Nara System — Natara Konstruksi",
     "APP_BASE_URL": "https://kendali-natara-v2.natarakonstruksi.workers.dev"

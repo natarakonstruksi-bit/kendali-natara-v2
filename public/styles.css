@@ -144,3 +144,13 @@ input:focus,select:focus,textarea:focus{border-color:#c48a7b;box-shadow:0 0 0 3p
 .qc-route-daypick{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.qc-route-daychip{margin:0!important;cursor:pointer}.qc-route-daychip input{position:absolute;opacity:0;width:1px;height:1px}.qc-route-daychip span{display:inline-block;min-width:52px;text-align:center;padding:8px 10px;border:1px solid #d0d5dd;border-radius:9px;font-size:12px;font-weight:700;color:#344054;text-transform:none;letter-spacing:0;background:#fff}.qc-route-daychip input:checked+span{background:var(--ink);border-color:var(--ink);color:#fff}.qc-route-daychip input:focus-visible+span{outline:2px solid #84caff;outline-offset:2px}
 @media(max-width:1750px){.qc-route-week{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:1100px){.qc-route-week{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.qc-route-week{grid-template-columns:1fr}.qc-route-day.is-empty:not(.today){display:none}.qc-route-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.qc-route-summary>div:nth-child(2){border-right:0}.qc-route-summary>div:nth-child(-n+2){border-bottom:1px solid var(--line)}.qc-route-filter{min-width:0;flex:1}.qc-route-path{grid-template-columns:1fr}}
+/* V3.4.20 — Butuh konfirmasi */
+.qc-result-buttons.three{grid-template-columns:repeat(3,1fr);max-width:560px}
+.qc-result-btn.warn.selected{border-color:#d97706;background:#fffaeb;color:#b54708;font-weight:700}
+.qc-subitem.warn{border-left-color:#d97706;background:#fffcf5}
+.qc-result-read.warn{background:#fffaeb;color:#b54708}
+.qc-session-kpi.warn{border-left-color:#d97706}
+.qc-session-kpis{grid-template-columns:repeat(5,1fr)}
+.qc-confirm-tag{display:inline-block;align-self:flex-start;width:max-content;margin-top:3px;border-radius:999px;padding:2px 8px;font-size:10.5px;font-weight:700;background:#fffaeb;color:#b54708;border:1px solid #fedf89}
+.qc-warn-text{color:#b54708}
+@media(max-width:760px){.qc-result-buttons.three{grid-template-columns:1fr 1fr 1fr}.qc-result-buttons.three .qc-result-btn{padding:9px 4px;font-size:11px}.qc-session-kpis{grid-template-columns:1fr 1fr}}
