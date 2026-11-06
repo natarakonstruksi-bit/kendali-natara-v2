@@ -20,13 +20,13 @@ const pub=fs.readFileSync(path.join(root,'public/public.js'),'utf8');
 const pubHtml=fs.readFileSync(path.join(root,'public/public.html'),'utf8');
 const cfg=fs.readFileSync(path.join(root,'wrangler.jsonc'),'utf8');
 const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
-for(const m of ['APP-V3.4.21','public_portfolio','public_site_settings','/api/public/site','/api/public/portfolio','publicMediaHandler','servePublicPortal'])if(!worker.includes(m))throw new Error(`Marker public backend hilang: ${m}`);
+for(const m of ['APP-V3.4.22','public_portfolio','public_site_settings','/api/public/site','/api/public/portfolio','publicMediaHandler','servePublicPortal'])if(!worker.includes(m))throw new Error(`Marker public backend hilang: ${m}`);
 for(const m of ['Profil & Portofolio','renderPublicInfo','openPublicPortfolio','Filosofi','Pendekatan Kerja'])if(!app.includes(m))throw new Error(`Marker public admin hilang: ${m}`);
 for(const m of ['/api/public/site','/api/public/portfolio','portfolioGrid','openDetail','Membangun dengan Arah.','serviceGroups'])if(!pub.includes(m))throw new Error(`Marker public frontend hilang: ${m}`);
 for(const m of ['TENTANG NATARA','LAYANAN KAMI','PENDEKATAN KERJA','SEGMENTASI KLIEN','portfolioGrid','company-profile/losari-cover.webp'])if(!pubHtml.includes(m))throw new Error(`Marker public HTML hilang: ${m}`);
 if(!html.includes('data-view="public_info"'))throw new Error('Menu Informasi Publik hilang.');
 if(!html.includes('href="/info"'))throw new Error('Link portal publik di login hilang.');
-if(pkg.version!=='3.4.21')throw new Error('package version bukan 3.4.21');
+if(pkg.version!=='3.4.22')throw new Error('package version bukan 3.4.22');
 if(!pkg.scripts?.build)throw new Error('package.json wajib memiliki script build.');
 for(const token of ['PASTE_EXISTING_KENDALI_D1','PASTE_','YOUR_DATABASE'])if(cfg.includes(token))throw new Error(`Placeholder konfigurasi masih ada: ${token}`);
 if(!cfg.includes('04849d77-cb23-4d50-9cfc-4e0d9c542d6b'))throw new Error('D1 existing tidak terpasang.');
@@ -53,4 +53,4 @@ if(app.includes("employeeField('qcUserId','QC',['qc'],false)"))throw new Error('
 for(const marker of ['philosophy:String(d.philosophy','serviceGroups:asList(d.serviceGroups','galleryUrls:[...documentGallery,...staticGallery]','coverUrl=d.coverDocumentId'])if(!worker.includes(marker))throw new Error(`Public company profile backend hilang: ${marker}`);
 for(const marker of ['valueGrid','serviceGrid','approachList','advantageList','audienceList','detail-specs'])if(!pub.includes(marker)&&!pubHtml.includes(marker))throw new Error(`Public company profile frontend hilang: ${marker}`);
 
-console.log('Nara System V3.4.21 QC Confirm Workflow preflight OK');
+console.log('Nara System V3.4.22 PWA preflight OK');

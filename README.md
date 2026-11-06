@@ -1,3 +1,21 @@
+# Nara System V3.4.22 — Aplikasi HP (PWA)
+
+Nara System kini bisa **dipasang sebagai aplikasi di HP** (Android & iPhone) dan di laptop, tanpa Play Store/App Store:
+
+- Ikon Nara System di layar utama, terbuka **layar penuh tanpa tampilan browser**, dengan pintasan Tugas Saya / Progress / QC (tekan lama ikon di Android).
+- **Lebih cepat dibuka**: tampilan aplikasi (HTML/CSS/JS/ikon) disimpan di HP. Sinyal lemah >4 detik → tampilan tersimpan dipakai dulu. **Data tidak pernah disimpan di HP** — selalu langsung dari server.
+- **Offline**: muncul halaman "Tidak ada koneksi internet" + tombol Coba lagi (otomatis memuat ulang saat online).
+- **Pembaruan otomatis**: setiap `npm run deploy`, aplikasi menampilkan "Versi baru Nara System tersedia → Perbarui".
+- Tombol **Pasang** di layar login (HP) dan **Pasang Aplikasi** di sidebar; iPhone mendapat panduan langkah (Safari → Bagikan → Tambah ke Layar Utama).
+
+Cara pasang:
+- **Android (Chrome)**: buka alamat Nara System → ketuk **Pasang** di layar login (atau menu ⋮ → *Instal aplikasi*).
+- **iPhone (Safari)**: buka alamat Nara System → ketuk **Bagikan ⬆︎** → **Tambah ke Layar Utama** → **Tambah**.
+- **Laptop (Chrome/Edge)**: ikon instal di ujung kanan kolom alamat.
+
+Penting saat rilis berikutnya: versi di `public/sw.js` (`APP_VERSION`) harus sama dengan `package.json` dan `?v=` di `index.html` — dijaga otomatis oleh `scripts/pwa-smoke.mjs` di `npm run check`.
+File baru: `public/manifest.webmanifest`, `public/sw.js`, `public/offline.html`, `public/icons/*`. Tidak ada migration baru.
+
 # Nara System V3.4.21 — Alur Konfirmasi QC
 
 Sub-pekerjaan **Butuh konfirmasi** sekarang menjadi tugas yang dikirim ke pihak yang bisa menjawab:

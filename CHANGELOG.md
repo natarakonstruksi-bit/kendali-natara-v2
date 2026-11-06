@@ -1,3 +1,9 @@
+## V3.4.22 — Aplikasi HP (PWA)
+
+- Manifest, ikon (any + maskable + apple-touch), service worker `nara-shell-<versi>` (shell cache, API network-only, navigasi network-first dengan fallback 4 detik, halaman `/offline`).
+- Tombol pasang (beforeinstallprompt / panduan iOS), banner pembaruan (SKIP_WAITING), safe-area untuk mode standalone.
+- Tes `scripts/pwa-smoke.mjs`. Tidak ada migration baru.
+
 ## V3.4.21 — Alur Konfirmasi QC
 
 - `qc_inspection_items` masuk workflow: tahap `QC_CONFIRM_ANSWER` (Site Manager / Head of Engineering), `QC_CONFIRM_DECIDE` (QC penanya), `QC_CONFIRM_ESCALATED` (Head of Operational).

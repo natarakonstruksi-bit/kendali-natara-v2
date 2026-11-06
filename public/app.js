@@ -1380,3 +1380,68 @@ if(globalThis.KENDALI_TEST_MODE&&globalThis.__kendaliQa)Object.assign(globalThis
 const v3421PrevOpenTask=v34OpenTask;
 v34OpenTask=async function(t){if(t?.data?.sourceCollection==='qc_inspection_items')state.pendingConfirmItem=String(t.data.sourceId||'');return v3421PrevOpenTask(t);};
 if(globalThis.KENDALI_TEST_MODE&&globalThis.__kendaliQa)Object.assign(globalThis.__kendaliQa,{openQcConfirmAnswer,openQcConfirmDecide,qcConfirmState});
+
+/* ------------------------------------------------------------------ */
+/* V3.4.22 — Aplikasi HP (PWA): pasang ke layar utama + pembaruan     */
+/* ------------------------------------------------------------------ */
+const naraPwa={deferred:null,
+  standalone(){try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;}catch{return false;}},
+  ios(){const ua=navigator.userAgent||'';return /iphone|ipad|ipod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);},
+  mobile(){return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent||'')||this.ios();}
+};
+function naraInstallSheet(){
+  document.getElementById('naraInstallSheet')?.remove();
+  const ios=naraPwa.ios();
+  const steps=ios?[
+    'Buka halaman ini di <b>Safari</b> (bukan Chrome/WhatsApp).',
+    'Ketuk tombol <b>Bagikan</b> <span class="pwa-ico">⬆︎</span> di bagian bawah layar.',
+    'Gulir lalu pilih <b>Tambah ke Layar Utama</b> (Add to Home Screen).',
+    'Ketuk <b>Tambah</b>. Ikon Nara System muncul di layar HP.'
+  ]:[
+    'Buka halaman ini di <b>Google Chrome</b>.',
+    'Ketuk menu <b>⋮</b> di kanan atas.',
+    'Pilih <b>Instal aplikasi</b> atau <b>Tambahkan ke layar utama</b>.',
+    'Ketuk <b>Instal</b>. Ikon Nara System muncul di layar HP.'
+  ];
+  const el=document.createElement('div');el.id='naraInstallSheet';el.className='pwa-sheet-backdrop';
+  el.innerHTML=`<div class="pwa-sheet" role="dialog" aria-label="Pasang Nara System"><div class="pwa-sheet-head"><img src="/icons/icon-192.png" alt=""><div><b>Pasang Nara System di HP</b><span>Buka langsung dari ikon, layar penuh, lebih cepat.</span></div></div><ol>${steps.map(x=>`<li>${x}</li>`).join('')}</ol><button type="button" class="btn primary" id="naraInstallClose">Mengerti</button></div>`;
+  document.body.appendChild(el);el.onclick=e=>{if(e.target===el||e.target.id==='naraInstallClose')el.remove();};
+}
+async function naraInstall(){
+  if(naraPwa.deferred){const ev=naraPwa.deferred;naraPwa.deferred=null;try{ev.prompt();const r=await ev.userChoice;if(r?.outcome==='accepted')naraUpdateInstallButtons();}catch{naraInstallSheet();}return;}
+  naraInstallSheet();
+}
+function naraUpdateInstallButtons(){
+  const show=!naraPwa.standalone()&&(naraPwa.deferred||naraPwa.mobile());
+  // tombol di sidebar (setelah login)
+  const foot=document.querySelector('#sidebar .foot-actions');
+  if(foot&&!document.getElementById('installAppBtn')){const b=document.createElement('button');b.id='installAppBtn';b.type='button';b.className='btn ghost small';b.textContent='Pasang Aplikasi';b.onclick=naraInstall;foot.prepend(b);}
+  document.getElementById('installAppBtn')?.classList.toggle('hidden',!show);
+  // banner di layar login
+  const form=document.getElementById('loginForm');
+  if(form&&!document.getElementById('installLoginBanner')){const d=document.createElement('div');d.id='installLoginBanner';d.className='pwa-login-banner';d.innerHTML='<img src="/icons/icon-192.png" alt=""><div><b>Pasang Nara System di HP</b><span>Ikon di layar utama, buka tanpa browser.</span></div><button type="button" class="btn small">Pasang</button>';d.querySelector('button').onclick=naraInstall;const submit=form.querySelector('button[type=submit]');if(submit)submit.insertAdjacentElement('afterend',d);else form.appendChild(d);}
+  document.getElementById('installLoginBanner')?.classList.toggle('hidden',!show);
+}
+function naraShowUpdate(worker){
+  if(document.getElementById('naraUpdateBar'))return;
+  const bar=document.createElement('div');bar.id='naraUpdateBar';bar.className='pwa-update-bar';
+  bar.innerHTML='<span>Versi baru Nara System tersedia.</span><button type="button" class="btn small primary">Perbarui</button>';
+  bar.querySelector('button').onclick=()=>{bar.querySelector('button').disabled=true;worker.postMessage({type:'SKIP_WAITING'});setTimeout(()=>location.reload(),3000);};
+  document.body.appendChild(bar);
+}
+if(!globalThis.KENDALI_TEST_MODE&&typeof window!=='undefined'){
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();naraPwa.deferred=e;naraUpdateInstallButtons();});
+  window.addEventListener('appinstalled',()=>{naraPwa.deferred=null;naraUpdateInstallButtons();try{toast('Nara System terpasang di HP.');}catch{}});
+  if('serviceWorker' in navigator&&location.protocol!=='file:'){
+    let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
+    window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').then(reg=>{
+      if(reg.waiting&&navigator.serviceWorker.controller)naraShowUpdate(reg.waiting);
+      reg.addEventListener('updatefound',()=>{const w=reg.installing;w&&w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)naraShowUpdate(w);});});
+      setInterval(()=>reg.update().catch(()=>{}),30*60*1000);
+      document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reg.update().catch(()=>{});});
+    }).catch(e=>console.warn('SW gagal didaftarkan',e));});
+  }
+  document.documentElement.classList.toggle('is-standalone',naraPwa.standalone());
+  const tick=()=>naraUpdateInstallButtons();setTimeout(tick,600);document.addEventListener('click',()=>setTimeout(tick,50),{once:true});
+}
+if(globalThis.KENDALI_TEST_MODE&&globalThis.__kendaliQa)Object.assign(globalThis.__kendaliQa,{naraPwa,naraInstallSheet});

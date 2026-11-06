@@ -1,0 +1,27 @@
+{
+  "name": "Nara System — Natara Konstruksi",
+  "short_name": "Nara System",
+  "description": "Sistem kendali proyek Natara Konstruksi: proyek, progress, QC, PR/vendor, keuangan, dan Tugas Saya.",
+  "id": "/?app=nara-system",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0f0f0f",
+  "theme_color": "#101828",
+  "lang": "id",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Tugas Saya", "short_name": "Tugas", "url": "/?view=tasks&source=pwa", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Progress", "url": "/?view=progress&source=pwa", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "QC Dashboard", "short_name": "QC", "url": "/?view=qc&source=pwa", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
