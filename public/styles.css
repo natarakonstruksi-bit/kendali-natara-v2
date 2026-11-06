@@ -190,3 +190,6 @@ input:focus,select:focus,textarea:focus{border-color:#c48a7b;box-shadow:0 0 0 3p
 .pwa-ico{display:inline-block;padding:0 5px;border:1px solid #d0d5dd;border-radius:5px;font-size:12px}
 .pwa-update-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom));z-index:1900;display:flex;align-items:center;gap:12px;background:#101828;color:#fff;padding:10px 12px 10px 16px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.25);font-size:13px;max-width:calc(100vw - 32px)}
 @media(min-width:900px){.pwa-sheet-backdrop{align-items:center}}
+/* V3.4.23 — pilih periode laporan */
+.report-range-quick{display:flex;flex-wrap:wrap;align-items:center;gap:6px;align-self:end;padding-bottom:2px}
+.report-range-quick span{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-right:2px}

@@ -1,3 +1,12 @@
+# Nara System V3.4.23 — Periode Laporan Bebas
+
+Form **Buat & Kirim Laporan** (QC dan ATI ke Head Unit Bisnis) kini memakai **Dari tanggal – Sampai tanggal**:
+- Jenis: Mingguan (Senin–Minggu), Bulanan (tgl 1–akhir bulan), atau **Periode khusus**. Mengubah tanggal secara manual otomatis menjadi Periode khusus.
+- Tombol pilih cepat: Minggu ini, Minggu lalu, Bulan ini, Bulan lalu. Durasi (hari) tampil di bawah tanggal.
+- Validasi: tanggal akhir tidak boleh sebelum awal; rentang maksimal 366 hari.
+- Laporan berlabel "Periode Khusus • 20 Okt 2026 – 06 Nov 2026" di daftar dan detail.
+Tidak ada migration baru.
+
 # Nara System V3.4.22 — Aplikasi HP (PWA)
 
 Nara System kini bisa **dipasang sebagai aplikasi di HP** (Android & iPhone) dan di laptop, tanpa Play Store/App Store:

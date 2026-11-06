@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.22 — Aplikasi HP (PWA)
+ * Nara System V3.4.23 — Periode Laporan Bebas
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.22";
+const APP_VERSION = "APP-V3.4.23";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -2215,7 +2215,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.22"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.23"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2236,7 +2236,19 @@ function reportDay(value) {
   const x=String(value || "").slice(0,10);
   return /^\d{4}-\d{2}-\d{2}$/.test(x) ? x : "";
 }
-function reportPeriod(periodType, anchorDate) {
+// V3.4.23: periode dapat dipilih bebas (dari–sampai). Tanpa rentang → Mingguan (Senin–Minggu) / Bulanan (tgl 1–akhir) dari tanggal acuan.
+const REPORT_PERIOD_LABEL = {WEEKLY:"Mingguan",MONTHLY:"Bulanan",CUSTOM:"Periode Khusus"};
+const REPORT_MAX_RANGE_DAYS = 366;
+function reportPeriod(periodType, anchorDate, startDate="", endDate="") {
+  const s0=reportDay(startDate), e0=reportDay(endDate);
+  if (s0 && e0) {
+    if (e0 < s0) throw new Error("Tanggal akhir periode tidak boleh sebelum tanggal awal.");
+    const days=Math.round((Date.parse(e0+"T00:00:00Z")-Date.parse(s0+"T00:00:00Z"))/864e5)+1;
+    if (days > REPORT_MAX_RANGE_DAYS) throw new Error(`Rentang periode maksimal ${REPORT_MAX_RANGE_DAYS} hari.`);
+    const t=String(periodType||"").toUpperCase(); const std=reportPeriod(t==="MONTHLY"?"MONTHLY":"WEEKLY",s0);
+    const type=(["WEEKLY","MONTHLY"].includes(t) && std.start===s0 && std.end===e0) ? t : "CUSTOM";
+    return {periodType:type,start:s0,end:e0,anchor:s0,days};
+  }
   const type=String(periodType || "WEEKLY").toUpperCase()==="MONTHLY" ? "MONTHLY" : "WEEKLY";
   const anchor=reportDay(anchorDate) || new Date().toISOString().slice(0,10);
   const d=new Date(anchor+"T12:00:00Z");
@@ -2330,11 +2342,11 @@ async function generateDivisionReport(request,env,user,type) {
   if(t==="QC" && !cap.qcReportCreate) return json({ok:false,message:"Role ini tidak dapat membuat laporan QC."},403);
   if(t==="ATI" && !cap.atiReportCreate) return json({ok:false,message:"Role ini tidak dapat membuat laporan ATI."},403);
   if(!["QC","ATI"].includes(t)) return json({ok:false,message:"Jenis laporan tidak dikenal."},400);
-  const body=await parseJson(request)||{}; const range=reportPeriod(body.periodType,body.anchorDate);
+  const body=await parseJson(request)||{}; let range; try { range=reportPeriod(body.periodType,body.anchorDate,body.startDate,body.endDate); } catch(e) { return json({ok:false,message:e.message},400); }
   const recipients=await headUnitRecipients(env);
   if(!recipients.length) return json({ok:false,message:"Belum ada akun aktif dengan role Head Unit Bisnis sebagai penerima laporan."},400);
   const snapshot=t==="QC"?await buildQcReportSnapshot(env,range):await buildAtiReportSnapshot(env,range);
-  const id=crypto.randomUUID(); const label=range.periodType==="MONTHLY"?"Bulanan":"Mingguan";
+  const id=crypto.randomUUID(); const label=REPORT_PERIOD_LABEL[range.periodType]||"Mingguan";
   const data={reportType:t,periodType:range.periodType,periodStart:range.start,periodEnd:range.end,title:`Laporan ${t} ${label} ${range.start} s.d. ${range.end}`,status:"SUBMITTED",notes:String(body.notes||""),submittedAt:new Date().toISOString(),submittedByUserId:user.id,submittedByName:user.name||user.username||user.id,recipientRole:"Head Unit Bisnis",recipients,snapshot};
   const collection=t==="QC"?"qc_reports":"ati_reports"; const row=await upsertRecord(env,collection,id,data,user); await syncWorkflowTask(env,collection,id,data,user); await audit(env,user,"DIVISION_REPORT_SUBMIT",collection,id,"",{periodType:range.periodType,start:range.start,end:range.end,recipients:recipients.map(x=>x.id)}); return json({ok:true,row});
 }
@@ -2668,7 +2680,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.22-pwa"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.23-report-range"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);

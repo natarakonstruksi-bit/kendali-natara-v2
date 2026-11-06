@@ -1,3 +1,8 @@
+## V3.4.23 — Periode Laporan Bebas
+
+- `reportPeriod(periodType, anchorDate, startDate, endDate)`: rentang bebas, tipe `CUSTOM`, validasi ≤ 366 hari; kompatibel dengan tanggal acuan lama.
+- Form laporan QC/ATI: dari–sampai tanggal + pilih cepat. Tes `scripts/report-range-smoke.mjs`.
+
 ## V3.4.22 — Aplikasi HP (PWA)
 
 - Manifest, ikon (any + maskable + apple-touch), service worker `nara-shell-<versi>` (shell cache, API network-only, navigasi network-first dengan fallback 4 detik, halaman `/offline`).

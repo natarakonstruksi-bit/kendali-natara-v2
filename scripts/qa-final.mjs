@@ -10,9 +10,9 @@ const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 function must(cond,msg){ if(!cond) throw new Error(msg); }
 function has(text,needle,msg=needle){ must(text.includes(needle),`QA marker hilang: ${msg}`); }
 
-must(pkg.version==='3.4.22','Versi package harus 3.4.22');
-has(worker,'APP-V3.4.22','APP version 3.4.22');
-has(html,'Natara Konstruksi • V3.4.22','label frontend 3.4.22');
+must(pkg.version==='3.4.23','Versi package harus 3.4.23');
+has(worker,'APP-V3.4.23','APP version 3.4.23');
+has(html,'Natara Konstruksi • V3.4.23','label frontend 3.4.23');
 has(html,'NARA SYSTEM','branding Nara System');
 has(html,'Masuk ke Nara System','login branding Nara System');
 has(worker,'const SERVICE_NAME = "Nara System";','service branding Nara System');
@@ -24,7 +24,7 @@ has(app,"'head operational':'Head of Operational'",'normalisasi legacy display')
 has(worker,'["head operational","manager_operasional"]','backend alias legacy role');
 
 
-// V3.4.22: Project Manager + Pelaksana Lapangan => Site Manager (di bawah Head of Operational); Admin Logistik di Divisi Operational.
+// V3.4.23: Project Manager + Pelaksana Lapangan => Site Manager (di bawah Head of Operational); Admin Logistik di Divisi Operational.
 must(!app.includes("'Project Manager','Pelaksana Lapangan',"),'Role PM/Pelaksana lama masih muncul sebagai pilihan aktif.');
 has(app,"['Divisi Operational',['Site Manager','Admin Logistik']]",'Divisi Operational berisi Site Manager + Admin Logistik');
 has(app,"'project manager':'Site Manager'",'display alias Project Manager => Site Manager');
