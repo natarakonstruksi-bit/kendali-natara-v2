@@ -33,7 +33,7 @@ try{
   const smQc=m.collectionPermission({id:'sm',role:'Site Manager'},'defects');
   const smDaily=m.collectionPermission({id:'sm',role:'Site Manager'},'daily_progress');
   if(!smPr.read||!smPr.create||!smPr.update)throw new Error('Site Manager harus dapat membuat/mengubah Purchase Request.');
-  if(!smQc.read||!smQc.create||!smQc.update||!smQc.delete)throw new Error('Site Manager adalah PIC temuan QC proyek.');
+  if(!smQc.read||smQc.create||smQc.update||smQc.delete)throw new Error('V3.4.26: Site Manager PIC temuan QC hanya membaca & kirim foto perbaikan.');
   if(!smDaily.read||!smDaily.create||!smDaily.update)throw new Error('Site Manager membuat laporan harian.');
   if(m.ROLE_LABELS.procurement!=='Admin Logistik')throw new Error('Label Admin Logistik belum aktif.');
   console.log('Worker RBAC smoke OK — role aliases, hierarchy, permissions');

@@ -18,11 +18,11 @@ try{
   const pm=m.buildAccess({id:'pm',role:'Project Manager'});
   must(pm.views.includes('qc'),'Site Manager harus melihat QC Dashboard');
   must(!pm.capabilities.qcInspect,'Site Manager bukan inspector QC');
-  must(pm.capabilities.qcFindingManage,'Site Manager harus dapat mengisi/edit Temuan QC');
+  must(!pm.capabilities.qcFindingManage,'V3.4.26: Site Manager tidak mengedit Temuan QC');
   const pmDef=m.collectionPermission({id:'pm',role:'Project Manager'},'defects');
-  must(pmDef.read&&pmDef.create&&pmDef.update&&pmDef.delete,'Site Manager harus CRUD Temuan QC pada proyeknya');
+  must(pmDef.read&&!pmDef.update&&!pmDef.delete,'V3.4.26: Site Manager hanya membaca Temuan QC');
   const pelDef=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'defects'); // V3.4.17: alias lama => Site Manager (PIC temuan)
-  must(pelDef.read&&pelDef.create&&pelDef.update&&pelDef.delete,'Jabatan lama Pelaksana kini Site Manager dan mengelola Temuan QC proyeknya');
+  must(pelDef.read&&!pelDef.update&&!pelDef.delete,'Jabatan lama Pelaksana: hanya membaca Temuan QC');
   must(!app.includes("employeeField('qcUserId','QC',['qc'],false)"),'Master Proyek tidak boleh meminta satu QC per proyek');
   must(!app.includes('<th>QS</th><th>QC</th><th>Kontrak</th>'),'Kolom QC assignment harus hilang dari daftar proyek');
   for(const marker of ['PIC Temuan — Site Manager','PIC otomatis Site Manager proyek','qcFindingManage']) must(app.includes(marker)||worker.includes(marker),`Marker hilang: ${marker}`);

@@ -27,11 +27,12 @@ try{
     must(actions.read&&ver.read,`${role} harus dapat membaca riwayat perbaikan/verifikasi QC`);
   }
   const pm=m.buildAccess({id:'pm',role:'Project Manager'});
-  must(pm.views.includes('qc')&&!pm.capabilities.qcInspect&&pm.capabilities.qcFindingManage,'PM harus bisa membaca/mengelola Temuan QC tetapi tidak menjadi inspector QC.');
+  must(pm.views.includes('qc')&&!pm.capabilities.qcInspect&&!pm.capabilities.qcFindingManage&&!pm.capabilities.qcDeleteFinding,'V3.4.26: Site Manager hanya membaca temuan & mengirim foto perbaikan, tidak mengedit/menghapus.');
   const pmDef=m.collectionPermission({id:'pm',role:'Project Manager'},'defects');
-  must(pmDef.read&&pmDef.create&&pmDef.update&&pmDef.delete,'PM harus dapat CRUD Temuan QC pada proyeknya.');
+  must(pmDef.read&&!pmDef.create&&!pmDef.update&&!pmDef.delete,'V3.4.26: Site Manager tidak boleh CRUD Temuan QC.');
+  for(const role of ['Head of Operational','Direktur','Head Unit Bisnis']){const a=m.buildAccess({id:'x',role});const d=m.collectionPermission({id:'x',role},'defects');must(!a.capabilities.qcFindingManage&&!a.capabilities.qcDeleteFinding&&d.read&&!d.update&&!d.delete,`V3.4.26: ${role} hanya membaca Temuan QC`);}
   const pelDef=m.collectionPermission({id:'pel',role:'Pelaksana Lapangan'},'defects'); // V3.4.17: alias lama => Site Manager (PIC temuan)
-  must(pelDef.read&&pelDef.create&&pelDef.update&&pelDef.delete,'Jabatan lama Pelaksana kini Site Manager dan mengelola Temuan QC proyeknya.');
+  must(pelDef.read&&!pelDef.update&&!pelDef.delete,'Jabatan lama Pelaksana kini Site Manager: hanya membaca Temuan QC.');
   for(const marker of [
     'async function qcSessionUpdateHandler','async function qcFindingUpdateHandler','async function qcFindingDeleteHandler',
     'async function deleteQcFindingData','QC_SESSION_EDIT','QC_FINDING_EDIT','QC_FINDING_DELETE',

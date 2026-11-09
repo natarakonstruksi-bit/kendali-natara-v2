@@ -1,3 +1,19 @@
+## V3.4.27 — Arsip Laporan QC
+
+- Menu baru **Arsip Laporan QC** (view `qc_archive`) untuk QC, Head of Supporting, Head of Operational, Admin Teknik, dan pimpinan: tabel Dikirim · Laporan · Lingkup · Hasil · Perlu tindakan · Nilai · Status (Dibaca/Belum dibaca) dengan tombol Buka PDF, Rincian, Hapus; filter jenis, bulan, status baca, dan pencarian.
+- Buat laporan QC kini memilih **jenis** (Inspeksi / Temuan), **lingkup** (semua proyek atau satu proyek), dan **sertakan foto**. Judul otomatis, mis. "Laporan Inspeksi QC Mingguan 26 Okt 2026 – 30 Okt 2026". Laporan kosong ditolak.
+- **Buka PDF**: halaman cetak A4 berlogo Natara (ringkasan nilai, KPI, rekap per item, perlu tindakan, rincian pemeriksaan / temuan dengan foto sebelum–sesudah) → Simpan sebagai PDF.
+- **Status baca**: otomatis "Dibaca" (nama & tanggal) saat Head Unit Bisnis/Direktur membuka Rincian atau PDF — `POST /api/reports/qc/:id/read`.
+- Laporan lama tetap tampil sebagai "Inspeksi + Temuan".
+- Perbaikan: menu yang diklik saat aplikasi masih memuat tidak lagi tertimpa Dashboard.
+
+## V3.4.26 — Temuan QC dikunci untuk QC & Head of Supporting
+
+- Edit, hapus, dan buat temuan QC manual hanya untuk **QC** dan **Head of Supporting** (plus Administrator sistem untuk darurat). Berlaku di tombol layar, endpoint `/api/qc/findings/:id` (PATCH/DELETE), dan CRUD generik `defects`.
+- Site Manager (PIC) tetap: melihat temuan, **Mulai** tindak lanjut, dan **Kirim Perbaikan** dengan foto hasil perbaikan. QC lalu memverifikasi.
+- Head of Operational, Direktur, Head Unit Bisnis: hanya membaca temuan (tetap bisa membantu Mulai/Kirim Perbaikan seperti sebelumnya).
+- Tes peran QC diperbarui.
+
 ## V3.4.25 — Database Mitra
 
 - Menu baru **Database Mitra** (view `directory`): tab Tukang, Vendor, Subkon, Toko Material — kontak, rekening, status, dan nominal masing-masing (nilai SPK/dikerjakan/dibayar/belum dibayar/retensi; total beli/dibayar; upah absensi/dibayar/dalam pengajuan/belum diajukan). Pencarian, filter status, urutan.

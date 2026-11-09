@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.25 — Database Mitra (Tukang, Vendor, Subkon, Toko Material)
+ * Nara System V3.4.27 — Arsip Laporan QC
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.25";
+const APP_VERSION = "APP-V3.4.27";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -48,20 +48,20 @@ const ROLE_LABELS = {
   viewer: "Viewer"
 };
 
-const ALL_VIEWS = ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","employees","master","audit"];
+const ALL_VIEWS = ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","ati","documents","flow","closeout","public_info","employees","master","audit"];
 const ROLE_VIEWS = {
   administrator: ALL_VIEWS,
   direktur: ALL_VIEWS,
   head_unit_bisnis: ALL_VIEWS,
-  manager_operasional: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","master","audit"],
+  manager_operasional: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","ati","documents","flow","closeout","public_info","master","audit"],
   koordinator_engineering: ["dashboard","tasks","projects","progress","opname","asbuilt","qc","cco","procurement","documents","flow","closeout"],
-  koordinator_supporting: ["dashboard","tasks","projects","progress","qc","documents","flow","closeout"],
-  admin_teknik: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","master"],
+  koordinator_supporting: ["dashboard","tasks","projects","progress","qc","qc_archive","documents","flow","closeout"],
+  admin_teknik: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","ati","documents","flow","closeout","public_info","master"],
   site_manager: ["dashboard","tasks","projects","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout"],
   estimator: ["dashboard","tasks","projects","cco","documents","flow"],
   qs: ["dashboard","tasks","projects","fund_requests","progress","opname","cco","documents","flow"],
   drafter: ["dashboard","tasks","projects","asbuilt","documents","flow"],
-  qc: ["dashboard","tasks","projects","fund_requests","progress","qc","documents","flow"],
+  qc: ["dashboard","tasks","projects","fund_requests","progress","qc","qc_archive","documents","flow"],
   mep_engineer: ["dashboard","tasks","projects","progress","qc","documents","flow"],
   finance: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","procurement","documents","flow","closeout"],
   procurement: ["dashboard","tasks","projects","payments","directory","fund_requests","procurement","documents","flow"],
@@ -201,6 +201,8 @@ function collectionPermission(user, collection) {
     read:readRoles.includes(role), create:writeRoles.includes(role), update:writeRoles.includes(role), delete:deleteRoles.includes(role)
   });
   if (collection === "workflow_tasks") return allow([],[],[]);
+  // Temuan QC: hanya QC & Head of Supporting (dan Administrator sistem) yang boleh membuat/mengubah/menghapus. Site Manager hanya mengirim foto perbaikan lewat alur tindak lanjut.
+  if (collection === "defects") return allow(["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager","qs","qc","mep_engineer"],["administrator","koordinator_supporting","qc"],["administrator","koordinator_supporting","qc"]);
   const top = ["administrator","direktur","head_unit_bisnis"].includes(role);
   if (top) return {read:true,create:true,update:true,delete:true};
   const projectReaders=["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager","estimator","qs","drafter","qc","mep_engineer","finance","procurement","viewer"];
@@ -230,7 +232,6 @@ function collectionPermission(user, collection) {
   if (collection === "qc_inspection_sessions") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager","qs","qc","mep_engineer"],[],[]);
   if (collection === "qc_inspection_items") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager","qs","qc","mep_engineer"],[],[]);
   if (collection === "qc_inspections") return allow(["manager_operasional","koordinator_supporting","admin_teknik","site_manager","qs","qc"],["manager_operasional","koordinator_supporting","qc"],["manager_operasional","koordinator_supporting","qc"]);
-  if (collection === "defects") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager","qs","qc","mep_engineer"],["manager_operasional","koordinator_supporting","site_manager","qc"],["manager_operasional","koordinator_supporting","site_manager","qc"]);
   if (collection === "cco") return allow(["manager_operasional","koordinator_engineering","admin_teknik","site_manager","estimator","qs"],["manager_operasional","koordinator_engineering","admin_teknik","qs","site_manager"],["manager_operasional"]);
   if (collection === "approvals") return allow(["manager_operasional","admin_teknik","finance"],["manager_operasional","admin_teknik","finance"]);
   if (collection === "procurement") return allow(["manager_operasional","koordinator_engineering","admin_teknik","site_manager","procurement","finance"],["manager_operasional","admin_teknik","site_manager","procurement"]);
@@ -289,12 +290,12 @@ function buildAccess(user) {
       projectManagerProcurementAccess: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","site_manager"]),
       projectManagerQcReadAccess: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","site_manager"]),
       qcInspect: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
-      qcFindingManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc","site_manager"]),
+      qcFindingManage: roleIn(user,["administrator","koordinator_supporting","qc"]),
       qcVerify: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
       qcCloseSession: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting"]),
       qcDeleteSession: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
       qcRouteManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc"]),
-      qcDeleteFinding: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_supporting","qc","site_manager"]),
+      qcDeleteFinding: roleIn(user,["administrator","koordinator_supporting","qc"]),
       atiManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","kepala_ati","instruktur_ati"]),
       managePublicInfo: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
       qcSyncRab: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_engineering","koordinator_supporting","qc","qs"]),
@@ -1875,7 +1876,7 @@ async function qcSessionDeleteItemHandler(env,user,id) {
   const item=await getRecord(env,"qc_inspection_items",id);
   if (!item) return json({ok:true});
   const linkedFindingId=String(item.data.findingId||"");
-  if (linkedFindingId && !buildAccess(user).capabilities.qcDeleteFinding) return json({ok:false,message:`Sub-pekerjaan sudah diterbitkan menjadi temuan ${linkedFindingId}. Hanya QC/Head of Supporting/Manajemen yang dapat menghapusnya.`},409);
+  if (linkedFindingId && !buildAccess(user).capabilities.qcDeleteFinding) return json({ok:false,message:`Sub-pekerjaan sudah diterbitkan menjadi temuan ${linkedFindingId}. Hanya QC/Head of Supporting yang dapat menghapusnya.`},409);
   const session=await getRecord(env,"qc_inspection_sessions",item.data.sessionId);
   if (!session || String(session.data.status||"").toUpperCase()!=="DRAFT") return json({ok:false,message:"Catatan pemeriksaan sudah ditutup."},409);
   const denied=await requireProjectAccess(env,user,item.data.projectId); if (denied) return denied;
@@ -1946,7 +1947,7 @@ async function deleteQcFindingData(env,user,id,{checkAccess=true}={}) {
 }
 
 async function qcFindingUpdateHandler(request,env,user,id) {
-  if (!buildAccess(user).capabilities.qcFindingManage) return json({ok:false,message:"Edit temuan QC hanya untuk Site Manager, QC, Head of Supporting, atau Manajemen."},403);
+  if (!buildAccess(user).capabilities.qcFindingManage) return json({ok:false,message:"Edit temuan QC hanya untuk QC dan Head of Supporting. Site Manager cukup mengirim foto hasil perbaikan."},403);
   const rec=await getRecord(env,"defects",id); if(!rec) return json({ok:false,message:"Temuan QC tidak ditemukan."},404);
   const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
   const body=await parseJson(request)||{}; const next={...rec.data};
@@ -1961,7 +1962,7 @@ async function qcFindingUpdateHandler(request,env,user,id) {
 }
 
 async function qcFindingDeleteHandler(env,user,id) {
-  if (!buildAccess(user).capabilities.qcDeleteFinding) return json({ok:false,message:"Hapus temuan QC hanya untuk Site Manager, QC, Head of Supporting, atau Manajemen."},403);
+  if (!buildAccess(user).capabilities.qcDeleteFinding) return json({ok:false,message:"Hapus temuan QC hanya untuk QC dan Head of Supporting."},403);
   const rec=await getRecord(env,"defects",id); if(!rec) return json({ok:true});
   const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
   await deleteQcFindingData(env,user,id,{checkAccess:false});
@@ -2246,7 +2247,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.25"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.27"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2309,8 +2310,10 @@ async function headUnitRecipients(env) {
 async function projectNameMap(env) { const rows=await allRows(env,"projects"); return Object.fromEntries(rows.map(r=>[String(r.id),String(r.data.name||r.data.project_name||r.data.projectName||r.data.namaProyek||r.id)])); }
 async function employeeNameMap(env) { const rows=await allRows(env,"users"); return Object.fromEntries(rows.map(r=>[String(r.id),String(r.data.name||r.data.username||r.id)])); }
 
-async function buildQcReportSnapshot(env, range) {
-  const [sessions,items,findings,projects,employees]=await Promise.all([allRows(env,"qc_inspection_sessions"),allRows(env,"qc_inspection_items"),allRows(env,"defects"),projectNameMap(env),employeeNameMap(env)]);
+async function buildQcReportSnapshot(env, range, opts={}) {
+  const scope=String(opts.projectId||""); const inScope=r=>!scope||String(r.data.projectId||"")===scope; const photos=Boolean(opts.withPhotos);
+  let [sessions,items,findings,projects,employees]=await Promise.all([allRows(env,"qc_inspection_sessions"),allRows(env,"qc_inspection_items"),allRows(env,"defects"),projectNameMap(env),employeeNameMap(env)]);
+  sessions=sessions.filter(inScope); items=items.filter(inScope); findings=findings.filter(inScope);
   const periodItems=items.filter(r=>inReportPeriod(r.data.date,range.start,range.end));
   const sessionIds=new Set(periodItems.map(r=>String(r.data.sessionId||"")));
   const periodSessions=sessions.filter(r=>sessionIds.has(String(r.id)));
@@ -2328,10 +2331,10 @@ async function buildQcReportSnapshot(env, range) {
   const perGroup={};
   for(const r of periodItems){const g=String(r.data.workGroup||"Tanpa Kelompok");if(!perGroup[g])perGroup[g]={workGroup:g,total:0,sesuai:0,tidak:0,konfirmasi:0};perGroup[g].total++;const rr=String(r.data.result).toUpperCase();if(rr==="SESUAI")perGroup[g].sesuai++;else if(rr==="BUTUH KONFIRMASI")perGroup[g].konfirmasi++;else perGroup[g].tidak++;}
   return {
-    metrics:{catatanInspeksi:periodSessions.length,subPekerjaan:total,sesuai,tidakSesuai:tidak,butuhKonfirmasi:konfirmasi,kesesuaian:(sesuai+tidak)?Math.round(sesuai/(sesuai+tidak)*100):0,totalTemuan:periodFindings.length,openPerbaikan:periodFindings.filter(r=>String(r.data.status||"").toUpperCase()!=="CLOSED").length,menungguVerifikasi:waiting,closedOnTime,overdue,qcScore:qcSnapshotScore(periodFindings)},
+    metrics:{catatanInspeksi:periodSessions.length,subPekerjaan:total,sesuai,tidakSesuai:tidak,butuhKonfirmasi:konfirmasi,kesesuaian:(sesuai+tidak)?Math.round(sesuai/(sesuai+tidak)*100):0,totalTemuan:periodFindings.length,openPerbaikan:periodFindings.filter(r=>String(r.data.status||"").toUpperCase()!=="CLOSED").length,menungguVerifikasi:waiting,closedOnTime,overdue,qcScore:qcSnapshotScore(periodFindings),temuanSelesai:closedRows.length,totalOpen:allOpen.length},
     groups:Object.values(perGroup).sort((a,b)=>a.workGroup.localeCompare(b.workGroup,"id")),
-    inspections:periodItems.slice().sort((a,b)=>String(b.data.date||"").localeCompare(String(a.data.date||""))).map(r=>({date:r.data.date,projectId:r.data.projectId,project:projects[r.data.projectId]||r.data.projectId||"-",workGroup:r.data.workGroup||"-",item:r.data.item||"-",result:r.data.result||"-",note:r.data.note||"",inspector:employees[r.data.inspectorUserId]||r.data.inspectorUserId||"-",findingId:r.data.findingId||""})).slice(0,500),
-    findings:periodFindings.slice().sort((a,b)=>String(b.data.date||"").localeCompare(String(a.data.date||""))).map(r=>({id:r.id,date:r.data.date,projectId:r.data.projectId,project:projects[r.data.projectId]||r.data.projectId||"-",area:r.data.area||r.data.item||"-",category:r.data.category||"-",description:r.data.description||r.data.notes||"-",severity:r.data.severity||"-",pic:employees[r.data.picUserId]||r.data.picUserId||"-",deadline:r.data.deadline||"",status:r.data.status||"OPEN"})).slice(0,300),
+    inspections:periodItems.slice().sort((a,b)=>String(b.data.date||"").localeCompare(String(a.data.date||""))).map(r=>({date:r.data.date,projectId:r.data.projectId,project:projects[r.data.projectId]||r.data.projectId||"-",workGroup:r.data.workGroup||"-",item:r.data.item||"-",result:r.data.result||"-",note:r.data.note||"",inspector:employees[r.data.inspectorUserId]||r.data.inspectorUserId||"-",findingId:r.data.findingId||"",photoDocId:photos?(r.data.evidenceDocumentId||""):""})).slice(0,500),
+    findings:periodFindings.slice().sort((a,b)=>String(b.data.date||"").localeCompare(String(a.data.date||""))).map(r=>({id:r.id,date:r.data.date,projectId:r.data.projectId,project:projects[r.data.projectId]||r.data.projectId||"-",area:r.data.area||r.data.item||"-",category:r.data.category||"-",description:r.data.description||r.data.notes||"-",severity:r.data.severity||"-",pic:employees[r.data.picUserId]||r.data.picUserId||"-",deadline:r.data.deadline||"",status:r.data.status||"OPEN",closedAt:r.data.closedAt||"",beforeDocId:photos?(r.data.beforeDocumentId||""):"",afterDocId:photos?(r.data.lastFixDocumentId||""):""})).slice(0,300),
     attention:allOpen.slice().sort((a,b)=>String(a.data.deadline||"9999").localeCompare(String(b.data.deadline||"9999"))).slice(0,30).map(r=>({id:r.id,project:projects[r.data.projectId]||r.data.projectId||"-",description:r.data.description||r.data.item||"-",pic:employees[r.data.picUserId]||r.data.picUserId||"-",deadline:r.data.deadline||"",status:r.data.status||"OPEN"}))
   };
 }
@@ -2376,9 +2379,16 @@ async function generateDivisionReport(request,env,user,type) {
   const body=await parseJson(request)||{}; let range; try { range=reportPeriod(body.periodType,body.anchorDate,body.startDate,body.endDate); } catch(e) { return json({ok:false,message:e.message},400); }
   const recipients=await headUnitRecipients(env);
   if(!recipients.length) return json({ok:false,message:"Belum ada akun aktif dengan role Head Unit Bisnis sebagai penerima laporan."},400);
-  const snapshot=t==="QC"?await buildQcReportSnapshot(env,range):await buildAtiReportSnapshot(env,range);
+  const kind=t==="QC"?(String(body.reportKind||"INSPEKSI").toUpperCase()==="TEMUAN"?"TEMUAN":"INSPEKSI"):"";
+  const scopeId=t==="QC"?String(body.projectId||""):""; if(scopeId){ const denied=await requireProjectAccess(env,user,scopeId); if(denied) return denied; }
+  const withPhotos=t==="QC"&&body.withPhotos!==false&&body.withPhotos!=="false";
+  const snapshot=t==="QC"?await buildQcReportSnapshot(env,range,{projectId:scopeId,withPhotos}):await buildAtiReportSnapshot(env,range);
+  const pnames=scopeId?await projectNameMap(env):{};
+  if(t==="QC"){ const mm=snapshot.metrics||{}; if(kind==="INSPEKSI"&&!mm.subPekerjaan) return json({ok:false,message:"Tidak ada hasil inspeksi QC pada periode/lingkup ini. Pilih periode lain atau buat Laporan Temuan."},400); if(kind==="TEMUAN"&&!mm.totalTemuan&&!(snapshot.attention||[]).length) return json({ok:false,message:"Tidak ada temuan QC pada periode/lingkup ini."},400); }
   const id=crypto.randomUUID(); const label=REPORT_PERIOD_LABEL[range.periodType]||"Mingguan";
-  const data={reportType:t,periodType:range.periodType,periodStart:range.start,periodEnd:range.end,title:`Laporan ${t} ${label} ${range.start} s.d. ${range.end}`,status:"SUBMITTED",notes:String(body.notes||""),submittedAt:new Date().toISOString(),submittedByUserId:user.id,submittedByName:user.name||user.username||user.id,recipientRole:"Head Unit Bisnis",recipients,snapshot};
+  const fmtD=v=>{const [y,m,d]=String(v).split("-");return `${Number(d)} ${["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"][Number(m)-1]||m} ${y}`;};
+  const title=t==="QC"?`Laporan ${kind==="TEMUAN"?"Temuan":"Inspeksi"} QC ${label} ${fmtD(range.start)} – ${fmtD(range.end)}${scopeId?` — ${pnames[scopeId]||scopeId}`:""}`:`Laporan ${t} ${label} ${fmtD(range.start)} – ${fmtD(range.end)}`;
+  const data={reportType:t,reportKind:kind,projectId:scopeId,projectName:scopeId?(pnames[scopeId]||scopeId):"",withPhotos,periodType:range.periodType,periodStart:range.start,periodEnd:range.end,title,status:"SUBMITTED",notes:String(body.notes||""),submittedAt:new Date().toISOString(),submittedByUserId:user.id,submittedByName:user.name||user.username||user.id,recipientRole:"Head Unit Bisnis",recipients,snapshot};
   const collection=t==="QC"?"qc_reports":"ati_reports"; const row=await upsertRecord(env,collection,id,data,user); await syncWorkflowTask(env,collection,id,data,user); await audit(env,user,"DIVISION_REPORT_SUBMIT",collection,id,"",{periodType:range.periodType,start:range.start,end:range.end,recipients:recipients.map(x=>x.id)}); return json({ok:true,row});
 }
 
@@ -2387,6 +2397,18 @@ async function reviewDivisionReport(env,user,type,id) {
   const t=String(type||"").toUpperCase(); const collection=t==="QC"?"qc_reports":t==="ATI"?"ati_reports":""; if(!collection) return json({ok:false,message:"Jenis laporan tidak dikenal."},400);
   const rec=await getRecord(env,collection,id); if(!rec) return json({ok:false,message:"Laporan tidak ditemukan."},404);
   const data={...rec.data,status:"REVIEWED",reviewedAt:new Date().toISOString(),reviewedByUserId:user.id,reviewedByName:user.name||user.username||user.id}; const row=await upsertRecord(env,collection,id,data,user); await syncWorkflowTask(env,collection,id,data,user); await audit(env,user,"DIVISION_REPORT_REVIEW",collection,id,"",{}); return json({ok:true,row});
+}
+
+async function readDivisionReport(env,user,type,id) {
+  const t=String(type||"").toUpperCase(); const collection=t==="QC"?"qc_reports":t==="ATI"?"ati_reports":""; if(!collection) return json({ok:false,message:"Jenis laporan tidak dikenal."},400);
+  const rec=await getRecord(env,collection,id); if(!rec) return json({ok:false,message:"Laporan tidak ditemukan."},404);
+  // Hanya penerima (Head Unit Bisnis/Direktur) yang dihitung "Dibaca"; Administrator & pengirim tidak mengubah status.
+  if(!roleIn(user,["head_unit_bisnis","direktur"])) return json({ok:true,row:rec,counted:false});
+  const reads=Array.isArray(rec.data.reads)?rec.data.reads.slice():[]; const now=new Date().toISOString();
+  if(!reads.some(r=>r.userId===user.id)) reads.push({userId:user.id,name:user.name||user.username||user.id,at:now});
+  const data={...rec.data,reads,readAt:rec.data.readAt||now,readByUserId:rec.data.readByUserId||user.id,readByName:rec.data.readByName||user.name||user.username||user.id};
+  const row=await upsertRecord(env,collection,id,data,user); if(!rec.data.readAt) await audit(env,user,"DIVISION_REPORT_READ",collection,id,"",{});
+  return json({ok:true,row,counted:true});
 }
 
 async function updateDivisionReport(request,env,user,type,id) {
@@ -3122,7 +3144,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.25-partner-directory"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.27-qc-report-archive"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3150,6 +3172,8 @@ async function handleRequest(request, env) {
     if (path === "/api/reports/ati/generate" && request.method === "POST") return generateDivisionReport(request,env,auth.user,"ATI");
     const reportReviewMatch=path.match(/^\/api\/reports\/(qc|ati)\/([^/]+)\/review$/);
     if (reportReviewMatch && request.method === "POST") return reviewDivisionReport(env,auth.user,reportReviewMatch[1],decodeURIComponent(reportReviewMatch[2]));
+    const reportReadMatch=path.match(/^\/api\/reports\/(qc|ati)\/([^/]+)\/read$/);
+    if (reportReadMatch && request.method === "POST") return readDivisionReport(env,auth.user,reportReadMatch[1],decodeURIComponent(reportReadMatch[2]));
     const reportManageMatch=path.match(/^\/api\/reports\/(qc|ati)\/([^/]+)$/);
     if (reportManageMatch && request.method === "PATCH") return updateDivisionReport(request,env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));
     if (reportManageMatch && request.method === "DELETE") return deleteDivisionReport(env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));

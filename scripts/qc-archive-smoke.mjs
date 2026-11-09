@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root=path.resolve(import.meta.dirname,'..');
+const worker=fs.readFileSync(path.join(root,'src/worker.js'),'utf8');
+const app=fs.readFileSync(path.join(root,'public/app.js'),'utf8');
+const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
+const must=(c,m)=>{if(!c)throw new Error(m)};
+for(const mk of ['async function readDivisionReport','reportReadMatch','reportKind:kind','withPhotos','buildQcReportSnapshot(env,range,{projectId:scopeId,withPhotos})','temuanSelesai','photoDocId:photos','beforeDocId:photos','"qc","qc_archive"','Tidak ada hasil inspeksi QC pada periode/lingkup ini']) must(worker.includes(mk),`Backend marker hilang: ${mk}`);
+for(const mk of ['renderQcArchive','qc_archive:renderQcArchive','v3427OpenPdf','v3427MarkRead','v3427QcComposeFields','Buka PDF','Belum dibaca','state.navClicked']) must(app.includes(mk),`Frontend marker hilang: ${mk}`);
+must(html.includes('data-view="qc_archive"'),'Menu Arsip Laporan QC hilang');
+must(/roleIn\(user,\["head_unit_bisnis","direktur"\]\)\) return json\(\{ok:true,row:rec,counted:false\}\)/.test(worker),'Status Dibaca hanya dihitung untuk Head Unit Bisnis/Direktur');
+console.log('QC archive smoke OK — arsip laporan, jenis Inspeksi/Temuan, lingkup proyek, PDF dengan foto, status baca.');

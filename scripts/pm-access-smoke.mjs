@@ -6,7 +6,7 @@ const must=[
   'site_manager: ["dashboard","tasks","projects","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout"]',
   'if (collection === "procurement") return allow(["manager_operasional","koordinator_engineering","admin_teknik","site_manager","procurement","finance"]',
   'if (collection === "qc_inspection_sessions") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager"',
-  'if (collection === "defects") return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager"',
+  'if (collection === "defects") return allow(["administrator","direktur","head_unit_bisnis","manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager"',
   '["project manager / superintendent","site_manager"]',
   'input?.position, input?.jabatan, input?.role, input?.roleKey'
 ];
