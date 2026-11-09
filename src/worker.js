@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.29 — Pindah jenis mitra (Toko/Vendor/Subkon/Reimburse)
+ * Nara System V3.4.30 — Verifikasi perbaikan temuan oleh QC & Head of Supporting
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.29";
+const APP_VERSION = "APP-V3.4.30";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -1154,7 +1154,9 @@ async function getProjectBudgetValue(env, projectId) {
 
 const WORKFLOW_SOURCE_COLLECTIONS = new Set(["daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items","partner_payments","project_terms"]);
 
-function workflowRoleLabel(role) { return ROLE_LABELS[role] || role || ""; }
+function workflowRoleLabel(role) { return String(role||"").split(",").filter(Boolean).map(r=>ROLE_LABELS[r]||r).join(" / "); }
+// V3.4.30: antrean tugas bisa untuk beberapa jabatan sekaligus, ditulis "qc,koordinator_supporting".
+function roleQueueHas(assigneeRole,role){ return String(assigneeRole||"").split(",").map(x=>x.trim()).filter(Boolean).includes(String(role||"")); }
 function workflowActiveStatus(status) { return ["OPEN","IN_PROGRESS"].includes(String(status||"").toUpperCase()); }
 function workflowSourceView(collection) {
   return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc",partner_payments:"payments",project_terms:"finance"})[collection] || "dashboard";
@@ -1194,7 +1196,7 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
   }
   if(collection==="defects"){
     if(["OPEN","ON PROGRESS","IN PROGRESS","REVISION REQUIRED"].includes(status)) return mk("QC_PM_FOLLOWUP","Tindak Lanjut Temuan QC", "Site Manager menindaklanjuti temuan dan mengunggah bukti hasil perbaikan","Tindak Lanjut Temuan",d.picUserId||sm,"site_manager",{priority:String(d.severity||"").toUpperCase().includes("KRIT")?"CRITICAL":"HIGH"});
-    if(["WAITING QC CHECK","WAITING"].includes(status)) return mk("QC_VERIFY","Verifikasi Perbaikan QC", "Tim QC memeriksa ulang hasil perbaikan","Verifikasi QC","","qc",{priority:"HIGH"});
+    if(["WAITING QC CHECK","WAITING"].includes(status)) return mk("QC_VERIFY","Verifikasi Perbaikan QC", "QC atau Head of Supporting memeriksa hasil perbaikan Site Manager","Verifikasi","","qc,koordinator_supporting",{priority:"HIGH"});
     return null;
   }
   if(collection==="cco"){
@@ -1343,9 +1345,12 @@ async function backfillWorkflowTasks(env,user,{force=false}={}) {
 
 function taskVisibleToUser(task,user) {
   const d=task.data||{}; const role=normalizeRole(user);
-  return String(d.assigneeUserId||"")===String(user.id||"") || (!d.assigneeUserId && String(d.assigneeRole||"")===role);
+  return String(d.assigneeUserId||"")===String(user.id||"") || (!d.assigneeUserId && roleQueueHas(d.assigneeRole,role));
 }
+let v3430QueueMigrated=false;
+async function migrateQcVerifyQueue(env){ if(v3430QueueMigrated) return; v3430QueueMigrated=true; try{ await env.DB.prepare(`UPDATE app_records SET data_json=json_set(data_json,'$.assigneeRole','qc,koordinator_supporting','$.assigneeRoleLabel','QC / Head of Supporting','$.waitingFor','QC atau Head of Supporting memeriksa hasil perbaikan Site Manager') WHERE collection='workflow_tasks' AND json_extract(data_json,'$.stage')='QC_VERIFY' AND json_extract(data_json,'$.assigneeRole')='qc'`).run(); }catch(e){ v3430QueueMigrated=false; } }
 async function listWorkflowTasks(env,user,url) {
+  await migrateQcVerifyQueue(env);
   await backfillWorkflowTasks(env,user,{force:truthy(url.searchParams.get('resync'))});
   const scope=String(url.searchParams.get('scope')||'mine').toLowerCase(); const includeDone=truthy(url.searchParams.get('includeDone')); const projectId=String(url.searchParams.get('projectId')||'');
   if(projectId && !(await userCanAccessProject(env,user,projectId))) return [];
@@ -1362,8 +1367,9 @@ async function listWorkflowTasks(env,user,url) {
 }
 // V3.4.18 — Hitung badge Tugas Saya dengan satu query ringan (tanpa sinkronisasi).
 async function countMyWorkflowTasks(env,user) {
+  await migrateQcVerifyQueue(env);
   const role=normalizeRole(user);
-  const res=await env.DB.prepare(`SELECT json_extract(data_json,'$.projectId') AS projectId FROM app_records WHERE collection='workflow_tasks' AND upper(COALESCE(json_extract(data_json,'$.status'),'OPEN')) IN ('OPEN','IN_PROGRESS') AND (COALESCE(json_extract(data_json,'$.assigneeUserId'),'')=? OR (COALESCE(json_extract(data_json,'$.assigneeUserId'),'')='' AND COALESCE(json_extract(data_json,'$.assigneeRole'),'')=?))`).bind(String(user.id||""),role).all();
+  const res=await env.DB.prepare(`SELECT json_extract(data_json,'$.projectId') AS projectId FROM app_records WHERE collection='workflow_tasks' AND upper(COALESCE(json_extract(data_json,'$.status'),'OPEN')) IN ('OPEN','IN_PROGRESS') AND (COALESCE(json_extract(data_json,'$.assigneeUserId'),'')=? OR (COALESCE(json_extract(data_json,'$.assigneeUserId'),'')='' AND (','||COALESCE(json_extract(data_json,'$.assigneeRole'),'')||',') LIKE ('%,'||?||',%')))`).bind(String(user.id||""),role).all();
   let rows=res.results||[];
   if(isProjectScopedRole(user)){ const ids=await accessibleProjectIds(env,user); rows=rows.filter(r=>!r.projectId||ids.has(String(r.projectId))); }
   return rows.length;
@@ -1372,7 +1378,7 @@ async function taskActionHandler(request,env,user,id){
   const task=await getRecord(env,'workflow_tasks',id); if(!task) return json({ok:false,message:'Tugas tidak ditemukan.'},404);
   if(task.data.projectId){ const denied=await requireProjectAccess(env,user,task.data.projectId); if(denied) return denied; }
   const body=await parseJson(request)||{}; const action=String(body.action||'').toLowerCase(); const d={...task.data}; const role=normalizeRole(user);
-  const assignedToMe=String(d.assigneeUserId||'')===String(user.id||''); const roleQueue=!d.assigneeUserId && String(d.assigneeRole||'')===role;
+  const assignedToMe=String(d.assigneeUserId||'')===String(user.id||''); const roleQueue=!d.assigneeUserId && roleQueueHas(d.assigneeRole,role);
   if(!assignedToMe && !roleQueue && !buildAccess(user).capabilities.workflowOversight) return json({ok:false,message:'Tugas ini bukan untuk Anda.'},403);
   if(action==='claim') { if(!workflowActiveStatus(d.status)) return json({ok:false,message:'Tugas sudah selesai.'},409); d.assigneeUserId=user.id; d.assigneeName=user.name||user.username; d.claimedAt=new Date().toISOString(); }
   else if(action==='start') { if(!workflowActiveStatus(d.status)) return json({ok:false,message:'Tugas sudah selesai.'},409); if(!d.assigneeUserId){d.assigneeUserId=user.id;d.assigneeName=user.name||user.username;d.claimedAt=new Date().toISOString();} d.status='IN_PROGRESS'; d.startedAt=d.startedAt||new Date().toISOString(); }
@@ -2128,6 +2134,23 @@ function normalizePrArrays(d) {
   return out;
 }
 
+// V3.4.30: verifikasi "Sesuai" untuk banyak temuan sekaligus (QC / Head of Supporting / Manajemen)
+async function qcBulkVerifyHandler(request,env,user){
+  if(!buildAccess(user).capabilities.qcVerify) return json({ok:false,message:"Hanya QC, Head of Supporting, atau Manajemen yang dapat memverifikasi perbaikan."},403);
+  const b=await parseJson(request)||{}; const ids=[...new Set((b.ids||[]).map(String))].slice(0,100); const note=String(b.note||"Diverifikasi sesuai").slice(0,500);
+  let ok=0; const fail=[];
+  for(const id of ids){
+    const rec=await getRecord(env,"defects",id); if(!rec){ fail.push(`${id}: tidak ditemukan`); continue; }
+    if(!(await recordAllowedByProjectScope(env,user,"defects",id,rec.data))){ fail.push(`${id}: di luar proyek Anda`); continue; }
+    const d={...rec.data}; if(String(d.status||"").toUpperCase()!=="WAITING QC CHECK"){ fail.push(`${d.item||id}: tidak menunggu verifikasi`); continue; }
+    const vid=crypto.randomUUID(); const now=new Date().toISOString();
+    await upsertRecord(env,"qc_verifications",vid,{projectId:d.projectId,findingId:id,date:now.slice(0,10),result:"SESUAI",note,qcUserId:user.id,bulk:true},user);
+    d.status="CLOSED"; d.lastVerificationId=vid; d.verifiedAt=now; d.qcNote=note; d.closedAt=now; d.verifiedByUserId=user.id;
+    await upsertRecord(env,"defects",id,d,user); await syncWorkflowTask(env,"defects",id,d,user); ok++;
+  }
+  await audit(env,user,"QC_FINDING_BULK_VERIFY","defects","","",{ok,fail:fail.length});
+  return json({ok:true,closed:ok,failed:fail});
+}
 async function qcFindingActionHandler(request,env,user,id) {
   const rec=await getRecord(env,"defects",id); if(!rec) return json({ok:false,message:"Temuan QC tidak ditemukan."},404);
   const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
@@ -2150,7 +2173,7 @@ async function qcFindingActionHandler(request,env,user,id) {
     await upsertRecord(env,"qc_actions",aid,{projectId:d.projectId,findingId:id,date:new Date().toISOString().slice(0,10),action:"SUBMIT_FIX",description:note,afterDocumentId:doc.id,byUserId:user.id},user);
     d.status="WAITING QC CHECK"; d.lastFixDocumentId=doc.id; d.lastFixNote=note; d.submittedFixAt=new Date().toISOString();
   } else if(action==="verify") {
-    if(!buildAccess(user).capabilities.qcVerify) return json({ok:false,message:"Hanya QC/Manajemen yang dapat memverifikasi perbaikan."},403);
+    if(!buildAccess(user).capabilities.qcVerify) return json({ok:false,message:"Hanya QC, Head of Supporting, atau Manajemen yang dapat memverifikasi perbaikan."},403);
     if(old!=="WAITING QC CHECK") return json({ok:false,message:"Temuan belum menunggu verifikasi QC."},409);
     if(!["SESUAI","TIDAK SESUAI"].includes(result)) return json({ok:false,message:"Hasil verifikasi wajib SESUAI atau TIDAK SESUAI."},400);
     if(result==="TIDAK SESUAI" && !note.trim()) return json({ok:false,message:"Catatan QC wajib diisi jika hasil tidak sesuai."},400);
@@ -2248,7 +2271,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.29"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.30"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2588,7 +2611,7 @@ async function taskEmailRecipients(env,task,actor) {
   let targets=[];
   if(task.assigneeUserId) targets=users.filter(u=>u.id===String(task.assigneeUserId));
   else if(task.assigneeRole) {
-    targets=users.filter(u=>normalizeRole(u.data)===task.assigneeRole);
+    targets=users.filter(u=>roleQueueHas(task.assigneeRole,normalizeRole(u.data)));
     // Antrean role yang terikat proyek (mis. Site Manager) hanya ke yang ditugaskan di proyek tsb.
     if(task.projectId && isProjectScopedRole({role:task.assigneeRole})){
       const p=await getRecord(env,"projects",String(task.projectId));
@@ -3239,7 +3262,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.29-partner-move"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.30-qc-verify-supporting"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3344,6 +3367,7 @@ async function handleRequest(request, env) {
     if (qcFindingMatch && request.method === "PATCH") return qcFindingUpdateHandler(request,env,auth.user,decodeURIComponent(qcFindingMatch[1]));
     if (qcFindingMatch && request.method === "DELETE") return qcFindingDeleteHandler(env,auth.user,decodeURIComponent(qcFindingMatch[1]));
     const qcFindingAction = path.match(/^\/api\/qc\/findings\/([^/]+)\/action$/);
+    if (path === "/api/qc/findings/verify-bulk" && request.method === "POST") return qcBulkVerifyHandler(request,env,auth.user);
     if (qcFindingAction && request.method === "POST") return qcFindingActionHandler(request,env,auth.user,decodeURIComponent(qcFindingAction[1]));
 
     const ccoAction = path.match(/^\/api\/cco\/([^/]+)\/action$/);

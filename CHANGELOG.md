@@ -1,3 +1,10 @@
+## V3.4.30 — Verifikasi perbaikan temuan oleh Head of Supporting
+
+- Tugas **Verifikasi Perbaikan QC** kini masuk ke Tugas Saya (dan email) **QC dan Head of Supporting** sekaligus — siapa pun yang lebih dulu mengerjakan. Tugas lama yang hanya untuk QC otomatis dipindah ke antrean bersama.
+- Antrean tugas mendukung beberapa jabatan sekaligus (`assigneeRole: "qc,koordinator_supporting"`).
+- QC Dashboard: kartu **Menunggu verifikasi hasil perbaikan** + layar verifikasi dengan foto sebelum/sesudah, catatan perbaikan Site Manager, centang banyak → **Sesuai — tutup temuan**, atau **Tidak sesuai** + catatan per temuan (kembali ke Site Manager).
+- Endpoint `POST /api/qc/findings/verify-bulk {ids}`.
+
 ## V3.4.29 — Pindah jenis mitra
 
 - Database Mitra punya tab baru **Reimburse** (perorangan/karyawan yang menalangi belanja), di samping Tukang, Vendor, Subkon, Toko Material.
