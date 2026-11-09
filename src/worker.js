@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.23 — Periode Laporan Bebas
+ * Nara System V3.4.25 — Database Mitra (Tukang, Vendor, Subkon, Toko Material)
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.23";
+const APP_VERSION = "APP-V3.4.25";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -16,9 +16,9 @@ const STORAGE_BUCKET = "kendali-natara-files-v2";
 const LOGIN_MAX_FAILS = 8;
 const LOGIN_WINDOW_SEC = 15 * 60;
 
-const COLLECTIONS = new Set(["projects","users","rabs","surat","tukang","pelatihan","aset","proyeksi","vendor","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","qc_inspection_sessions","qc_inspection_items","qc_work_groups","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","public_site_settings","public_portfolio","qc_reports","ati_reports","workflow_tasks","as_built_progress","qc_visit_routes"]);
+const COLLECTIONS = new Set(["partners","project_terms","partner_payments","projects","users","rabs","surat","tukang","pelatihan","aset","proyeksi","vendor","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","qc_inspection_sessions","qc_inspection_items","qc_work_groups","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","public_site_settings","public_portfolio","qc_reports","ati_reports","workflow_tasks","as_built_progress","qc_visit_routes"]);
 
-const PROJECT_SCOPED_COLLECTIONS = new Set(["projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","as_built_progress","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks","qc_visit_routes"]);
+const PROJECT_SCOPED_COLLECTIONS = new Set(["project_terms","partner_payments","projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","as_built_progress","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks","qc_visit_routes"]);
 
 const DOC_CORE = ["CONTRACT", "RAB_BASELINE", "DED_FINAL", "TIME_SCHEDULE"];
 const DOC_PRECON = ["PCM", "MC0"];
@@ -48,23 +48,23 @@ const ROLE_LABELS = {
   viewer: "Viewer"
 };
 
-const ALL_VIEWS = ["dashboard","tasks","projects","finance","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","employees","master","audit"];
+const ALL_VIEWS = ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","employees","master","audit"];
 const ROLE_VIEWS = {
   administrator: ALL_VIEWS,
   direktur: ALL_VIEWS,
   head_unit_bisnis: ALL_VIEWS,
-  manager_operasional: ["dashboard","tasks","projects","finance","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","master","audit"],
+  manager_operasional: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","master","audit"],
   koordinator_engineering: ["dashboard","tasks","projects","progress","opname","asbuilt","qc","cco","procurement","documents","flow","closeout"],
   koordinator_supporting: ["dashboard","tasks","projects","progress","qc","documents","flow","closeout"],
-  admin_teknik: ["dashboard","tasks","projects","finance","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","master"],
-  site_manager: ["dashboard","tasks","projects","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout"],
+  admin_teknik: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout","public_info","master"],
+  site_manager: ["dashboard","tasks","projects","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout"],
   estimator: ["dashboard","tasks","projects","cco","documents","flow"],
   qs: ["dashboard","tasks","projects","fund_requests","progress","opname","cco","documents","flow"],
   drafter: ["dashboard","tasks","projects","asbuilt","documents","flow"],
   qc: ["dashboard","tasks","projects","fund_requests","progress","qc","documents","flow"],
   mep_engineer: ["dashboard","tasks","projects","progress","qc","documents","flow"],
-  finance: ["dashboard","tasks","projects","finance","fund_requests","procurement","documents","flow","closeout"],
-  procurement: ["dashboard","tasks","projects","fund_requests","procurement","documents","flow"],
+  finance: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","procurement","documents","flow","closeout"],
+  procurement: ["dashboard","tasks","projects","payments","directory","fund_requests","procurement","documents","flow"],
   kepala_ati: ["dashboard","tasks","ati","progress","master"],
   instruktur_ati: ["dashboard","tasks","ati","master"],
   viewer: ["dashboard","projects","documents","flow"]
@@ -234,13 +234,17 @@ function collectionPermission(user, collection) {
   if (collection === "cco") return allow(["manager_operasional","koordinator_engineering","admin_teknik","site_manager","estimator","qs"],["manager_operasional","koordinator_engineering","admin_teknik","qs","site_manager"],["manager_operasional"]);
   if (collection === "approvals") return allow(["manager_operasional","admin_teknik","finance"],["manager_operasional","admin_teknik","finance"]);
   if (collection === "procurement") return allow(["manager_operasional","koordinator_engineering","admin_teknik","site_manager","procurement","finance"],["manager_operasional","admin_teknik","site_manager","procurement"]);
+  // V3.4.24 — Keuangan proyek
+  if (collection === "partners") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance","koordinator_engineering"],["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","finance"]);
+  if (collection === "project_terms") return allow(["manager_operasional","admin_teknik","finance","site_manager"],["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
+  if (collection === "partner_payments") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],[],[]);
   if (collection === "po") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","admin_teknik","procurement","finance"]);
   if (collection === "project_documents") return allow(projectReaders,["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager","qs","drafter","qc","finance","procurement"],["manager_operasional","koordinator_engineering","admin_teknik"]);
   if (["retention","closeout"].includes(collection)) return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager","finance"],["manager_operasional","admin_teknik","finance"]);
   if (collection === "rabs") return allow(["manager_operasional","koordinator_engineering","admin_teknik","site_manager","estimator","qs"],["manager_operasional","koordinator_engineering","admin_teknik","estimator","qs"]);
   if (collection === "surat") return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
   if (collection === "vendor") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","admin_teknik","procurement","finance"]);
-  if (collection === "tukang") return allow(["manager_operasional","admin_teknik","site_manager","finance","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati"],["manager_operasional","admin_teknik","kepala_ati"]);
+  if (collection === "tukang") return allow(["manager_operasional","admin_teknik","site_manager","finance","kepala_ati","instruktur_ati","procurement"],["manager_operasional","admin_teknik","kepala_ati","site_manager","finance"],["manager_operasional","admin_teknik","kepala_ati"]);
   if (collection === "aset") return allow(["manager_operasional","admin_teknik","procurement"],["manager_operasional","admin_teknik"]);
   if (collection === "pelatihan") return allow(["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"],["manager_operasional","admin_teknik","kepala_ati","instruktur_ati"]);
   if (collection === "proyeksi") return allow(["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
@@ -270,6 +274,14 @@ function buildAccess(user) {
       ccoEscalation: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       financeApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","finance"]),
       financePay: roleIn(user,["administrator","direktur","head_unit_bisnis","finance"]),
+      partnerPaymentCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","site_manager"]),
+      partnerPaymentOpsApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
+      partnerPaymentHubApprove: roleIn(user,["administrator","direktur","head_unit_bisnis"]),
+      termBill: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
+      contractManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
+      financeSettings: roleIn(user,["administrator","direktur","head_unit_bisnis"]),
+      directoryMerge: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","finance"]),
+      directoryEdit: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","site_manager","procurement","finance"]),
       procurementApprove: roleIn(user,["head_unit_bisnis","manager_operasional"]),
       procurementVendorSelect: roleIn(user,["head_unit_bisnis","manager_operasional"]),
       procurementSpkCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","admin_teknik"]),
@@ -1138,12 +1150,12 @@ async function getProjectBudgetValue(env, projectId) {
 }
 
 
-const WORKFLOW_SOURCE_COLLECTIONS = new Set(["daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items"]);
+const WORKFLOW_SOURCE_COLLECTIONS = new Set(["daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items","partner_payments","project_terms"]);
 
 function workflowRoleLabel(role) { return ROLE_LABELS[role] || role || ""; }
 function workflowActiveStatus(status) { return ["OPEN","IN_PROGRESS"].includes(String(status||"").toUpperCase()); }
 function workflowSourceView(collection) {
-  return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc"})[collection] || "dashboard";
+  return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc",partner_payments:"payments",project_terms:"finance"})[collection] || "dashboard";
 }
 async function projectRoleUser(env, projectId, roleKey, ctx=null) {
   if (!projectId) return "";
@@ -1232,6 +1244,22 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
   if(collection==="ati_field_issues"){
     if(["OPEN","IN PROGRESS"].includes(status)) return mk("ATI_ISSUE_ACTION","Masalah Lapangan ATI", "PIC menangani masalah tenaga/operasional ATI","Tangani Masalah",d.picUserId,"kepala_ati",{priority:"HIGH"});
     if(status==="WAITING EVALUATION") return mk("ATI_ISSUE_EVAL","Evaluasi Masalah ATI", "Kepala ATI melakukan evaluasi dan menutup masalah","Evaluasi Masalah","","kepala_ati");
+    return null;
+  }
+  if(collection==="partner_payments"){
+    const cat=PAYMENT_CATEGORY_LABEL[d.category]||"Pembayaran"; const who=d.partnerName||(d.category==="TUKANG"?"Tukang":"-");
+    const ttl=`Pembayaran ${cat} — ${who}`; const amt=`Rp ${Math.round(num(d.netAmount||d.grossAmount)).toLocaleString("id-ID")}`;
+    if(status==="DRAFT") return mk("PAY_DRAFT",ttl,`Lengkapi lalu ajukan pembayaran ${cat} ${amt}.`,"Ajukan",d.requesterUserId||sm,"site_manager");
+    if(status==="RETURNED") return mk("PAY_FIX",ttl,`Pengajuan dikembalikan: ${d.returnNote||"perlu perbaikan"}.`,"Perbaiki & Ajukan Ulang",d.requesterUserId||sm,"site_manager",{priority:"HIGH"});
+    if(status==="SUBMITTED") return mk("PAY_OPS_APPROVE",ttl,`Head of Operational memeriksa pengajuan ${cat} ${amt}.`,"ACC / Kembalikan","","manager_operasional");
+    if(status==="OPS_APPROVED") return mk("PAY_HUB_APPROVE",ttl,`Material di atas batas — Head Unit Bisnis menyetujui ${amt}.`,"ACC / Kembalikan","","head_unit_bisnis");
+    if(status==="APPROVED") return mk("PAY_FINANCE",ttl,`Finance memverifikasi dan membayar ${amt}, lalu mengunggah bukti transfer.`,"Verifikasi & Bayar","","finance",{priority:"HIGH"});
+    return null;
+  }
+  if(collection==="project_terms"){
+    const ttl=`Termin ${d.label||d.termNo||""} — pemasukan proyek`;
+    if(status==="BILLED") return mk("TERM_RECEIVE",ttl,`Termin sudah ditagih (Rp ${Math.round(num(d.netAmount)).toLocaleString("id-ID")}). Finance memverifikasi uang masuk + bukti transfer.`,"Verifikasi Uang Masuk","","finance",{priority:"HIGH"});
+    if(status==="RETURNED") return mk("TERM_FIX",ttl,`Finance mengembalikan tagihan termin: ${d.returnNote||"perlu dicek"}.`,"Perbaiki Tagihan","","admin_teknik");
     return null;
   }
   if(collection==="qc_inspection_items"){
@@ -2058,6 +2086,9 @@ async function normalizeOperationalResponsibility(env,collection,data) {
   if (collection === "po" && d.picUserId && !["site_manager","procurement"].includes(await employeeRoleKey(env,d.picUserId))) throw new Error("PIC PO/SPK wajib Site Manager proyek atau Admin Logistik. ");
   if (collection === "cco" && d.requestedByUserId) { const rk=await employeeRoleKey(env,d.requestedByUserId); if(rk!=="site_manager") throw new Error("Pengaju lapangan CCO wajib Site Manager."); }
   if (collection === "qc_visit_routes") Object.assign(d,await normalizeQcVisitRoute(env,d));
+  if (collection === "project_terms") Object.assign(d,await normalizeProjectTerm(env,d));
+  if (collection === "po") normalizeContractFields(d);
+  if (collection === "partners") Object.assign(d,normalizePartner(d));
   if (collection === "surat" && d.picUserId && (await employeeRoleKey(env,d.picUserId)) !== "admin_teknik") throw new Error("PIC administrasi surat wajib Admin Teknik.");
   if (collection === "aset" && d.picUserId) { const rk=await employeeRoleKey(env,d.picUserId); if(!["procurement","admin_teknik"].includes(rk)) throw new Error("PIC aset wajib Admin Logistik atau Admin Teknik."); }
   if (collection === "retention" && d.picUserId) { const rk=await employeeRoleKey(env,d.picUserId); if(!["finance","admin_teknik","manager_operasional"].includes(rk)) throw new Error("PIC retensi wajib Finance/Admin Teknik/Manager Operasional."); }
@@ -2215,7 +2246,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.23"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.25"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2659,6 +2690,417 @@ async function emailRetryHandler(env,user) {
   return json({ok:true,...r});
 }
 
+
+/* ============================================================================
+ * V3.4.24 — KEUANGAN PROYEK
+ * Pemasukan : project_terms (termin kontrak client) → Admin Teknik tagih → Finance verifikasi uang masuk + bukti TF → cash_in.
+ * Pengeluaran: partner_payments kategori VENDOR / SUBKON (dari PO/SPK + termin), TUKANG (dari absensi), MATERIAL (toko, form + file).
+ *   Site Manager ajukan → Head of Operational ACC → (Material > batas: Head Unit Bisnis ACC) → Finance verifikasi & bayar + bukti TF → cash_out.
+ * Master pihak: partners (VENDOR/SUBKON/SUPPLIER) — dibuat otomatis dari pengajuan pertama, lalu tinggal dipilih.
+ * Operasional (bensin, makan, sewa alat) tetap lewat Pengajuan Dana (payment_requests).
+ * ==========================================================================*/
+const PAYMENT_CATEGORIES = ["VENDOR","SUBKON","TUKANG","MATERIAL"];
+const PAYMENT_CATEGORY_LABEL = {VENDOR:"Vendor",SUBKON:"Subkon",TUKANG:"Tukang",MATERIAL:"Material",OPERASIONAL:"Operasional"};
+const PARTNER_TYPES = {VENDOR:"Vendor",SUBKON:"Subkon",SUPPLIER:"Toko Material"};
+const FINANCE_SETTINGS_ID = "finance";
+const DEFAULT_MATERIAL_HUB_THRESHOLD = 5000000;
+const rp = v => `Rp ${Math.round(num(v)).toLocaleString("id-ID")}`;
+const nameKey = v => String(v||"").toLowerCase().replace(/\b(pt|cv|ud|tb|toko)\.?\s+/g,"").replace(/[^a-z0-9]+/g," ").trim();
+
+function normalizePartner(d) {
+  const t=String(d.partnerType||"").toUpperCase(); if(!PARTNER_TYPES[t]) throw new Error("Jenis pihak harus Vendor, Subkon, atau Toko Material.");
+  const name=String(d.name||"").trim(); if(!name) throw new Error("Nama pihak wajib diisi.");
+  return {partnerType:t,name,nameKey:nameKey(name),phone:String(d.phone||"").trim(),address:String(d.address||"").trim(),bankName:String(d.bankName||"").trim(),accountNo:String(d.accountNo||"").trim(),accountName:String(d.accountName||"").trim(),specialty:String(d.specialty||"").trim(),notes:String(d.notes||"").trim(),aliases:Array.isArray(d.aliases)?d.aliases.map(String).slice(0,20):[],createdByUserId:d.createdByUserId||"",createdByName:d.createdByName||"",status:String(d.status||"ACTIVE").toUpperCase()==="INACTIVE"?"INACTIVE":"ACTIVE"};
+}
+async function findOrCreatePartner(env,user,type,data) {
+  const t=String(type||"").toUpperCase(); const base=normalizePartner({...data,partnerType:t});
+  const q=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='partners' AND json_extract(data_json,'$.partnerType')=? AND json_extract(data_json,'$.nameKey')=? LIMIT 1`).bind(t,base.nameKey).first();
+  if(q) { const cur=safeJsonParse(q.data_json,{}); const patch={}; for(const k of ["phone","address","bankName","accountNo","accountName","specialty"]) if(!cur[k]&&base[k]) patch[k]=base[k]; if(Object.keys(patch).length) await upsertRecord(env,"partners",q.id,{...cur,...patch},user); return {id:q.id,data:{...cur,...patch}}; }
+  const id=`PTN-${crypto.randomUUID().slice(0,8)}`; const rec=await upsertRecord(env,"partners",id,{...base,createdByUserId:user.id,createdByName:user.name||user.username||""},user);
+  return {id,data:rec.data||base};
+}
+function normalizeContractFields(d) {
+  // PO/SPK = kontrak vendor/subkon. Field tambahan: jenis pihak, retensi, skema termin.
+  if(d.partnerType!==undefined||d.terms!==undefined||d.retentionPct!==undefined){
+    const t=String(d.partnerType||"VENDOR").toUpperCase(); d.partnerType=t==="SUBKON"?"SUBKON":"VENDOR";
+    d.retentionPct=Math.max(0,Math.min(20,num(d.retentionPct)));
+    const terms=(Array.isArray(d.terms)?d.terms:[]).map(x=>({label:String(x.label||"").trim(),percent:Math.max(0,Math.min(100,num(x.percent))),condition:String(x.condition||"").trim()})).filter(x=>x.percent>0).map((x,i)=>({no:i+1,...x,label:x.label||`Termin ${i+1}`}));
+    const sum=terms.reduce((a,x)=>a+x.percent,0); if(sum>100.0001) throw new Error(`Total persentase termin ${sum}% melebihi 100%.`);
+    d.terms=terms;
+  }
+}
+async function normalizeProjectTerm(env,d) {
+  if(!d.projectId) throw new Error("Proyek wajib dipilih.");
+  const st=String(d.status||"PLANNED").toUpperCase();
+  if(!["PLANNED","RETURNED"].includes(st)) throw new Error("Termin yang sudah ditagih/diterima tidak dapat diubah dari form ini.");
+  const p=await getRecord(env,"projects",String(d.projectId)); if(!p) throw new Error("Proyek tidak ditemukan.");
+  const cv=num(d.contractValue)||pickNum(p.data,["contractValue","nilaiKontrak","contract","value"]);
+  const percent=Math.max(0,Math.min(100,num(d.percent)));
+  let gross=num(d.grossAmount); if(!gross && percent && cv) gross=Math.round(cv*percent/100);
+  if(gross<=0) throw new Error("Nilai termin wajib diisi (persentase × nilai kontrak, atau nominal).");
+  const retentionPct=Math.max(0,Math.min(20,num(d.retentionPct))); const retentionAmount=Math.round(gross*retentionPct/100);
+  return {status:st,termNo:Math.max(1,Math.round(num(d.termNo)||1)),label:String(d.label||`Termin ${num(d.termNo)||1}`).trim(),percent,contractValue:cv,grossAmount:gross,retentionPct,retentionAmount,netAmount:gross-retentionAmount,progressRequired:Math.max(0,Math.min(100,num(d.progressRequired))),dueDate:String(d.dueDate||"")};
+}
+async function financeSettings(env) {
+  const r=await getRecord(env,"app_settings",FINANCE_SETTINGS_ID);
+  return {materialHubThreshold:num(r?.data?.materialHubThreshold)||DEFAULT_MATERIAL_HUB_THRESHOLD};
+}
+async function contractPaymentsTotals(env,contractId,excludeId="") {
+  const q=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='partner_payments' AND json_extract(data_json,'$.contractId')=?`).bind(String(contractId)).all();
+  let gross=0,retention=0,released=0,paidGross=0,maxProgress=0;
+  for(const r of (q.results||[])){ if(r.id===excludeId) continue; const x=safeJsonParse(r.data_json,{}); if(["REJECTED"].includes(String(x.status).toUpperCase())) continue;
+    if(x.isRetentionRelease) { released+=num(x.grossAmount); continue; }
+    gross+=num(x.grossAmount); retention+=num(x.retentionAmount); maxProgress=Math.max(maxProgress,num(x.workProgressPct)); if(String(x.status).toUpperCase()==="PAID") paidGross+=num(x.grossAmount); }
+  return {gross,retention,released,paidGross,maxProgress};
+}
+async function normalizePartnerPayment(env,d,id="") {
+  const cat=String(d.category||"").toUpperCase(); if(!PAYMENT_CATEGORIES.includes(cat)) throw new Error("Kategori pembayaran harus Vendor, Subkon, Tukang, atau Material.");
+  if(!d.projectId) throw new Error("Proyek wajib dipilih.");
+  const out={category:cat,projectId:String(d.projectId),notes:String(d.notes||"").trim(),retentionPct:0,retentionAmount:0,isRetentionRelease:false};
+  if(cat==="VENDOR"||cat==="SUBKON"){
+    const c=await getRecord(env,"po",String(d.contractId||"")); if(!c) throw new Error("Pilih SPK/kontrak vendor atau subkon.");
+    if(String(c.data.projectId)!==out.projectId) throw new Error("SPK tidak sesuai dengan proyek yang dipilih.");
+    const value=num(c.data.contractValue||c.data.amount); if(value<=0) throw new Error("Nilai SPK belum diisi. Minta Admin Teknik melengkapi nilai SPK.");
+    const t=await contractPaymentsTotals(env,c.id,id); const retPct=num(c.data.retentionPct);
+    Object.assign(out,{contractId:c.id,contractNumber:c.data.number||c.id,contractValue:value,partnerId:c.data.partnerId||"",partnerName:c.data.partnerName||c.data.vendor||""});
+    if(truthy(d.isRetentionRelease)){
+      const held=t.retention-t.released; const gross=num(d.grossAmount)||held;
+      if(held<=0) throw new Error("Tidak ada retensi yang tertahan untuk SPK ini.");
+      if(gross>held+1) throw new Error(`Pelepasan retensi maksimal ${rp(held)}.`);
+      Object.assign(out,{isRetentionRelease:true,termNo:0,termLabel:"Pelepasan retensi",workProgressPct:t.maxProgress,grossAmount:gross,netAmount:gross});
+    } else {
+      const progress=Math.max(0,Math.min(100,num(d.workProgressPct))); if(progress<=0) throw new Error("Isi progres pekerjaan vendor/subkon (kumulatif %).");
+      const terms=Array.isArray(c.data.terms)?c.data.terms:[]; const term=terms.find(x=>String(x.no)===String(d.termNo));
+      const gross=Math.round(num(d.grossAmount)||(term?value*num(term.percent)/100:0)); if(gross<=0) throw new Error("Nilai yang ditagih wajib diisi.");
+      const worked=Math.round(value*progress/100);
+      if(t.gross+gross>worked+1) throw new Error(`Total tagihan (${rp(t.gross+gross)}) melebihi nilai pekerjaan yang sudah dikerjakan ${progress}% (${rp(worked)}).`);
+      if(t.gross+gross>value+1) throw new Error(`Total tagihan melebihi nilai SPK ${rp(value)}.`);
+      const retAmt=Math.round(gross*retPct/100);
+      Object.assign(out,{termNo:term?term.no:num(d.termNo)||0,termLabel:term?term.label:String(d.termLabel||"Tagihan"),workProgressPct:progress,workValue:worked,grossAmount:gross,retentionPct:retPct,retentionAmount:retAmt,netAmount:gross-retAmt});
+    }
+  } else if(cat==="TUKANG"){
+    const a=reportDay(d.periodStart), b=reportDay(d.periodEnd); if(!a||!b||b<a) throw new Error("Isi periode upah tukang (dari–sampai) dengan benar.");
+    const lines=(Array.isArray(d.lines)?d.lines:[]).map(x=>({workerId:String(x.workerId||""),workerName:String(x.workerName||x.workerId||"").trim(),days:num(x.days),overtimeHours:num(x.overtimeHours),attendanceAmount:num(x.attendanceAmount),amount:Math.round(num(x.amount)),note:String(x.note||"")})).filter(x=>x.workerName&&x.amount>0);
+    if(!lines.length) throw new Error("Belum ada upah tukang pada periode ini. Ambil dari absensi atau isi manual.");
+    const q=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='partner_payments' AND json_extract(data_json,'$.category')='TUKANG' AND json_extract(data_json,'$.projectId')=?`).bind(out.projectId).all();
+    for(const r of (q.results||[])){ if(r.id===id) continue; const x=safeJsonParse(r.data_json,{}); if(String(x.status).toUpperCase()==="REJECTED") continue; if(!(b<x.periodStart||a>x.periodEnd)) throw new Error(`Periode bertabrakan dengan pengajuan upah ${fmtDay(x.periodStart)}–${fmtDay(x.periodEnd)} yang sudah ada.`); }
+    const gross=lines.reduce((s,x)=>s+x.amount,0);
+    Object.assign(out,{periodStart:a,periodEnd:b,lines,partnerName:`Upah tukang ${fmtDay(a)}–${fmtDay(b)}`,grossAmount:gross,netAmount:gross,workerCount:lines.length});
+  } else {
+    const items=(Array.isArray(d.items)?d.items:[]).map(x=>({name:String(x.name||"").trim(),qty:num(x.qty),unit:String(x.unit||"").trim(),price:num(x.price),total:Math.round(num(x.qty)*num(x.price))})).filter(x=>x.name&&x.qty>0);
+    if(!items.length) throw new Error("Isi minimal satu item material (nama, jumlah, harga).");
+    if(!d.partnerId) throw new Error("Pilih toko/supplier material.");
+    const sup=await getRecord(env,"partners",String(d.partnerId)); if(!sup||sup.data.partnerType!=="SUPPLIER") throw new Error("Toko material tidak ditemukan.");
+    const gross=items.reduce((s,x)=>s+x.total,0);
+    Object.assign(out,{partnerId:sup.id,partnerName:sup.data.name,items,grossAmount:gross,netAmount:gross,neededDate:String(d.neededDate||"")});
+  }
+  if(cat!=="TUKANG" && out.partnerId===undefined) out.partnerId="";
+  return out;
+}
+function fmtDay(v){ const x=reportDay(v); if(!x) return "-"; const [y,m,dd]=x.split("-"); return `${dd}/${m}/${y}`; }
+function paymentHistory(d,user,action,note="") { const h=Array.isArray(d.history)?d.history:[]; h.push({at:new Date().toISOString(),by:user.id,byName:user.name||user.username||"",action,note:String(note||"")}); return h.slice(-30); }
+async function attachFiles(env,user,fd,meta) {
+  const ids=[]; for(const f of fd.getAll("files")){ if(f instanceof File && f.size>0){ const doc=await storeEvidenceDocument(env,user,f,meta); ids.push(doc.id); } } return ids;
+}
+
+async function partnerPaymentSaveHandler(request,env,user,id="") {
+  const cap=buildAccess(user).capabilities; if(!cap.partnerPaymentCreate) return json({ok:false,message:"Role ini tidak dapat mengajukan pembayaran."},403);
+  let fd; try{ fd=await request.formData(); }catch{ return json({ok:false,message:"Form pengajuan tidak valid."},400); }
+  const body=safeJsonParse(String(fd.get("payload")||"{}"),{});
+  let old=null;
+  if(id){ old=await getRecord(env,"partner_payments",id); if(!old) return json({ok:false,message:"Pengajuan tidak ditemukan."},404);
+    if(!["DRAFT","RETURNED"].includes(String(old.data.status).toUpperCase())) return json({ok:false,message:"Pengajuan yang sudah diproses tidak dapat diubah."},409);
+    if(old.data.requesterUserId!==user.id && !isManagementRole(user)) return json({ok:false,message:"Hanya pengaju atau Head of Operational yang dapat mengubah pengajuan ini."},403); }
+  const projectId=String(body.projectId||old?.data?.projectId||"");
+  const denied=await requireProjectAccess(env,user,projectId); if(denied) return denied;
+  try{
+    const cat=String(body.category||old?.data?.category||"").toUpperCase();
+    if(cat==="MATERIAL" && !body.partnerId && body.newPartner?.name){ const pt=await findOrCreatePartner(env,user,"SUPPLIER",body.newPartner); body.partnerId=pt.id; }
+    const norm=await normalizePartnerPayment(env,{...(old?.data||{}),...body,projectId,category:cat},id);
+    const pid=id||`PAY-${crypto.randomUUID().slice(0,12)}`;
+    const newDocs=await attachFiles(env,user,fd,{projectId,category:"FINANCE_PAYMENT",title:`Lampiran pembayaran ${PAYMENT_CATEGORY_LABEL[cat]} - ${norm.partnerName||""}`,relatedCollection:"partner_payments",relatedId:pid});
+    const removed=new Set(Array.isArray(body.removeDocIds)?body.removeDocIds:[]);
+    const docs=[...(old?.data?.attachmentDocIds||[]).filter(x=>!removed.has(x)),...newDocs];
+    let d={...(old?.data||{}),...norm,attachmentDocIds:docs,requesterUserId:old?.data?.requesterUserId||user.id,requesterName:old?.data?.requesterName||user.name||user.username||"",status:old?String(old.data.status).toUpperCase():"DRAFT",updatedAt:new Date().toISOString()};
+    if(!old) d.history=paymentHistory(d,user,"BUAT"); 
+    if(truthy(body.submit)) d=await submitPartnerPayment(env,user,d);
+    const rec=await upsertRecord(env,"partner_payments",pid,d,user);
+    await syncWorkflowTask(env,"partner_payments",pid,d,user);
+    await audit(env,user,id?"PARTNER_PAYMENT_UPDATE":"PARTNER_PAYMENT_CREATE","partner_payments",pid,projectId,{category:cat,amount:d.grossAmount,status:d.status});
+    return json({ok:true,row:rec});
+  }catch(e){ return json({ok:false,message:e.message||String(e)},400); }
+}
+async function submitPartnerPayment(env,user,d) {
+  if(d.category==="MATERIAL" && !(d.attachmentDocIds||[]).length) throw new Error("Upload form/nota/penawaran material sebelum diajukan.");
+  if((d.category==="VENDOR"||d.category==="SUBKON") && !d.isRetentionRelease && !(d.attachmentDocIds||[]).length) throw new Error("Upload BAP/foto progres pekerjaan sebelum diajukan.");
+  const st=await financeSettings(env);
+  const needsHub=d.category==="MATERIAL" && num(d.grossAmount)>st.materialHubThreshold;
+  return {...d,status:"SUBMITTED",needsHub,hubThreshold:st.materialHubThreshold,submittedAt:new Date().toISOString(),returnNote:"",history:paymentHistory(d,user,"AJUKAN")};
+}
+async function partnerPaymentActionHandler(request,env,user,id) {
+  const rec=await getRecord(env,"partner_payments",id); if(!rec) return json({ok:false,message:"Pengajuan tidak ditemukan."},404);
+  const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
+  const body=await parseJson(request)||{}; const action=String(body.action||"").toLowerCase(); const note=String(body.note||"").trim();
+  const cap=buildAccess(user).capabilities; let d={...rec.data}; const st=String(d.status||"DRAFT").toUpperCase();
+  try{
+    if(action==="submit"){ if(!["DRAFT","RETURNED"].includes(st)) throw new Error("Pengajuan sudah diajukan."); if(d.requesterUserId!==user.id && !isManagementRole(user)) throw new Error("Hanya pengaju yang dapat mengajukan."); d=await submitPartnerPayment(env,user,d); }
+    else if(action==="ops-approve"){ if(!cap.partnerPaymentOpsApprove) throw new Error("Hanya Head of Operational yang dapat ACC."); if(st!=="SUBMITTED") throw new Error("Pengajuan tidak menunggu ACC Head of Operational.");
+      d.opsApprovedAt=new Date().toISOString(); d.opsApprovedBy=user.id; d.opsApprovedByName=user.name||user.username||""; d.status=d.needsHub?"OPS_APPROVED":"APPROVED"; d.history=paymentHistory(d,user,"ACC_HEAD_OPERATIONAL",note); }
+    else if(action==="hub-approve"){ if(!cap.partnerPaymentHubApprove) throw new Error("Hanya Head Unit Bisnis yang dapat ACC tahap ini."); if(st!=="OPS_APPROVED") throw new Error("Pengajuan tidak menunggu ACC Head Unit Bisnis.");
+      d.hubApprovedAt=new Date().toISOString(); d.hubApprovedBy=user.id; d.hubApprovedByName=user.name||user.username||""; d.status="APPROVED"; d.history=paymentHistory(d,user,"ACC_HEAD_UNIT_BISNIS",note); }
+    else if(action==="return"||action==="reject"){
+      const can=(st==="SUBMITTED"&&cap.partnerPaymentOpsApprove)||(st==="OPS_APPROVED"&&cap.partnerPaymentHubApprove)||(st==="APPROVED"&&cap.financePay);
+      if(!can) throw new Error("Anda tidak berwenang pada tahap pengajuan ini.");
+      if(!note) throw new Error("Tuliskan alasannya.");
+      if(action==="reject" && st==="APPROVED") throw new Error("Finance hanya dapat mengembalikan, bukan menolak.");
+      d.status=action==="return"?"RETURNED":"REJECTED"; d.returnNote=note; d.history=paymentHistory(d,user,action==="return"?"KEMBALIKAN":"TOLAK",note); }
+    else throw new Error("Aksi tidak dikenal.");
+  }catch(e){ return json({ok:false,message:e.message},400); }
+  d.updatedAt=new Date().toISOString();
+  const out=await upsertRecord(env,"partner_payments",id,d,user); await syncWorkflowTask(env,"partner_payments",id,d,user);
+  await audit(env,user,"PARTNER_PAYMENT_ACTION","partner_payments",id,d.projectId,{action,from:st,to:d.status});
+  return json({ok:true,row:out});
+}
+async function partnerPaymentPayHandler(request,env,user,id) {
+  if(!buildAccess(user).capabilities.financePay) return json({ok:false,message:"Hanya Finance yang dapat memverifikasi dan membayar."},403);
+  const rec=await getRecord(env,"partner_payments",id); if(!rec) return json({ok:false,message:"Pengajuan tidak ditemukan."},404);
+  if(String(rec.data.status).toUpperCase()!=="APPROVED") return json({ok:false,message:"Pengajuan belum disetujui lengkap."},409);
+  let fd; try{ fd=await request.formData(); }catch{ return json({ok:false,message:"Form pembayaran tidak valid."},400); }
+  const d={...rec.data}; const file=fd.get("file");
+  if(!(file instanceof File)||file.size<=0) return json({ok:false,message:"Upload bukti transfer wajib."},400);
+  const paidAmount=Math.round(num(fd.get("paidAmount"))||num(d.netAmount)); if(paidAmount<=0) return json({ok:false,message:"Nominal dibayar wajib diisi."},400);
+  if(paidAmount>num(d.netAmount)+1) return json({ok:false,message:`Nominal dibayar melebihi yang disetujui (${rp(d.netAmount)}).`},400);
+  const paidAt=reportDay(fd.get("paidAt"))||new Date().toISOString().slice(0,10);
+  const doc=await storeEvidenceDocument(env,user,file,{projectId:d.projectId,category:"FINANCE_PROOF",title:`Bukti transfer ${PAYMENT_CATEGORY_LABEL[d.category]} - ${d.partnerName||""}`,relatedCollection:"partner_payments",relatedId:id});
+  Object.assign(d,{status:"PAID",paidAmount,paidAt,paidAccount:String(fd.get("account")||""),paidReference:String(fd.get("reference")||""),proofDocId:doc.id,paidByUserId:user.id,paidByName:user.name||user.username||"",history:paymentHistory(d,user,"DIBAYAR",`${rp(paidAmount)}`)});
+  const cashId=`PP-${id}`;
+  await upsertRecord(env,"cash_out",cashId,{projectId:d.projectId,date:paidAt,category:PAYMENT_CATEGORY_LABEL[d.category],categoryKey:d.category,partnerId:d.partnerId||"",partnerName:d.partnerName||"",vendor:d.partnerName||"",amount:paidAmount,status:"PAID",reference:d.paidReference,paymentId:id,description:`${PAYMENT_CATEGORY_LABEL[d.category]} — ${d.termLabel||d.partnerName||""}`,proofDocId:doc.id},user);
+  d.cashOutId=cashId;
+  const out=await upsertRecord(env,"partner_payments",id,d,user); await syncWorkflowTask(env,"partner_payments",id,d,user);
+  await audit(env,user,"PARTNER_PAYMENT_PAID","partner_payments",id,d.projectId,{amount:paidAmount});
+  return json({ok:true,row:out});
+}
+async function payrollPreviewHandler(env,user,url) {
+  const projectId=String(url.searchParams.get("projectId")||""); const a=reportDay(url.searchParams.get("start")), b=reportDay(url.searchParams.get("end"));
+  if(!projectId||!a||!b) return json({ok:false,message:"Pilih proyek dan periode."},400);
+  const denied=await requireProjectAccess(env,user,projectId); if(denied) return denied;
+  const q=await env.DB.prepare(`SELECT data_json FROM app_records WHERE collection='daily_workers' AND json_extract(data_json,'$.projectId')=? AND json_extract(data_json,'$.date')>=? AND json_extract(data_json,'$.date')<=?`).bind(projectId,a,b).all();
+  const by=new Map();
+  for(const r of (q.results||[])){ const x=safeJsonParse(r.data_json,{}); const key=String(x.workerId||x.workerName||""); if(!key) continue; const stt=String(x.attendanceStatus||x.status||"HADIR").toUpperCase();
+    const cur=by.get(key)||{workerId:String(x.workerId||""),workerName:String(x.workerName||x.workerId||""),days:0,overtimeHours:0,attendanceAmount:0,dailyRate:num(x.dailyRate||x.wage||x.rate)};
+    if(!cur.dailyRate) cur.dailyRate=num(x.dailyRate||x.wage||x.rate);
+    if(!["ALPA","IZIN","SAKIT"].includes(stt)) cur.days+= stt==="SETENGAH HARI"||stt==="HALF"?0.5:1;
+    cur.overtimeHours+=num(x.overtimeHours); cur.attendanceAmount+=num(x.amount); by.set(key,cur); }
+  const lines=[...by.values()].map(x=>({...x,amount:Math.round(x.attendanceAmount||(x.days*x.dailyRate))})).sort((x,y)=>x.workerName.localeCompare(y.workerName));
+  return json({ok:true,lines,total:lines.reduce((s,x)=>s+x.amount,0)});
+}
+async function termBillHandler(request,env,user,id) {
+  if(!buildAccess(user).capabilities.termBill) return json({ok:false,message:"Hanya Admin Teknik/Head of Operational yang dapat menagih termin."},403);
+  const rec=await getRecord(env,"project_terms",id); if(!rec) return json({ok:false,message:"Termin tidak ditemukan."},404);
+  const st=String(rec.data.status||"PLANNED").toUpperCase(); if(!["PLANNED","RETURNED"].includes(st)) return json({ok:false,message:"Termin sudah ditagih."},409);
+  const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
+  let fd; try{ fd=await request.formData(); }catch{ return json({ok:false,message:"Form tagihan tidak valid."},400); }
+  const d={...rec.data}; const prog=num(fd.get("progressPct"));
+  if(prog<num(d.progressRequired)) return json({ok:false,message:`Progres ${prog}% belum memenuhi syarat termin (${num(d.progressRequired)}%).`},400);
+  const file=fd.get("file"); let docId=d.invoiceDocId||"";
+  if(file instanceof File && file.size>0){ const doc=await storeEvidenceDocument(env,user,file,{projectId:d.projectId,category:"FINANCE_INVOICE",title:`Tagihan ${d.label}`,relatedCollection:"project_terms",relatedId:id}); docId=doc.id; }
+  if(!docId) return json({ok:false,message:"Upload invoice/BAP progres termin."},400);
+  Object.assign(d,{status:"BILLED",billedProgress:prog,invoiceNo:String(fd.get("invoiceNo")||"").trim(),billedAt:reportDay(fd.get("billedAt"))||new Date().toISOString().slice(0,10),billedByUserId:user.id,billedByName:user.name||user.username||"",invoiceDocId:docId,returnNote:""});
+  const out=await upsertRecord(env,"project_terms",id,d,user); await syncWorkflowTask(env,"project_terms",id,d,user); await audit(env,user,"TERM_BILLED","project_terms",id,d.projectId,{progress:prog});
+  return json({ok:true,row:out});
+}
+async function termReceiveHandler(request,env,user,id) {
+  if(!buildAccess(user).capabilities.financePay) return json({ok:false,message:"Hanya Finance yang dapat memverifikasi uang masuk."},403);
+  const rec=await getRecord(env,"project_terms",id); if(!rec) return json({ok:false,message:"Termin tidak ditemukan."},404);
+  if(String(rec.data.status).toUpperCase()!=="BILLED") return json({ok:false,message:"Termin belum ditagih."},409);
+  let fd; try{ fd=await request.formData(); }catch{ return json({ok:false,message:"Form tidak valid."},400); }
+  const d={...rec.data};
+  if(String(fd.get("action")||"")==="return"){ const note=String(fd.get("note")||"").trim(); if(!note) return json({ok:false,message:"Tuliskan alasan pengembalian."},400); d.status="RETURNED"; d.returnNote=note; const out=await upsertRecord(env,"project_terms",id,d,user); await syncWorkflowTask(env,"project_terms",id,d,user); return json({ok:true,row:out}); }
+  const file=fd.get("file"); if(!(file instanceof File)||file.size<=0) return json({ok:false,message:"Upload bukti transfer dari client."},400);
+  const amount=Math.round(num(fd.get("receivedAmount"))); if(amount<=0) return json({ok:false,message:"Isi nominal yang benar-benar masuk."},400);
+  const doc=await storeEvidenceDocument(env,user,file,{projectId:d.projectId,category:"FINANCE_PROOF",title:`Bukti transfer masuk ${d.label}`,relatedCollection:"project_terms",relatedId:id});
+  Object.assign(d,{status:"PAID",receivedAmount:amount,receivedAt:reportDay(fd.get("receivedAt"))||new Date().toISOString().slice(0,10),receivedAccount:String(fd.get("account")||""),receivedReference:String(fd.get("reference")||""),proofDocId:doc.id,verifiedByUserId:user.id,verifiedByName:user.name||user.username||"",shortfall:Math.max(0,num(d.netAmount)-amount)});
+  const cashId=`TERM-${id}`;
+  await upsertRecord(env,"cash_in",cashId,{projectId:d.projectId,date:d.receivedAt,amount,status:"RECEIVED",source:"Termin",termId:id,description:`${d.label} (${d.percent||0}%)`,reference:d.receivedReference,proofDocId:doc.id},user);
+  d.cashInId=cashId;
+  const out=await upsertRecord(env,"project_terms",id,d,user); await syncWorkflowTask(env,"project_terms",id,d,user); await audit(env,user,"TERM_RECEIVED","project_terms",id,d.projectId,{amount});
+  return json({ok:true,row:out});
+}
+// Atur kontrak SPK (PO) atau catat SPK baru (mis. subkon dari luar menu PR). Pihak otomatis masuk database.
+async function contractSaveHandler(request,env,user,poId="") {
+  if(!buildAccess(user).capabilities.contractManage) return json({ok:false,message:"Hanya Admin Teknik/Head of Operational yang dapat mengatur kontrak SPK."},403);
+  let fd; try{ fd=await request.formData(); }catch{ return json({ok:false,message:"Form kontrak tidak valid."},400); }
+  const b=safeJsonParse(String(fd.get("payload")||"{}"),{});
+  let po=poId?await getRecord(env,"po",poId):null; if(poId&&!po) return json({ok:false,message:"SPK tidak ditemukan."},404);
+  const projectId=String(po?.data?.projectId||b.projectId||""); if(!projectId) return json({ok:false,message:"Proyek wajib dipilih."},400);
+  const denied=await requireProjectAccess(env,user,projectId); if(denied) return denied;
+  try{
+    const type=String(b.partnerType||po?.data?.partnerType||"VENDOR").toUpperCase()==="SUBKON"?"SUBKON":"VENDOR";
+    let partner=null;
+    if(b.partnerId){ const r=await getRecord(env,"partners",String(b.partnerId)); if(!r) throw new Error("Pihak tidak ditemukan."); partner={id:r.id,data:r.data}; }
+    else { const name=String(b.partnerName||po?.data?.vendor||"").trim(); if(!name) throw new Error("Nama vendor/subkon wajib diisi."); partner=await findOrCreatePartner(env,user,type,{name,phone:b.phone,bankName:b.bankName,accountNo:b.accountNo,accountName:b.accountName,specialty:b.specialty}); }
+    const value=Math.round(num(b.contractValue)||num(po?.data?.amount)); if(value<=0) throw new Error("Nilai SPK wajib diisi.");
+    const d={...(po?.data||{}),projectId,partnerType:type,partnerId:partner.id,partnerName:partner.data.name,vendor:partner.data.name,contractValue:value,amount:value,retentionPct:b.retentionPct,terms:b.terms,
+      number:String(b.number||po?.data?.number||"").trim(),date:reportDay(b.date)||po?.data?.date||new Date().toISOString().slice(0,10),description:String(b.description??po?.data?.description??"").trim(),status:po?.data?.status||"ACTIVE"};
+    if(!d.number) throw new Error("Nomor SPK wajib diisi.");
+    normalizeContractFields(d);
+    const id=poId||`SPK-${crypto.randomUUID().slice(0,10)}`;
+    const file=fd.get("file"); if(file instanceof File && file.size>0){ const doc=await storeEvidenceDocument(env,user,file,{projectId,category:"PO_SPK",title:`SPK ${d.number} - ${d.vendor}`,relatedCollection:"po",relatedId:id}); d.spkDocId=doc.id; }
+    const rec=await upsertRecord(env,"po",id,d,user); await audit(env,user,poId?"CONTRACT_UPDATE":"CONTRACT_CREATE","po",id,projectId,{partnerType:type,value});
+    return json({ok:true,row:rec});
+  }catch(e){ return json({ok:false,message:e.message},400); }
+}
+
+async function financeSettingsHandler(request,env,user) {
+  if(request.method==="GET") return json({ok:true,settings:await financeSettings(env)});
+  if(!buildAccess(user).capabilities.financeSettings) return json({ok:false,message:"Hanya pimpinan yang dapat mengubah pengaturan keuangan."},403);
+  const b=await parseJson(request)||{}; const t=Math.round(num(b.materialHubThreshold)); if(t<0) return json({ok:false,message:"Batas tidak valid."},400);
+  await upsertRecord(env,"app_settings",FINANCE_SETTINGS_ID,{materialHubThreshold:t},user); await audit(env,user,"FINANCE_SETTINGS","app_settings",FINANCE_SETTINGS_ID,"",{materialHubThreshold:t});
+  return json({ok:true,settings:{materialHubThreshold:t}});
+}
+async function financeSummaryHandler(env,user,url) {
+  const projectFilter=String(url.searchParams.get("projectId")||"");
+  const scope=isProjectScopedRole(user)?await accessibleProjectIds(env,user):null;
+  const ok=pid=>(!projectFilter||String(pid)===projectFilter)&&(!scope||scope.has(String(pid)));
+  const load=async c=>((await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection=?`).bind(c).all()).results||[]).map(r=>({id:r.id,data:safeJsonParse(r.data_json,{})}));
+  const [projects,terms,pays,pos,cashOut,cashIn,partners,workers,tukang]=await Promise.all(["projects","project_terms","partner_payments","po","cash_out","cash_in","partners","daily_workers","tukang"].map(load));
+  const P=projects.filter(p=>ok(p.id)); const pname=new Map(projects.map(p=>[p.id,p.data.name||p.id]));
+  const T=terms.filter(x=>ok(x.data.projectId)), PAY=pays.filter(x=>ok(x.data.projectId)), PO=pos.filter(x=>ok(x.data.projectId)), CO=cashOut.filter(x=>ok(x.data.projectId)&&paidLike(x.data.status)), CI=cashIn.filter(x=>ok(x.data.projectId)&&paidLike(x.data.status)), W=workers.filter(x=>ok(x.data.projectId));
+  const sum=(a,f)=>a.reduce((s,x)=>s+num(f(x)),0); const live=x=>String(x.data.status).toUpperCase()!=="REJECTED";
+  const catOf=x=>x.data.categoryKey&&PAYMENT_CATEGORY_LABEL[x.data.categoryKey]?x.data.categoryKey:"OPERASIONAL";
+  const projectsOut=P.map(p=>{const id=p.id; const t=T.filter(x=>x.data.projectId===id); const co=CO.filter(x=>x.data.projectId===id); const ci=CI.filter(x=>x.data.projectId===id); const pay=PAY.filter(x=>x.data.projectId===id&&live(x));
+    const byCat={}; for(const k of [...PAYMENT_CATEGORIES,"OPERASIONAL"]) byCat[k]=sum(co.filter(x=>catOf(x)===k),x=>x.data.amount);
+    const received=sum(ci,x=>x.data.amount); const out=sum(co,x=>x.data.amount);
+    return {projectId:id,name:p.data.name||id,contractValue:pickNum(p.data,["contractValue","nilaiKontrak"]),termsPlanned:sum(t,x=>x.data.grossAmount),termsReceived:sum(t.filter(x=>x.data.status==="PAID"),x=>x.data.receivedAmount),termsBilledOpen:sum(t.filter(x=>x.data.status==="BILLED"),x=>x.data.netAmount),retentionHeldByClient:sum(t.filter(x=>["BILLED","PAID"].includes(x.data.status)),x=>x.data.retentionAmount),cashIn:received,cashOut:out,byCategory:byCat,balance:received-out,
+      payablesApproved:sum(pay.filter(x=>["APPROVED"].includes(x.data.status)),x=>x.data.netAmount),payablesInApproval:sum(pay.filter(x=>["SUBMITTED","OPS_APPROVED"].includes(x.data.status)),x=>x.data.netAmount)};});
+  // Rekap pihak
+  const partnerRows=[];
+  const partnerInfo=pt=>({status:pt.data.status||"ACTIVE",address:pt.data.address||"",specialty:pt.data.specialty||"",bankName:pt.data.bankName||"",accountNo:pt.data.accountNo||"",accountName:pt.data.accountName||"",createdAt:pt.data.createdAt||""});
+  for(const pt of partners){ const t=pt.data.partnerType; const name=pt.data.name;
+    const matchPo=x=>x.data.partnerId===pt.id||(!x.data.partnerId&&nameKey(x.data.vendor||x.data.partnerName)===pt.data.nameKey);
+    if(t==="VENDOR"||t==="SUBKON"){
+      const contracts=PO.filter(x=>matchPo(x)&&String(x.data.partnerType||"VENDOR")===t).map(c=>{const value=num(c.data.contractValue||c.data.amount); const cp=PAY.filter(x=>x.data.contractId===c.id&&live(x)); const prog=Math.max(0,...cp.filter(x=>!x.data.isRetentionRelease).map(x=>num(x.data.workProgressPct)));
+        const paidGross=sum(cp.filter(x=>x.data.status==="PAID"&&!x.data.isRetentionRelease),x=>x.data.grossAmount); const paidNet=sum(cp.filter(x=>x.data.status==="PAID"),x=>x.data.paidAmount||x.data.netAmount);
+        const retHeld=sum(cp.filter(x=>x.data.status==="PAID"&&!x.data.isRetentionRelease),x=>x.data.retentionAmount)-sum(cp.filter(x=>x.data.status==="PAID"&&x.data.isRetentionRelease),x=>x.data.grossAmount);
+        const worked=Math.round(value*prog/100);
+        return {contractId:c.id,number:c.data.number||c.id,projectId:c.data.projectId,projectName:pname.get(c.data.projectId)||"-",description:c.data.description||"",value,progress:prog,worked,paidGross,paidNet,retentionHeld:retHeld,inProcess:sum(cp.filter(x=>["SUBMITTED","OPS_APPROVED","APPROVED"].includes(x.data.status)),x=>x.data.netAmount),unpaidWorked:Math.max(0,worked-paidGross),notWorked:Math.max(0,value-worked)};});
+      if(!contracts.length && projectFilter) continue;
+      partnerRows.push({id:pt.id,type:t,name,...partnerInfo(pt),phone:pt.data.phone||"",bank:[pt.data.bankName,pt.data.accountNo,pt.data.accountName].filter(Boolean).join(" · "),contracts,totals:{value:sum(contracts,x=>x.value),worked:sum(contracts,x=>x.worked),paid:sum(contracts,x=>x.paidNet),paidGross:sum(contracts,x=>x.paidGross),retentionHeld:sum(contracts,x=>x.retentionHeld),inProcess:sum(contracts,x=>x.inProcess),unpaidWorked:sum(contracts,x=>x.unpaidWorked),notWorked:sum(contracts,x=>x.notWorked)}});
+    } else if(t==="SUPPLIER"){
+      const ps=PAY.filter(x=>x.data.partnerId===pt.id&&live(x));
+      if(!ps.length && projectFilter) continue;
+      const byProject={}; for(const x of ps){ const k=x.data.projectId; byProject[k]=byProject[k]||{projectId:k,projectName:pname.get(k)||"-",purchased:0,paid:0}; byProject[k].purchased+=num(x.data.grossAmount); if(x.data.status==="PAID") byProject[k].paid+=num(x.data.paidAmount||x.data.netAmount); }
+      partnerRows.push({id:pt.id,type:t,name,...partnerInfo(pt),phone:pt.data.phone||"",bank:[pt.data.bankName,pt.data.accountNo,pt.data.accountName].filter(Boolean).join(" · "),projects:Object.values(byProject),purchases:ps.map(x=>({id:x.id,projectName:pname.get(x.data.projectId)||"-",date:x.data.submittedAt||x.data.createdAt||"",items:(x.data.items||[]).length,amount:x.data.grossAmount,status:x.data.status})),totals:{purchased:sum(ps,x=>x.data.grossAmount),paid:sum(ps.filter(x=>x.data.status==="PAID"),x=>x.data.paidAmount||x.data.netAmount),inProcess:sum(ps.filter(x=>x.data.status!=="PAID"),x=>x.data.grossAmount)}});
+    }
+  }
+  // SPK yang vendornya belum terdaftar sebagai pihak → tetap direkap per nama
+  const seen=new Set(partnerRows.flatMap(r=>(r.contracts||[]).map(c=>c.contractId))); const loose=new Map();
+  for(const c of PO){ if(seen.has(c.id)) continue; const nm=String(c.data.vendor||c.data.partnerName||"").trim(); if(!nm) continue; const t=String(c.data.partnerType||"VENDOR").toUpperCase()==="SUBKON"?"SUBKON":"VENDOR"; const k=`${t}|${nameKey(nm)}`; if(!loose.has(k)) loose.set(k,{t,nm,list:[]}); loose.get(k).list.push(c); }
+  for(const [k,g] of loose){ const contracts=g.list.map(c=>{const value=num(c.data.contractValue||c.data.amount); const cp=PAY.filter(x=>x.data.contractId===c.id&&live(x)); const prog=Math.max(0,...cp.filter(x=>!x.data.isRetentionRelease).map(x=>num(x.data.workProgressPct))); const worked=Math.round(value*prog/100); const paidGross=sum(cp.filter(x=>x.data.status==="PAID"&&!x.data.isRetentionRelease),x=>x.data.grossAmount);
+      return {contractId:c.id,number:c.data.number||c.id,projectId:c.data.projectId,projectName:pname.get(c.data.projectId)||"-",description:c.data.description||"",value,progress:prog,worked,paidGross,paidNet:sum(cp.filter(x=>x.data.status==="PAID"),x=>x.data.paidAmount||x.data.netAmount),retentionHeld:0,inProcess:sum(cp.filter(x=>["SUBMITTED","OPS_APPROVED","APPROVED"].includes(x.data.status)),x=>x.data.netAmount),unpaidWorked:Math.max(0,worked-paidGross),notWorked:Math.max(0,value-worked),needsSetup:true};});
+    partnerRows.push({id:`unregistered:${k}`,type:g.t,name:g.nm,unregistered:true,phone:"",bank:"",contracts,totals:{value:sum(contracts,x=>x.value),worked:sum(contracts,x=>x.worked),paid:sum(contracts,x=>x.paidNet),paidGross:sum(contracts,x=>x.paidGross),retentionHeld:0,inProcess:sum(contracts,x=>x.inProcess),unpaidWorked:sum(contracts,x=>x.unpaidWorked),notWorked:sum(contracts,x=>x.notWorked)}}); }
+  // Rekap tukang (dari absensi vs upah yang diajukan/dibayar)
+  const tk=new Map(); const tById=new Map(tukang.map(x=>[x.id,x])); const tByName=new Map(); for(const x of tukang){ const nk=nameKey(x.data.name||x.data.nama); if(nk&&!tByName.has(nk)) tByName.set(nk,x.id); }
+  const newRow=(k,name,master)=>({key:k,id:master?.id||"",name:master?.data?.name||name||k,unlinked:!master,workerType:master?.data?.workerType||master?.data?.skill1||master?.data?.skill||"",phone:master?.data?.phone||"",dailyRate:num(master?.data?.dailyRate),overtimeRate:num(master?.data?.overtimeRate),bankName:master?.data?.bankName||"",accountNo:master?.data?.accountNo||"",accountName:master?.data?.accountName||"",status:String(master?.data?.status||"AKTIF").toUpperCase(),atiLevel:master?.data?.atiLevel||"",days:0,earned:0,submitted:0,paid:0,projects:new Set(),aliases:new Set()});
+  // Kunci tukang: ID master; bila absensi lama hanya berisi nama → dicocokkan ke master dengan nama yang sama, sisanya ditandai "belum terhubung".
+  const resolve=(workerId,workerName)=>{ if(workerId&&tById.has(workerId)) return {k:workerId,master:tById.get(workerId)}; const nk=nameKey(workerName); if(nk&&tByName.has(nk)) return {k:tByName.get(nk),master:tById.get(tByName.get(nk))}; return {k:workerId||`name:${nk}`,master:null}; };
+  const rowFor=(workerId,workerName)=>{ const {k,master}=resolve(workerId,workerName); if(!k||k==="name:") return null; const r=tk.get(k)||newRow(k,workerName,master); if(workerName&&String(workerName).trim()!==String(r.name).trim()) r.aliases.add(String(workerName).trim()); tk.set(k,r); return r; };
+  if(!projectFilter) for(const x of tukang) if(!tk.has(x.id)) tk.set(x.id,newRow(x.id,x.data.name,x));
+  for(const w of W){ const r=rowFor(w.data.workerId,w.data.workerName); if(!r) continue; const stt=String(w.data.attendanceStatus||w.data.status||"HADIR").toUpperCase(); const dd=["ALPA","IZIN","SAKIT"].includes(stt)?0:(stt==="SETENGAH HARI"||stt==="HALF"?0.5:1); r.days+=dd; r.earned+=num(w.data.amount)||Math.round(dd*num(w.data.dailyRate||w.data.wage||w.data.rate)); r.projects.add(pname.get(w.data.projectId)||"-"); }
+  for(const pay of PAY.filter(x=>x.data.category==="TUKANG"&&live(x))) for(const l of (pay.data.lines||[])){ const r=rowFor(l.workerId,l.workerName); if(!r) continue; if(pay.data.status==="PAID") r.paid+=num(l.amount); else r.submitted+=num(l.amount); r.projects.add(pname.get(pay.data.projectId)||"-"); }
+  const workersOut=[...tk.values()].map(r=>({...r,projects:[...r.projects],aliases:[...r.aliases],notSubmitted:Math.max(0,r.earned-r.paid-r.submitted)})).sort((a,b)=>b.earned-a.earned||a.name.localeCompare(b.name));
+  const totals={cashIn:sum(projectsOut,x=>x.cashIn),cashOut:sum(projectsOut,x=>x.cashOut),termsBilledOpen:sum(projectsOut,x=>x.termsBilledOpen),retentionHeldByClient:sum(projectsOut,x=>x.retentionHeldByClient),payablesApproved:sum(projectsOut,x=>x.payablesApproved),payablesInApproval:sum(projectsOut,x=>x.payablesInApproval),byCategory:Object.fromEntries([...PAYMENT_CATEGORIES,"OPERASIONAL"].map(k=>[k,sum(projectsOut,x=>x.byCategory[k])]))};
+  totals.balance=totals.cashIn-totals.cashOut;
+  return json({ok:true,totals,projects:projectsOut,partners:partnerRows,workers:workersOut,settings:await financeSettings(env)});
+}
+
+
+// ===== V3.4.25 — Database Mitra (Tukang, Vendor, Subkon, Toko Material) =====
+const PARTY_COLLECTIONS = new Set(["partners","tukang"]);
+async function rowsWhere(env,collection,sql="",binds=[]) {
+  const q=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection=?${sql?` AND ${sql}`:""}`).bind(collection,...binds).all();
+  return (q.results||[]).map(r=>({id:r.id,data:safeJsonParse(r.data_json,{})}));
+}
+async function partyInUse(env,collection,id) {
+  if(collection==="partners"){
+    const n=await env.DB.prepare(`SELECT COUNT(*) AS n FROM app_records WHERE collection IN ('partner_payments','po','cash_out') AND json_extract(data_json,'$.partnerId')=?`).bind(id).first();
+    return num(n?.n)>0?"Pihak ini sudah dipakai di SPK/pengajuan/pembayaran. Ubah status menjadi Nonaktif agar riwayatnya tetap utuh.":"";
+  }
+  if(collection==="tukang"){
+    const n=await env.DB.prepare(`SELECT COUNT(*) AS n FROM app_records WHERE collection='daily_workers' AND json_extract(data_json,'$.workerId')=?`).bind(id).first();
+    if(num(n?.n)>0) return "Tukang ini sudah tercatat di absensi. Ubah status menjadi Nonaktif agar riwayat upahnya tetap utuh.";
+    const p=await env.DB.prepare(`SELECT COUNT(*) AS n FROM app_records WHERE collection='partner_payments' AND instr(data_json,?)>0`).bind(`"workerId":"${String(id).replace(/"/g,"")}"`).first();
+    return num(p?.n)>0?"Tukang ini sudah ada di pengajuan upah. Ubah status menjadi Nonaktif.":"";
+  }
+  return "";
+}
+async function partyDuplicate(env,collection,id,data) {
+  if(collection==="partners"){
+    const t=String(data.partnerType||"").toUpperCase(); const nk=nameKey(data.name); if(!nk) return "";
+    const hit=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='partners' AND json_extract(data_json,'$.partnerType')=? AND json_extract(data_json,'$.nameKey')=? AND id<>? LIMIT 1`).bind(t,nk,String(id||"")).first();
+    return hit?`${PARTNER_TYPES[t]||"Pihak"} "${safeJsonParse(hit.data_json,{}).name}" sudah terdaftar. Gunakan data yang ada, atau gabungkan bila duplikat.`:"";
+  }
+  if(collection==="tukang"){
+    const nk=nameKey(data.name); if(!nk) return "";
+    for(const r of await rowsWhere(env,"tukang")) if(r.id!==String(id||"")&&nameKey(r.data.name)===nk&&(!data.phone||!r.data.phone||String(r.data.phone).replace(/\D/g,"")===String(data.phone).replace(/\D/g,""))) return `Tukang "${r.data.name}" sudah terdaftar${r.data.phone?` (${r.data.phone})`:""}. Bila orang berbeda dengan nama sama, isi No. HP yang berbeda.`;
+  }
+  return "";
+}
+async function batchPut(env,items) {
+  const now=new Date().toISOString(); const stmts=items.map(({collection,id,data})=>env.DB.prepare(`UPDATE app_records SET data_json=?, updated_at=? WHERE collection=? AND id=?`).bind(JSON.stringify({...data,updatedAt:now}),now,collection,id));
+  for(let i=0;i<stmts.length;i+=80) await env.DB.batch(stmts.slice(i,i+80));
+}
+async function partyHistoryHandler(env,user,kind,id) {
+  const pname=new Map((await rowsWhere(env,"projects")).map(p=>[p.id,p.data.name||p.id]));
+  const scope=isProjectScopedRole(user)?await accessibleProjectIds(env,user):null; const ok=pid=>!scope||scope.has(String(pid));
+  if(kind==="tukang"){
+    let master=null, nk="";
+    if(id.startsWith("name:")) nk=id.slice(5); else { master=await getRecord(env,"tukang",id); if(!master) return json({ok:false,message:"Tukang tidak ditemukan."},404); nk=nameKey(master.data.name); }
+    const att=(await rowsWhere(env,"daily_workers")).filter(w=>ok(w.data.projectId)&&((master&&w.data.workerId===master.id)||(!w.data.workerId&&nameKey(w.data.workerName)===nk)||(!master&&nameKey(w.data.workerName)===nk&&!w.data.workerId)));
+    const att2=att.map(w=>{const stt=String(w.data.attendanceStatus||w.data.status||"HADIR").toUpperCase(); const dd=["ALPA","IZIN","SAKIT"].includes(stt)?0:(stt==="SETENGAH HARI"||stt==="HALF"?0.5:1); return {date:w.data.date||"",projectId:w.data.projectId,projectName:pname.get(w.data.projectId)||"-",status:stt,days:dd,overtimeHours:num(w.data.overtimeHours),amount:num(w.data.amount)||Math.round(dd*num(w.data.dailyRate||w.data.wage||w.data.rate))};}).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    const pays=[]; for(const p of await rowsWhere(env,"partner_payments","json_extract(data_json,'$.category')='TUKANG'")){ if(!ok(p.data.projectId)) continue; for(const l of (p.data.lines||[])) if((master&&l.workerId===master.id)||nameKey(l.workerName)===nk&&(!l.workerId||!master)) pays.push({id:p.id,projectName:pname.get(p.data.projectId)||"-",period:`${p.data.periodStart||""} – ${p.data.periodEnd||""}`,amount:num(l.amount),days:num(l.days),status:p.data.status,paidAt:p.data.paidAt||"",proofDocId:p.data.proofDocId||""}); }
+    const byProject={}; for(const a of att2){ const b=byProject[a.projectId]||(byProject[a.projectId]={projectName:a.projectName,days:0,earned:0,first:a.date,last:a.date}); b.days+=a.days; b.earned+=a.amount; if(a.date<b.first) b.first=a.date; if(a.date>b.last) b.last=a.date; }
+    return json({ok:true,kind,master,attendance:att2.slice(0,300),attendanceCount:att2.length,byProject:Object.values(byProject),payments:pays.sort((a,b)=>String(b.period).localeCompare(String(a.period)))});
+  }
+  const pt=await getRecord(env,"partners",id); if(!pt) return json({ok:false,message:"Data tidak ditemukan."},404);
+  const contracts=(await rowsWhere(env,"po")).filter(c=>ok(c.data.projectId)&&(c.data.partnerId===id||(!c.data.partnerId&&nameKey(c.data.vendor||c.data.partnerName)===pt.data.nameKey)));
+  const cids=new Set(contracts.map(c=>c.id));
+  const pays=(await rowsWhere(env,"partner_payments")).filter(p=>ok(p.data.projectId)&&(p.data.partnerId===id||cids.has(p.data.contractId)));
+  return json({ok:true,kind,partner:pt,
+    contracts:contracts.map(c=>({id:c.id,number:c.data.number||c.id,projectName:pname.get(c.data.projectId)||"-",date:c.data.date||"",description:c.data.description||"",value:num(c.data.contractValue||c.data.amount),retentionPct:num(c.data.retentionPct),terms:c.data.terms||[],spkDocId:c.data.spkDocId||""})),
+    payments:pays.map(p=>({id:p.id,projectName:pname.get(p.data.projectId)||"-",category:p.data.category,contractNumber:p.data.contractNumber||"",termLabel:p.data.termLabel||"",items:(p.data.items||[]).map(x=>`${x.name} ${num(x.qty)} ${x.unit||""}`.trim()),date:p.data.submittedAt||p.data.createdAt||"",gross:num(p.data.grossAmount),retention:num(p.data.retentionAmount),net:num(p.data.netAmount),status:p.data.status,paidAmount:num(p.data.paidAmount),paidAt:p.data.paidAt||"",proofDocId:p.data.proofDocId||"",attachmentDocIds:p.data.attachmentDocIds||[]})).sort((a,b)=>String(b.date).localeCompare(String(a.date)))});
+}
+async function partyMergeHandler(request,env,user) {
+  if(!buildAccess(user).capabilities.directoryMerge) return json({ok:false,message:"Hanya Head of Operational/Finance yang dapat menggabungkan data."},403);
+  const b=await parseJson(request)||{}; const kind=b.kind==="tukang"?"tukang":"partners"; const keepId=String(b.keepId||""); const mergeIds=[...new Set((b.mergeIds||[]).map(String))].filter(x=>x&&x!==keepId);
+  if(!keepId||!mergeIds.length) return json({ok:false,message:"Pilih data utama dan minimal satu data yang digabungkan."},400);
+  const keep=await getRecord(env,kind,keepId); if(!keep) return json({ok:false,message:"Data utama tidak ditemukan."},404);
+  const updates=[]; let touched=0;
+  if(kind==="partners"){
+    const olds=[]; for(const mid of mergeIds){ const r=await getRecord(env,"partners",mid); if(!r) continue; if(r.data.partnerType!==keep.data.partnerType) return json({ok:false,message:"Hanya data dengan jenis yang sama yang bisa digabungkan."},400); olds.push(r); }
+    const ids=new Set(olds.map(r=>r.id)); const nm=keep.data.name;
+    for(const col of ["po","partner_payments","cash_out"]) for(const r of await rowsWhere(env,col,"json_extract(data_json,'$.partnerId') IS NOT NULL")) if(ids.has(r.data.partnerId)){ const d={...r.data,partnerId:keepId}; if(col!=="partner_payments"||r.data.category!=="TUKANG") d.partnerName=nm; if(col==="po") d.vendor=nm; updates.push({collection:col,id:r.id,data:d}); }
+    const patch={}; for(const o of olds) for(const k of ["phone","address","bankName","accountNo","accountName","specialty"]) if(!keep.data[k]&&!patch[k]&&o.data[k]) patch[k]=o.data[k];
+    const aliases=[...new Set([...(keep.data.aliases||[]),...olds.map(o=>o.data.name)])];
+    await batchPut(env,updates); touched=updates.length;
+    await upsertRecord(env,"partners",keepId,{...keep.data,...patch,aliases},user);
+    for(const o of olds) await deleteRecord(env,"partners",o.id,user);
+  } else {
+    const ids=new Set(), names=new Set(), olds=[];
+    for(const mid of mergeIds){ if(mid.startsWith("name:")) names.add(mid.slice(5)); else { const r=await getRecord(env,"tukang",mid); if(r){ ids.add(r.id); olds.push(r); } } }
+    const nm=keep.data.name;
+    const hit=(wid,wname)=>ids.has(String(wid||""))||(!wid&&names.has(nameKey(wname)));
+    for(const r of await rowsWhere(env,"daily_workers")) if(hit(r.data.workerId,r.data.workerName)) updates.push({collection:"daily_workers",id:r.id,data:{...r.data,workerId:keepId,workerName:nm}});
+    for(const r of await rowsWhere(env,"partner_payments","json_extract(data_json,'$.category')='TUKANG'")){ let ch=false; const lines=(r.data.lines||[]).map(l=>{ if(hit(l.workerId,l.workerName)){ ch=true; return {...l,workerId:keepId,workerName:nm}; } return l; }); if(ch) updates.push({collection:"partner_payments",id:r.id,data:{...r.data,lines}}); }
+    await batchPut(env,updates); touched=updates.length;
+    const patch={}; for(const o of olds) for(const k of ["phone","bankName","accountNo","accountName","dailyRate","overtimeRate","workerType","domicile"]) if(!keep.data[k]&&!patch[k]&&o.data[k]) patch[k]=o.data[k];
+    if(Object.keys(patch).length) await upsertRecord(env,"tukang",keepId,{...keep.data,...patch},user);
+    for(const o of olds) await deleteRecord(env,"tukang",o.id,user);
+  }
+  await audit(env,user,"PARTY_MERGE",kind,keepId,"",{merged:mergeIds,records:touched});
+  return json({ok:true,records:touched});
+}
+
 export default {
   async fetch(request, env, ctx) {
     REQUEST_ORIGIN = new URL(request.url).origin;
@@ -2680,7 +3122,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.23-report-range"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.25-partner-directory"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -2712,6 +3154,20 @@ async function handleRequest(request, env) {
     if (reportManageMatch && request.method === "PATCH") return updateDivisionReport(request,env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));
     if (reportManageMatch && request.method === "DELETE") return deleteDivisionReport(env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));
 
+    const partyHistMatch = path.match(/^\/api\/finance\/directory\/(tukang|partners)\/([^/]+)\/history$/);
+    if (partyHistMatch && request.method === "GET") return partyHistoryHandler(env,auth.user,partyHistMatch[1],decodeURIComponent(partyHistMatch[2]));
+    if (path === "/api/finance/directory/merge" && request.method === "POST") return partyMergeHandler(request,env,auth.user);
+    if (path === "/api/finance/summary" && request.method === "GET") return financeSummaryHandler(env,auth.user,url);
+    if (path === "/api/finance/settings" && ["GET","PUT"].includes(request.method)) return financeSettingsHandler(request,env,auth.user);
+    if (path === "/api/finance/contracts" && request.method === "POST") return contractSaveHandler(request,env,auth.user,"");
+    const finContractMatch = path.match(/^\/api\/finance\/contracts\/([^/]+)$/);
+    if (finContractMatch && request.method === "POST") return contractSaveHandler(request,env,auth.user,decodeURIComponent(finContractMatch[1]));
+    if (path === "/api/finance/payroll-preview" && request.method === "GET") return payrollPreviewHandler(env,auth.user,url);
+    if (path === "/api/finance/payments" && request.method === "POST") return partnerPaymentSaveHandler(request,env,auth.user,"");
+    const finPayMatch = path.match(/^\/api\/finance\/payments\/([^/]+)(?:\/(action|pay))?$/);
+    if (finPayMatch && request.method === "POST") { const pid=decodeURIComponent(finPayMatch[1]); if(finPayMatch[2]==="action") return partnerPaymentActionHandler(request,env,auth.user,pid); if(finPayMatch[2]==="pay") return partnerPaymentPayHandler(request,env,auth.user,pid); return partnerPaymentSaveHandler(request,env,auth.user,pid); }
+    const finTermMatch = path.match(/^\/api\/finance\/terms\/([^/]+)\/(bill|receive)$/);
+    if (finTermMatch && request.method === "POST") return finTermMatch[2]==="bill" ? termBillHandler(request,env,auth.user,decodeURIComponent(finTermMatch[1])) : termReceiveHandler(request,env,auth.user,decodeURIComponent(finTermMatch[1]));
     if (path === "/api/notifications/email" && request.method === "GET") return emailStatusHandler(env,auth.user);
     if (path === "/api/notifications/email/test" && request.method === "POST") return emailTestHandler(request,env,auth.user);
     if (path === "/api/notifications/email/retry" && request.method === "POST") return emailRetryHandler(env,auth.user);
@@ -2823,6 +3279,7 @@ async function handleRequest(request, env) {
         if (!body) return json({ok:false,message:"JSON tidak valid."},400);
         let data={...(body.data || body)};
         try { data=await normalizeOperationalResponsibility(env,collection,data); } catch(e) { return json({ok:false,message:e.message},400); }
+        if (PARTY_COLLECTIONS.has(collection)) { const dup=await partyDuplicate(env,collection,body.id||"",data); if(dup) return json({ok:false,message:dup},409); }
         if (collection === "procurement") data=normalizePrArrays(data);
         if (collection === "po" && data.prId) {
           if (!roleIn(auth.user,["admin_teknik","administrator","direktur","head_unit_bisnis"])) return json({ok:false,message:"PO/SPK dari PR hanya dapat dibuat oleh Admin Teknik."},403);
@@ -2889,6 +3346,7 @@ async function handleRequest(request, env) {
           data=normalizeAsBuiltProgress({...old.data,...data,projectId,drafterUserId:drafter||old.data.drafterUserId},oldStatus);
         }
         try { data=await normalizeOperationalResponsibility(env,collection,{...old.data,...data}); } catch(e) { return json({ok:false,message:e.message},400); }
+        if (PARTY_COLLECTIONS.has(collection)) { const dup=await partyDuplicate(env,collection,id,data); if(dup) return json({ok:false,message:dup},409); }
         if (collection === "procurement") data=normalizePrArrays({...old.data,...data});
         const roleKey=normalizeRole(auth.user);
         if (collection === "payment_requests") {
@@ -2927,6 +3385,7 @@ async function handleRequest(request, env) {
         if (collectionDenied(auth.user,collection,"delete")) return json({ok:false,message:`Role ${auth.user.role || ""} tidak dapat menghapus ${collection}.`},403);
         const old = await getRecord(env,collection,id);
         if (old && !(await recordAllowedByProjectScope(env,auth.user,collection,id,old.data))) return json({ok:false,message:"Anda tidak ditugaskan pada proyek data ini."},403);
+        if (PARTY_COLLECTIONS.has(collection)) { const used=await partyInUse(env,collection,id); if(used) return json({ok:false,message:used},409); }
         if(WORKFLOW_SOURCE_COLLECTIONS.has(collection)) await cancelWorkflowTasks(env,collection,id,auth.user);
         const ok = await deleteRecord(env,collection,id,auth.user);
         return ok ? json({ok:true}) : json({ok:false,message:"Data tidak ditemukan."},404);
@@ -2976,6 +3435,7 @@ async function handleRequest(request, env) {
         if (m) {
           const old = await getRecord(env,collection,m[1]);
           if (old && !(await recordAllowedByProjectScope(env,auth.user,collection,m[1],old.data))) return json({message:"Forbidden: project scope"},403);
+          if (PARTY_COLLECTIONS.has(collection)) { const used=await partyInUse(env,collection,m[1]); if(used) return json({message:used},409); }
           await deleteRecord(env,collection,m[1],auth.user);
         }
         return new Response(null,{status:204});

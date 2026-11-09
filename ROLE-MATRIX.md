@@ -81,3 +81,27 @@ Akses edit profil/portofolio tetap mengikuti capability koleksi `public_site_set
 | Head of Operational, Head of Supporting, QC | Semua | Ya |
 | Head of Engineering, Admin Teknik, QS, MEP | Semua | Tidak |
 | Site Manager | Hanya proyek yang ditugaskan | Tidak |
+
+
+## Keuangan Proyek (V3.4.24)
+
+| Aksi | Site Manager | Head of Operational | Head Unit Bisnis | Admin Teknik | Finance |
+|---|---|---|---|---|---|
+| Ajukan pembayaran Vendor/Subkon/Tukang/Material | ✓ | ✓ | ✓ | – | – |
+| ACC tahap 1 | – | ✓ | ✓ | – | – |
+| ACC material di atas batas | – | – | ✓ | – | – |
+| Verifikasi & bayar (bukti TF) | – | – | ✓ | – | ✓ |
+| Atur/catat SPK (jenis, retensi, termin) | – | ✓ | ✓ | ✓ | – |
+| Susun & tagih termin client | – | ✓ | ✓ | ✓ | – |
+| Verifikasi uang masuk termin | – | – | ✓ | – | ✓ |
+| Ubah batas ACC Head Unit Bisnis | – | – | ✓ (dan Direktur/Administrator) | – | – |
+
+## Database Mitra (V3.4.25)
+
+| Aksi | Site Manager | Head of Operational | Admin Teknik | Admin Logistik | Finance | Pimpinan |
+|---|---|---|---|---|---|---|
+| Lihat Database Mitra + nominal | ✓ (proyeknya) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Tambah/edit Vendor, Subkon, Toko | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Tambah/edit Tukang | ✓ | ✓ | ✓ | – | ✓ | ✓ |
+| Gabungkan duplikat / hubungkan nama absensi | – | ✓ | – | – | ✓ | ✓ |
+| Hapus (hanya yang belum pernah dipakai) | – | ✓ | Tukang | – | Vendor/Subkon/Toko | ✓ |

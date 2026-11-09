@@ -1,9 +1,9 @@
-/* Nara System — Service Worker (V3.4.23)
+/* Nara System — Service Worker (V3.4.25)
  * - Menyimpan tampilan aplikasi (HTML/CSS/JS/ikon) agar dibuka cepat dari ikon HP.
  * - Data (/api, /rest, /storage, /auth) SELALU dari server, tidak pernah di-cache.
  * - Versi baru: aplikasi menampilkan tombol "Perbarui"; cache lama dihapus otomatis.
  */
-const APP_VERSION = '3.4.23';
+const APP_VERSION = '3.4.25';
 const CACHE = `nara-shell-${APP_VERSION}`;
 const SHELL = [
   '/', `/styles.css?v=${APP_VERSION}`, `/app.js?v=${APP_VERSION}`, '/offline', '/manifest.webmanifest',

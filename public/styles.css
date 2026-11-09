@@ -193,3 +193,38 @@ input:focus,select:focus,textarea:focus{border-color:#c48a7b;box-shadow:0 0 0 3p
 /* V3.4.23 — pilih periode laporan */
 .report-range-quick{display:flex;flex-wrap:wrap;align-items:center;gap:6px;align-self:end;padding-bottom:2px}
 .report-range-quick span{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
+
+/* V3.4.24 — Keuangan proyek */
+.fin-tabs{display:flex;flex-wrap:wrap;gap:6px;padding:0 18px 12px;border-bottom:1px solid var(--line,#e5e7eb)}
+.fin-tabs button{border:1px solid var(--line,#e5e7eb);background:transparent;border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;cursor:pointer;color:inherit}
+.fin-tabs button.active{background:var(--primary,#1d4ed8);border-color:var(--primary,#1d4ed8);color:#fff}
+.fin-filter{display:flex;justify-content:flex-end;padding:10px 18px}.fin-filter label{display:flex;gap:8px;align-items:center;font-size:13px}
+.fin-kv{display:grid;grid-template-columns:minmax(120px,40%) 1fr;gap:6px 12px;font-size:13px;margin:8px 0}.fin-kv span{color:var(--muted,#64748b)}
+.fin-calc{align-self:end;font-size:13px;padding:10px 12px;border-radius:10px;background:rgba(29,78,216,.06);line-height:1.6}
+.fin-progress{height:6px;border-radius:99px;background:rgba(100,116,139,.18);overflow:hidden;min-width:80px}.fin-progress span{display:block;height:100%;background:#16a34a}
+.fin-lines input{width:100%;min-width:70px;padding:6px 8px}.fin-lines td{vertical-align:middle}
+.fin-two{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:900px){.fin-two{grid-template-columns:1fr}}
+.fin-cat-row{display:grid;grid-template-columns:110px 1fr 130px;gap:10px;align-items:center;margin:6px 0;font-size:13px}.fin-cat-row b{text-align:right}
+.fin-bar{height:8px;border-radius:99px;background:rgba(100,116,139,.15);overflow:hidden}.fin-bar span{display:block;height:100%;background:#ef4444}
+.fin-flow{display:grid;gap:8px;font-size:13px;line-height:1.5}
+.fin-ledger summary{padding:14px 18px;cursor:pointer}.fin-ledger[open] summary{border-bottom:1px solid var(--line,#e5e7eb)}#finLedger{padding:12px}
+.pill.fin-cat-vendor{background:#dbeafe;color:#1e40af}.pill.fin-cat-subkon{background:#ede9fe;color:#5b21b6}.pill.fin-cat-tukang{background:#fef3c7;color:#92400e}.pill.fin-cat-material{background:#dcfce7;color:#166534}.pill.fin-cat-operasional{background:#f1f5f9;color:#334155}
+.text-success{color:#16a34a}
+@media(max-width:640px){.fin-cat-row{grid-template-columns:90px 1fr;}.fin-cat-row b{grid-column:1/-1;text-align:left}.fin-kv{grid-template-columns:1fr}}
+
+/* V3.4.25 — Database Mitra */
+.dir-types{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.dir-types button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:12px 14px;border:1px solid var(--line,#e5e7eb);border-radius:12px;background:var(--card,#fff);cursor:pointer;font:inherit;color:inherit;text-align:left}
+.dir-types button span{font-size:12px;color:var(--muted,#64748b)}
+.dir-types button.active{border-color:var(--primary,#1d4ed8);box-shadow:inset 0 0 0 1px var(--primary,#1d4ed8)}
+.dir-toolbar{display:flex;gap:8px;padding:0 18px 12px;flex-wrap:wrap}.dir-toolbar input{flex:1;min-width:200px}
+.dir-table td{vertical-align:top}
+.dir-merge-list{max-height:300px;overflow:auto;border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:6px 10px;margin:10px 0}
+.dir-merge-list .check-line{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed var(--line,#e5e7eb)}
+.dir-merge-list .check-line:last-child{border-bottom:0}
+.modal.dir-detail-modal{width:min(980px,96vw)}.modal.dir-detail-modal h4{margin:16px 0 6px}
+.dir-scroll{max-height:280px;overflow:auto}
+.v31-newworker{display:grid;grid-template-columns:2fr 1.2fr 1fr 1.2fr auto;gap:8px;padding:10px;margin:8px 0;border:1px dashed var(--line,#cbd5e1);border-radius:10px;background:rgba(29,78,216,.04)}
+@media(max-width:720px){.dir-types{grid-template-columns:1fr 1fr}.v31-newworker{grid-template-columns:1fr 1fr}}
+.dir-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 170px 230px}.dir-toolbar>*{width:100%;min-width:0}
+@media(max-width:720px){.dir-toolbar{grid-template-columns:1fr 1fr}.dir-toolbar input{grid-column:1/-1}}

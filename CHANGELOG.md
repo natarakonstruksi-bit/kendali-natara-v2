@@ -1,3 +1,29 @@
+## V3.4.25 — Database Mitra
+
+- Menu baru **Database Mitra** (view `directory`): tab Tukang, Vendor, Subkon, Toko Material — kontak, rekening, status, dan nominal masing-masing (nilai SPK/dikerjakan/dibayar/belum dibayar/retensi; total beli/dibayar; upah absensi/dibayar/dalam pengajuan/belum diajukan). Pencarian, filter status, urutan.
+- Detail per pihak: `GET /api/finance/directory/(tukang|partners)/:id/history` — SPK, tagihan, pembelian, pembayaran + bukti; untuk tukang: per proyek, upah, absensi.
+- Gabung duplikat: `POST /api/finance/directory/merge` (Head of Operational/Finance/pimpinan) — memindahkan SPK, pengajuan, Cash Out, absensi, dan baris upah ke data utama.
+- Absensi lama yang hanya berisi nama ditandai "belum terhubung" → tombol **Hubungkan** (ke tukang yang ada atau jadikan tukang baru). Nama yang sama persis otomatis dicocokkan ke data tukang.
+- SPK dengan vendor yang belum terdaftar → tombol **Daftarkan**.
+- Pencegahan: nama dobel ditolak (tukang: kecuali No. HP berbeda); data yang sudah dipakai transaksi tidak bisa dihapus (409) — nonaktifkan.
+- Form laporan harian: tombol **+ Tukang baru** langsung menyimpan ke Database Mitra dan memilihnya di absensi. Site Manager & Finance kini boleh menambah/mengubah data tukang.
+- Tes `scripts/directory-smoke.mjs`. Tidak ada migration baru.
+
+## V3.4.24 — Keuangan Proyek (Pemasukan & Pengeluaran)
+
+- Koleksi baru (tanpa migration, tetap `app_records`): `partners` (Vendor/Subkon/Toko Material, terbentuk otomatis saat pertama diajukan), `project_terms` (termin client), `partner_payments` (pengajuan pembayaran), setting `app_settings/finance` (`materialHubThreshold`, default Rp 5.000.000).
+- SPK (`po`) diperluas jadi kontrak: `partnerType` VENDOR/SUBKON, `retentionPct` (0–20%), `terms[]` (≤ 100%). `POST /api/finance/contracts[/:poId]` untuk atur SPK lama atau catat SPK baru.
+- Alur pembayaran: Site Manager → Head of Operational → (Material > batas: Head Unit Bisnis) → Finance verifikasi + bukti transfer → `cash_out` `PP-<id>` otomatis per kategori.
+  - Vendor/Subkon: per termin SPK, nilai kumulatif tidak boleh melebihi progres pekerjaan & nilai SPK; retensi dipotong otomatis; pelepasan retensi di akhir.
+  - Tukang: mingguan dari absensi laporan harian (`GET /api/finance/payroll-preview`), periode tidak boleh tumpang tindih.
+  - Material: item + toko (baru/terdaftar), lampiran wajib.
+- Pemasukan: Admin Teknik menyusun termin & menagih (`/api/finance/terms/:id/bill`, syarat progres + invoice) → Finance verifikasi uang masuk (`/receive`, bukti TF) → `cash_in` `TERM-<id>`.
+- Rekap: `GET /api/finance/summary` — per proyek, per Vendor/Subkon (dikerjakan, dibayar, belum dibayar, belum dikerjakan, retensi), per Toko, per Tukang.
+- Tugas Saya: tahap `PAY_OPS_APPROVE`, `PAY_HUB_APPROVE`, `PAY_FINANCE`, `PAY_FIX`, `TERM_RECEIVE`, `TERM_FIX` (+ email).
+- Frontend: menu **Pembayaran Proyek**; menu **Keuangan** berisi ringkasan, termin client, buku kas rinci.
+- Perbaikan: halaman tidak lagi reload sendiri saat kunjungan pertama (service worker) — sebelumnya isian login bisa terhapus.
+- Tes `scripts/finance-smoke.mjs`.
+
 ## V3.4.23 — Periode Laporan Bebas
 
 - `reportPeriod(periodType, anchorDate, startDate, endDate)`: rentang bebas, tipe `CUSTOM`, validasi ≤ 366 hari; kompatibel dengan tanggal acuan lama.

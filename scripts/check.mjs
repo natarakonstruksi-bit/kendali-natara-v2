@@ -20,13 +20,13 @@ const pub=fs.readFileSync(path.join(root,'public/public.js'),'utf8');
 const pubHtml=fs.readFileSync(path.join(root,'public/public.html'),'utf8');
 const cfg=fs.readFileSync(path.join(root,'wrangler.jsonc'),'utf8');
 const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
-for(const m of ['APP-V3.4.23','public_portfolio','public_site_settings','/api/public/site','/api/public/portfolio','publicMediaHandler','servePublicPortal'])if(!worker.includes(m))throw new Error(`Marker public backend hilang: ${m}`);
+for(const m of ['APP-V3.4.25','public_portfolio','public_site_settings','/api/public/site','/api/public/portfolio','publicMediaHandler','servePublicPortal'])if(!worker.includes(m))throw new Error(`Marker public backend hilang: ${m}`);
 for(const m of ['Profil & Portofolio','renderPublicInfo','openPublicPortfolio','Filosofi','Pendekatan Kerja'])if(!app.includes(m))throw new Error(`Marker public admin hilang: ${m}`);
 for(const m of ['/api/public/site','/api/public/portfolio','portfolioGrid','openDetail','Membangun dengan Arah.','serviceGroups'])if(!pub.includes(m))throw new Error(`Marker public frontend hilang: ${m}`);
 for(const m of ['TENTANG NATARA','LAYANAN KAMI','PENDEKATAN KERJA','SEGMENTASI KLIEN','portfolioGrid','company-profile/losari-cover.webp'])if(!pubHtml.includes(m))throw new Error(`Marker public HTML hilang: ${m}`);
 if(!html.includes('data-view="public_info"'))throw new Error('Menu Informasi Publik hilang.');
 if(!html.includes('href="/info"'))throw new Error('Link portal publik di login hilang.');
-if(pkg.version!=='3.4.23')throw new Error('package version bukan 3.4.23');
+if(pkg.version!=='3.4.25')throw new Error('package version bukan 3.4.25');
 if(!pkg.scripts?.build)throw new Error('package.json wajib memiliki script build.');
 for(const token of ['PASTE_EXISTING_KENDALI_D1','PASTE_','YOUR_DATABASE'])if(cfg.includes(token))throw new Error(`Placeholder konfigurasi masih ada: ${token}`);
 if(!cfg.includes('04849d77-cb23-4d50-9cfc-4e0d9c542d6b'))throw new Error('D1 existing tidak terpasang.');
@@ -36,7 +36,7 @@ for(const marker of ['QC Management System','Alur QC:','Rekap Kehadiran & Gaji T
 for(const m of ['qc_reports','ati_reports','workflow_tasks','listWorkflowTasks','syncWorkflowTask','progressWorkflowAction','opnameWorkflowAction','generateDivisionReport','DIVISION_REPORT_SUBMIT','koordinator_engineering','koordinator_supporting',])if(!worker.includes(m))throw new Error(`Marker V3.3.1 backend hilang: ${m}`);
 for(const m of ['Tugas Saya','renderTasks','WORKFLOW INBOX','Posisi / Jabatan — sekaligus Role Akses','LAPORAN ${type} KE HEAD UNIT BISNIS','Buat & Kirim Laporan','v33OpenReportDetail'])if(!app.includes(m))throw new Error(`Marker V3.3.1 frontend hilang: ${m}`);
 
-for(const marker of ['site_manager: ["dashboard","tasks","projects","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout"]','projectManagerProcurementAccess','projectManagerQcReadAccess','input?.position, input?.jabatan, input?.role, input?.roleKey'])if(!worker.includes(marker))throw new Error(`PM access fix hilang: ${marker}`);
+for(const marker of ['site_manager: ["dashboard","tasks","projects","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout"]','projectManagerProcurementAccess','projectManagerQcReadAccess','input?.position, input?.jabatan, input?.role, input?.roleKey'])if(!worker.includes(marker))throw new Error(`PM access fix hilang: ${marker}`);
 for(const marker of ["if(!canCollection('qc_reports','read'))return","const poPromise=canCollection('po','read')?loadCollection('po',Boolean(state.selectedProjectId)):Promise.resolve([])","Ketik nama vendor","state.v31Vendors=[];"])if(!app.includes(marker))throw new Error(`PM runtime/free-text guard hilang: ${marker}`);
 if(app.includes("loadCollection('vendor',false)"))throw new Error('PR masih bergantung pada Master Vendor.');
 for(const marker of ['Site Manager wajib menambahkan minimal satu pembanding vendor','PR dan pembanding vendor harus dikirim Site Manager ke Head','Hanya Site Manager proyek atau Manajemen yang dapat menindaklanjuti vendor'])if(!worker.includes(marker))throw new Error(`PM vendor workflow guard hilang: ${marker}`);
@@ -53,4 +53,4 @@ if(app.includes("employeeField('qcUserId','QC',['qc'],false)"))throw new Error('
 for(const marker of ['philosophy:String(d.philosophy','serviceGroups:asList(d.serviceGroups','galleryUrls:[...documentGallery,...staticGallery]','coverUrl=d.coverDocumentId'])if(!worker.includes(marker))throw new Error(`Public company profile backend hilang: ${marker}`);
 for(const marker of ['valueGrid','serviceGrid','approachList','advantageList','audienceList','detail-specs'])if(!pub.includes(marker)&&!pubHtml.includes(marker))throw new Error(`Public company profile frontend hilang: ${marker}`);
 
-console.log('Nara System V3.4.23 Report Range preflight OK');
+console.log('Nara System V3.4.25 Partner Directory preflight OK');
