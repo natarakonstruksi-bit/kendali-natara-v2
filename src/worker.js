@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.27 — Arsip Laporan QC
+ * Nara System V3.4.28 — Impor Keuangan dari Google Sheet/Excel
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.27";
+const APP_VERSION = "APP-V3.4.28";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -281,6 +281,7 @@ function buildAccess(user) {
       termBill: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
       contractManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
       financeSettings: roleIn(user,["administrator","direktur","head_unit_bisnis"]),
+      financeImport: roleIn(user,["administrator","direktur","head_unit_bisnis","finance"]),
       directoryMerge: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","finance"]),
       directoryEdit: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","site_manager","procurement","finance"]),
       procurementApprove: roleIn(user,["head_unit_bisnis","manager_operasional"]),
@@ -2247,7 +2248,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.27"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.28"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -3037,6 +3038,73 @@ async function financeSummaryHandler(env,user,url) {
 }
 
 
+// ===== V3.4.28 — Impor data keuangan dari Google Sheet / Excel =====
+// Klien membaca file .xlsx (unduhan Google Sheet), mencocokkan proyek, lalu mengirim data bertahap ke endpoint ini.
+// ID dibuat deterministik dari isi baris sehingga impor ulang memperbarui data (tidak dobel).
+function importCan(user){ return roleIn(user,["administrator","direktur","head_unit_bisnis","finance"]); }
+async function importPutMany(env,items){
+  const now=new Date().toISOString();
+  const stmts=items.map(({collection,id,data})=>env.DB.prepare(`INSERT INTO app_records(collection,id,data_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(collection,id) DO UPDATE SET data_json=excluded.data_json, updated_at=excluded.updated_at`).bind(collection,id,JSON.stringify({...data,updatedAt:now,createdAt:data.createdAt||now}),now));
+  for(let i=0;i<stmts.length;i+=90) await env.DB.batch(stmts.slice(i,i+90));
+}
+const IMPORT_PROJECT_STATUS={"IN PROGRESS":"IN PROGRESS","COMPLETED":"CLOSED","SELESAI":"CLOSED","ON HOLD":"ON HOLD","HOLD":"ON HOLD"};
+async function importProjectsHandler(request,env,user){
+  if(!importCan(user)) return json({ok:false,message:"Impor keuangan hanya untuk Finance dan pimpinan."},403);
+  const b=await parseJson(request)||{}; const batch=String(b.batch||"").slice(0,80)||"SHEET"; const list=Array.isArray(b.projects)?b.projects.slice(0,500):[];
+  const existing=await rowsWhere(env,"projects"); const byId=new Map(existing.map(r=>[r.id,r])); const byName=new Map(existing.map(r=>[nameKey(r.data.name),r]));
+  const map={}, items=[]; let created=0, updated=0, skipped=0; const now=new Date().toISOString();
+  for(const it of list){
+    const d=it.data||{}; const key=String(it.key||d.name||""); if(!key) continue;
+    if(it.mode==="skip"){ skipped++; continue; }
+    let rec=it.mode==="existing"&&it.existingId?byId.get(String(it.existingId)):null;
+    if(!rec&&it.mode!=="new") rec=byName.get(nameKey(d.name))||null;
+    const fields={name:String(d.name||"").trim(),client:d.client||"",location:d.location||"",contractNo:d.contractNo||"",contractValue:num(d.contractValue),budget:num(d.budget),startDate:d.startDate||"",endDate:d.endDate||"",status:IMPORT_PROJECT_STATUS[String(d.status||"").toUpperCase()]||String(d.status||"").toUpperCase()||"",sheetPic:d.picName||"",sheetSupervisor:d.supervisorName||"",addendumSale:num(d.addendumSale),addendumCost:num(d.addendumCost),addendumStatus:d.addendumStatus||"",costVarianceNote:d.costNote||""};
+    if(rec){
+      const cur={...rec.data}; for(const [k,v] of Object.entries(fields)){ if(k==="name") continue; const empty=cur[k]===undefined||cur[k]===""||cur[k]===null||(typeof cur[k]==="number"&&!cur[k]); if((it.overwrite||empty)&&v!==""&&v!==0) cur[k]=v; }
+      cur.importBatch=cur.importBatch||batch; items.push({collection:"projects",id:rec.id,data:cur}); map[key]=rec.id; updated++;
+    } else {
+      if(!fields.name) continue; const id=`PRJ-${nameKey(fields.name).replace(/[^a-z0-9]+/g,"-").slice(0,40)}-${String(Math.abs(hashStr(fields.name))).slice(0,5)}`;
+      const cur=byId.get(id)?.data||{}; const data={...cur,...Object.fromEntries(Object.entries(fields).filter(([,v])=>v!==""&&v!==0)),importBatch:batch,importedAt:now,importedByName:user.name||user.username||""};
+      items.push({collection:"projects",id,data}); map[key]=id; byName.set(nameKey(fields.name),{id,data}); byId.set(id,{id,data}); created++;
+    }
+  }
+  await importPutMany(env,items);
+  await audit(env,user,"FINANCE_IMPORT_PROJECTS","projects",batch,"",{created,updated,skipped});
+  return json({ok:true,map,created,updated,skipped});
+}
+function hashStr(v){ let h=2166136261; const s=String(v); for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+async function importTransactionsHandler(request,env,user){
+  if(!importCan(user)) return json({ok:false,message:"Impor keuangan hanya untuk Finance dan pimpinan."},403);
+  const b=await parseJson(request)||{}; const batch=String(b.batch||"").slice(0,80)||"SHEET"; const rows=Array.isArray(b.rows)?b.rows.slice(0,600):[];
+  const createSuppliers=b.createSuppliers!==false; const projectIds=new Set((await rowsWhere(env,"projects")).map(r=>r.id));
+  const partnerCache=new Map(); const items=[]; let co=0, pp=0, bad=0, newPartners=0; const now=new Date().toISOString();
+  for(const r of rows){
+    const id=String(r.id||"").replace(/[^A-Za-z0-9_-]/g,"").slice(0,60); const pid=String(r.projectId||""); const amount=num(r.amount); const cat=["MATERIAL","TUKANG","SUBKON","VENDOR","OPERASIONAL"].includes(String(r.category))?String(r.category):"OPERASIONAL";
+    if(!id||!projectIds.has(pid)||!amount||!/^\d{4}-\d{2}-\d{2}$/.test(String(r.date||""))){ bad++; continue; }
+    const name=String(r.partnerName||"").trim(); let partner=null;
+    if(cat==="MATERIAL"&&createSuppliers&&name){
+      const k=nameKey(name); if(partnerCache.has(k)) partner=partnerCache.get(k); else { const before=await env.DB.prepare(`SELECT id FROM app_records WHERE collection='partners' AND json_extract(data_json,'$.partnerType')='SUPPLIER' AND json_extract(data_json,'$.nameKey')=? LIMIT 1`).bind(k).first(); partner=await findOrCreatePartner(env,user,"SUPPLIER",{name,notes:"Dibuat dari impor Google Sheet"}); if(!before) newPartners++; partnerCache.set(k,partner); }
+    }
+    const itemsArr=(Array.isArray(r.items)?r.items:[]).slice(0,80).map(x=>({name:String(x.name||"").slice(0,160),qty:num(x.qty),unit:String(x.unit||"").slice(0,20),price:num(x.price),total:num(x.total)||Math.round(num(x.qty)*num(x.price))}));
+    const desc=String(r.description||"").slice(0,400); const coId=`IMP-CO-${id}`; const ppId=partner?`IMP-PP-${id}`:"";
+    items.push({collection:"cash_out",id:coId,data:{projectId:pid,date:r.date,category:PAYMENT_CATEGORY_LABEL[cat],categoryKey:cat,partnerId:partner?.id||"",partnerName:name,vendor:name,amount,status:"PAID",description:desc,notes:desc,items:itemsArr,account:String(r.bank||""),reference:String(r.source||""),paymentId:ppId,imported:true,importBatch:batch,importSource:String(r.source||""),importLocation:String(r.location||""),createdBy:"Impor Google Sheet"}}); co++;
+    if(partner){ items.push({collection:"partner_payments",id:ppId,data:{projectId:pid,category:"MATERIAL",partnerId:partner.id,partnerName:partner.data?.name||name,items:itemsArr.length?itemsArr:[{name:desc||"Belanja material",qty:1,unit:"",price:amount,total:amount}],grossAmount:amount,retentionAmount:0,netAmount:amount,paidAmount:amount,status:"PAID",submittedAt:r.date,paidAt:r.date,paidAccount:String(r.bank||""),cashOutId:coId,requesterName:"Impor Google Sheet",notes:desc,imported:true,importBatch:batch,history:[{action:"IMPORTED",byName:user.name||user.username||"",at:now,note:`Dari ${r.source||"Google Sheet"}`}]}}); pp++; }
+  }
+  await importPutMany(env,items);
+  return json({ok:true,cashOut:co,payments:pp,skipped:bad,newPartners});
+}
+async function importBatchesHandler(env,user){
+  if(!importCan(user)) return json({ok:false,message:"Hanya Finance dan pimpinan."},403);
+  const q=await env.DB.prepare(`SELECT json_extract(data_json,'$.importBatch') AS batch, COUNT(*) AS n, SUM(json_extract(data_json,'$.amount')) AS total, MIN(json_extract(data_json,'$.date')) AS first, MAX(json_extract(data_json,'$.date')) AS last, MAX(updated_at) AS at FROM app_records WHERE collection='cash_out' AND json_extract(data_json,'$.imported')=1 GROUP BY batch ORDER BY at DESC`).all();
+  return json({ok:true,batches:q.results||[]});
+}
+async function importDeleteHandler(env,user,batch){
+  if(!roleIn(user,["administrator","direktur","head_unit_bisnis","finance"])) return json({ok:false,message:"Hanya Finance dan pimpinan."},403);
+  const r=await env.DB.prepare(`DELETE FROM app_records WHERE collection IN ('cash_out','partner_payments') AND json_extract(data_json,'$.imported')=1 AND json_extract(data_json,'$.importBatch')=?`).bind(batch).run();
+  await audit(env,user,"FINANCE_IMPORT_DELETE","cash_out",batch,"",{deleted:r.meta?.changes||0});
+  return json({ok:true,deleted:r.meta?.changes||0});
+}
+
 // ===== V3.4.25 — Database Mitra (Tukang, Vendor, Subkon, Toko Material) =====
 const PARTY_COLLECTIONS = new Set(["partners","tukang"]);
 async function rowsWhere(env,collection,sql="",binds=[]) {
@@ -3144,7 +3212,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.27-qc-report-archive"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.28-finance-import"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3178,6 +3246,11 @@ async function handleRequest(request, env) {
     if (reportManageMatch && request.method === "PATCH") return updateDivisionReport(request,env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));
     if (reportManageMatch && request.method === "DELETE") return deleteDivisionReport(env,auth.user,reportManageMatch[1],decodeURIComponent(reportManageMatch[2]));
 
+    if (path === "/api/finance/import/projects" && request.method === "POST") return importProjectsHandler(request,env,auth.user);
+    if (path === "/api/finance/import/transactions" && request.method === "POST") return importTransactionsHandler(request,env,auth.user);
+    if (path === "/api/finance/import" && request.method === "GET") return importBatchesHandler(env,auth.user);
+    const importDelMatch = path.match(/^\/api\/finance\/import\/([^/]+)$/);
+    if (importDelMatch && request.method === "DELETE") return importDeleteHandler(env,auth.user,decodeURIComponent(importDelMatch[1]));
     const partyHistMatch = path.match(/^\/api\/finance\/directory\/(tukang|partners)\/([^/]+)\/history$/);
     if (partyHistMatch && request.method === "GET") return partyHistoryHandler(env,auth.user,partyHistMatch[1],decodeURIComponent(partyHistMatch[2]));
     if (path === "/api/finance/directory/merge" && request.method === "POST") return partyMergeHandler(request,env,auth.user);

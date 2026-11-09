@@ -1,3 +1,14 @@
+## V3.4.28 — Impor Keuangan dari Google Sheet / Excel
+
+- Menu **Keuangan → Impor file…** (Finance & pimpinan): baca file .xlsx hasil unduhan Google Sheet rekap proyek. Sheet yang dibaca: REKAP DANA PROYEK, Keuangan PROYEK, DATA BELANJA PROYEK, IMPOR BELANJA.
+- Proyek: nilai kontrak, HPP, tanggal mulai/target, status, owner, lokasi, no. kontrak, adendum. Dicocokkan otomatis ke proyek Nara System berdasarkan nama; bisa dipilih manual, dibuat baru, atau dilewati. Nama kembar (mis. "Sumur Bor" No 16 & 46) dibedakan.
+- Pengeluaran: hanya baris "Dihitung ke Proyek = Ya" (sama dengan REKAP). Kategori Material → Material (atau Subkon bila uraian "subkon"), Gaji → Tukang, Operasional/Lainnya → Operasional. Nama toko, jumlah, satuan, harga diambil dari IMPOR BELANJA; satu nota per tanggal + toko + proyek.
+- Toko material otomatis masuk Database Mitra beserta nominal pembelian.
+- Pratinjau sebelum impor: total per kategori, baris dilewati beserta alasannya, dan cek "Dana keluar REKAP" vs "Akan diimpor" per proyek.
+- Impor ulang file yang sama memperbarui (ID deterministik), tidak dobel. Riwayat impor + **Hapus hasil impor** per batch.
+- Endpoint: `POST /api/finance/import/projects`, `POST /api/finance/import/transactions`, `GET /api/finance/import`, `DELETE /api/finance/import/:batch`.
+- Pembaca Excel (SheetJS 0.18.5, Apache-2.0) disertakan lokal di `public/vendor/`.
+
 ## V3.4.27 — Arsip Laporan QC
 
 - Menu baru **Arsip Laporan QC** (view `qc_archive`) untuk QC, Head of Supporting, Head of Operational, Admin Teknik, dan pimpinan: tabel Dikirim · Laporan · Lingkup · Hasil · Perlu tindakan · Nilai · Status (Dibaca/Belum dibaca) dengan tombol Buka PDF, Rincian, Hapus; filter jenis, bulan, status baca, dan pencarian.
