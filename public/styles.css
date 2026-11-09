@@ -258,3 +258,20 @@ input:focus,select:focus,textarea:focus{border-color:#c48a7b;box-shadow:0 0 0 3p
 .qv-info{display:grid;gap:3px;justify-items:start}.qv-fix{background:#ecfdf5;padding:4px 6px;border-radius:6px}
 .qv-reject{display:grid;gap:6px;width:100%;margin-top:4px}.qv-reject textarea{min-height:60px}
 @media(max-width:700px){.qv-item{grid-template-columns:26px 1fr}.qv-photos{grid-column:2}.qv-info{grid-column:2}}
+/* V3.4.31 — QC disederhanakan */
+.qc-flow{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.qc-step{flex:1 1 150px;display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line,#e5e7eb);border-radius:12px;background:var(--card,#fff);cursor:pointer;font:inherit;color:inherit;text-align:left}
+.qc-step:hover,.qc-step:focus{border-color:var(--primary,#1d4ed8);outline:none}
+.qc-step-n{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#f05a22;color:#fff;font-weight:700;flex:none}
+.qc-step-t{display:flex;flex-direction:column;line-height:1.25}.qc-step-t small{color:var(--muted,#64748b)}
+.qc-step-arrow{align-self:center;color:var(--muted,#94a3b8)}
+.qc-step-help{font-size:13px;color:var(--muted,#475569);margin:4px 2px 12px;min-height:18px}
+.qc-tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line,#e5e7eb);margin-bottom:14px}
+.qc-tabs button{border:0;background:transparent;padding:10px 14px;font:inherit;font-weight:600;color:var(--muted,#64748b);border-bottom:3px solid transparent;cursor:pointer;margin-bottom:-1px}
+.qc-tabs button.active{color:var(--ink,#0f172a);border-bottom-color:#f05a22}
+.qc-tab-badge{display:inline-block;min-width:20px;padding:1px 6px;border-radius:99px;background:#dc2626;color:#fff;font-size:11px;margin-left:4px}
+.qc-pane>*+*{margin-top:14px}.qc-pane[hidden]{display:none}
+.qc-pager-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:0 18px 10px}.qc-pager-bar input{flex:1 1 220px;width:auto}.qc-pager-bar select{width:auto;min-width:170px}.qc-pager-info{font-size:12px;color:var(--muted,#64748b);margin-left:auto}
+@media(max-width:760px){.qc-step-arrow{display:none}.qc-step{flex:1 1 45%}}
+.qc-mytasks{display:grid;gap:8px}.qc-mytask{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px}
+.qc-mytask-act{display:flex;gap:6px;flex:none}@media(max-width:600px){.qc-mytask{flex-direction:column}}
