@@ -1,3 +1,14 @@
+## V3.4.31 — QC disederhanakan
+
+- Halaman QC kini diawali **alur 1-2-3-4**: Inspeksi → Konfirmasi → Perbaikan → Verifikasi → Selesai, masing-masing dengan jumlahnya; klik langkah untuk langsung ke bagiannya, arahkan kursor untuk penjelasan.
+- Isi dibagi **tab**: Tugas saya (default, dengan angka) · Inspeksi · Temuan · Ringkasan · Laporan. Halaman tidak lagi memanjang puluhan ribu piksel.
+- **Tugas saya**:
+  - QC / Head of Supporting: verifikasi hasil perbaikan + konfirmasi yang perlu diputuskan.
+  - Site Manager: daftar temuan yang harus diperbaiki (urut deadline, tanda lewat deadline, catatan QC bila perbaiki ulang) dengan tombol **Mulai** dan **Kirim Perbaikan** langsung di daftar; serta yang sudah dikirim dan menunggu dicek.
+- Tabel Temuan, Inspeksi, Perlu Perhatian, Temuan per Proyek, Performa Site Manager: **per halaman (20)** + pencarian + filter status (default "Belum selesai").
+- Status temuan berbahasa sehari-hari: Belum dikerjakan · Sedang diperbaiki · Menunggu verifikasi · Perbaiki ulang · Selesai. Label angka diperjelas.
+- Pesan aksi diperjelas (mis. "Perbaikan dimulai…", "Temuan selesai (ditutup)").
+
 ## V3.4.30 — Verifikasi perbaikan temuan oleh Head of Supporting
 
 - Tugas **Verifikasi Perbaikan QC** kini masuk ke Tugas Saya (dan email) **QC dan Head of Supporting** sekaligus — siapa pun yang lebih dulu mengerjakan. Tugas lama yang hanya untuk QC otomatis dipindah ke antrean bersama.

@@ -9,7 +9,7 @@ for(const mk of ['async function readDivisionReport','reportReadMatch','reportKi
 for(const mk of ['renderQcArchive','qc_archive:renderQcArchive','v3427OpenPdf','v3427MarkRead','v3427QcComposeFields','Buka PDF','Belum dibaca','state.navClicked']) must(app.includes(mk),`Frontend marker hilang: ${mk}`);
 must(html.includes('data-view="qc_archive"'),'Menu Arsip Laporan QC hilang');
 for(const mk of ['"qc,koordinator_supporting"','function roleQueueHas','qcBulkVerifyHandler','"/api/qc/findings/verify-bulk"','migrateQcVerifyQueue']) must(worker.includes(mk),`V3.4.30 marker hilang: ${mk}`);
-for(const mk of ['openQcBulkVerify','/api/qc/findings/verify-bulk','qcVerifyAll']) must(app.includes(mk),`V3.4.30 frontend marker hilang: ${mk}`);
+for(const mk of ['qcPaginate','qc-flow','data-qc-tab','Temuan yang harus saya perbaiki','QC_STATUS_ID','openQcBulkVerify','/api/qc/findings/verify-bulk','qcVerifyAll']) must(app.includes(mk),`V3.4.30 frontend marker hilang: ${mk}`);
 must(/qcVerify: roleIn\(user,\[[^\]]*"koordinator_supporting"/.test(worker),'Head of Supporting harus bisa verifikasi');
 must(/roleIn\(user,\["head_unit_bisnis","direktur"\]\)\) return json\(\{ok:true,row:rec,counted:false\}\)/.test(worker),'Status Dibaca hanya dihitung untuk Head Unit Bisnis/Direktur');
 console.log('QC archive smoke OK — arsip laporan, jenis Inspeksi/Temuan, lingkup proyek, PDF dengan foto, status baca.');
