@@ -1901,3 +1901,106 @@ renderQc=async function(){await v3427BaseRenderQc();const sec=$('.division-repor
 // halaman lama yang selesai belakangan tidak boleh menimpa halaman yang sedang dibuka.
 const v3427BaseRenderView=renderView;
 renderView=async function(...args){const view=state.view;const seq=(state.v3427Seq=(state.v3427Seq||0)+1);const out=await v3427BaseRenderView(...args);if(state.view!==view&&state.v3427Seq===seq+0)return out;if(state.view!==view){state.v3427Rerender=(state.v3427Rerender||0)+1;if(state.v3427Rerender<3)await renderView();state.v3427Rerender=0;}return out;};
+
+/* ======================================================================== */
+/* V3.4.28 — IMPOR DATA KEUANGAN DARI GOOGLE SHEET / EXCEL                  */
+/* File .xlsx dari Google Sheet (File → Download → Microsoft Excel).        */
+/* Sheet dibaca: REKAP DANA PROYEK, Keuangan PROYEK, DATA BELANJA PROYEK,   */
+/* IMPOR BELANJA (untuk nama toko, jumlah, satuan, harga).                  */
+/* ======================================================================== */
+const IMP_MONTHS={jan:1,januari:1,feb:2,februari:2,mar:3,maret:3,apr:4,april:4,mei:5,may:5,jun:6,juni:6,jul:7,juli:7,agu:8,ags:8,agt:8,aug:8,agustus:8,sep:9,sept:9,september:9,okt:10,oct:10,oktober:10,nov:11,november:11,des:12,dec:12,desember:12};
+function impNum(v){if(typeof v==='number')return v;let t=String(v??'').trim();if(!t||t==='-')return 0;const neg=/^-|\(.*\)/.test(t)||/-\s*Rp/i.test(t);t=t.replace(/rp/ig,'').replace(/[^\d,.-]/g,'').replace(/^-/,'');if(/,\d{1,2}$/.test(t))t=t.replace(/\./g,'').replace(',','.');else t=t.replace(/[.,](?=\d{3}(\D|$))/g,'').replace(',','.');const n=Number(t);return Number.isFinite(n)?(neg?-n:n):0;}
+function impDate(v){if(v instanceof Date&&!isNaN(v)){const d=new Date(v.getTime()+12*36e5);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+  if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Math.round((v-25569)*864e5));return d.toISOString().slice(0,10);}
+  const t=String(v??'').trim();if(!t)return '';let m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m=t.match(/^(\d{1,2})[\s\-/.]+([A-Za-z]+)[\s\-/.]+(\d{2,4})/);if(m&&IMP_MONTHS[m[2].toLowerCase()]){const y=m[3].length===2?'20'+m[3]:m[3];return `${y}-${String(IMP_MONTHS[m[2].toLowerCase()]).padStart(2,'0')}-${m[1].padStart(2,'0')}`;}
+  m=t.match(/^(\d{1,2})[\-/.](\d{1,2})[\-/.](\d{2,4})/);if(m){const y=m[3].length===2?'20'+m[3]:m[3];return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;}return '';}
+const impKey=v=>String(v??'').toLowerCase().replace(/\s+/g,' ').trim();
+function impHash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(36);}
+async function impLoadXlsx(){if(window.XLSX)return window.XLSX;await new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='/vendor/xlsx-0.18.5.full.min.js';sc.onload=res;sc.onerror=()=>rej(new Error('Gagal memuat pembaca Excel. Muat ulang halaman lalu coba lagi.'));document.head.appendChild(sc);});return window.XLSX;}
+function impSheet(XLSX,wb,names){const n=wb.SheetNames.find(x=>names.some(y=>impKey(x)===impKey(y)))||wb.SheetNames.find(x=>names.some(y=>impKey(x).includes(impKey(y))));return n?XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''}):null;}
+function impHeader(rows,must){for(let i=0;i<Math.min(rows.length,30);i++){const r=rows[i].map(x=>impKey(x));if(must.every(m=>r.some(c=>c===impKey(m)||c.startsWith(impKey(m)))))return i;}return -1;}
+function impCol(h,label,from=0,last=false){const L=impKey(label);const idx=h.map((c,i)=>[impKey(c),i]).filter(([c,i])=>i>=from&&(c===L||c.startsWith(L)));return idx.length?(last?idx[idx.length-1][1]:idx[0][1]):-1;}
+function impParse(XLSX,wb){
+  const warn=[];const rekap=impSheet(XLSX,wb,['REKAP DANA PROYEK']);const keu=impSheet(XLSX,wb,['Keuangan PROYEK']);const belanja=impSheet(XLSX,wb,['DATA BELANJA PROYEK']);const impor=impSheet(XLSX,wb,['IMPOR BELANJA']);
+  if(!rekap&&!keu)throw new Error('Sheet "REKAP DANA PROYEK" atau "Keuangan PROYEK" tidak ditemukan di file.');
+  if(!belanja)throw new Error('Sheet "DATA BELANJA PROYEK" tidak ditemukan di file.');
+  // --- Proyek ---
+  const projects=new Map();
+  if(rekap){const hi=impHeader(rekap,['No','Nama Proyek']);if(hi<0)warn.push('Header REKAP DANA PROYEK tidak dikenali.');else{const h=rekap[hi];const c={no:impCol(h,'No'),name:impCol(h,'Nama Proyek'),status:impCol(h,'Status'),start:impCol(h,'Tanggal Mulai'),end:impCol(h,'Target Selesai'),contract:impCol(h,'Nilai Kontrak'),hppUsed:impCol(h,'Anggaran Biaya'),hpp:impCol(h,'HPP dari'),out:impCol(h,'Dana yang Benar-benar Keluar'),progress:impCol(h,'Progress Aktual'),note:impCol(h,'Selisih?'),adJual:impCol(h,'Adendum Jual'),adHpp:impCol(h,'Adendum HPP'),adStatus:impCol(h,'Status',(impCol(h,'Status')+1),true),totalRab:impCol(h,'Total RAB')};
+    for(const r of rekap.slice(hi+1)){const no=String(r[c.no]??'').trim();const name=String(r[c.name]??'').trim();if(!/^\d+$/.test(no)||!name)continue;projects.set(no,{no,name,status:String(r[c.status]||'').trim(),startDate:impDate(r[c.start]),endDate:impDate(r[c.end]),contractValue:impNum(r[c.contract]),budget:impNum(r[c.hppUsed])||impNum(r[c.hpp]),sheetOut:impNum(r[c.out]),progress:r[c.progress],costNote:c.note>=0?String(r[c.note]||'').trim():'',addendumSale:c.adJual>=0?impNum(r[c.adJual]):0,addendumCost:c.adHpp>=0?impNum(r[c.adHpp]):0,addendumStatus:c.adStatus>c.status?String(r[c.adStatus]||'').trim():''});}}}
+  if(keu){const hi=impHeader(keu,['No','Nama Proyek']);if(hi>=0){const h=keu[hi];const c={no:impCol(h,'No'),name:impCol(h,'Nama Proyek'),kontrak:impCol(h,'No. Kontrak'),owner:impCol(h,'Owner'),lokasi:impCol(h,'Lokasi'),pic:impCol(h,'PM'),spv:impCol(h,'Pelaksana'),start:impCol(h,'Tgl Mulai'),end:impCol(h,'Target Selesai'),contract:impCol(h,'Nilai RAB'),hpp:impCol(h,'Nilai HPP'),status:impCol(h,'Status')};
+    for(const r of keu.slice(hi+1)){const no=String(r[c.no]??'').trim();const name=String(r[c.name]??'').trim();if(!/^\d+$/.test(no)||!name)continue;const p=projects.get(no)||{no,name,status:String(r[c.status]||'').trim(),startDate:impDate(r[c.start]),endDate:impDate(r[c.end]),contractValue:impNum(r[c.contract]),budget:impNum(r[c.hpp]),sheetOut:0};
+      Object.assign(p,{contractNo:String(r[c.kontrak]||'').replace(/\s+/g,' ').replace(/^Nomor:\s*/i,'').trim(),client:String(r[c.owner]||'').trim(),location:String(r[c.lokasi]||'').trim(),picName:String(r[c.pic]||'').trim(),supervisorName:String(r[c.spv]||'').trim()});if(!p.startDate)p.startDate=impDate(r[c.start]);if(!p.endDate)p.endDate=impDate(r[c.end]);projects.set(no,p);}}}
+  // nama kembar (mis. "Sumur Bor" No 16 & No 46) dibedakan agar tidak tergabung
+  const nameCount={};for(const p of projects.values())nameCount[impKey(p.name)]=(nameCount[impKey(p.name)]||0)+1;
+  for(const p of projects.values()){p.sheetName=p.name;if(nameCount[impKey(p.name)]>1)p.name=`${p.name} (No ${p.no})`;}
+  // --- Detail toko/qty/harga dari IMPOR BELANJA ---
+  const enrich=new Map();const push=(k,v)=>{if(!enrich.has(k))enrich.set(k,[]);enrich.get(k).push(v);};
+  if(impor){const title=impor[0]||[];const blocks=[];title.forEach((t,i)=>{const s=String(t||'');const m=s.match(/(20\d\d)\s*[–-]\s*Belanja\s*(Q\d)/i);if(m){const cols=s.match(/kolom\s*B:([A-Z])/i);const w=cols?cols[1].charCodeAt(0)-'B'.charCodeAt(0)+1:12;blocks.push({o:i,src:`${m[1]} ${m[2].toUpperCase()}`,w});}});
+    for(const b of blocks){const L=b.w>=13?{who:1,date:2,desc:3,loc:4,bank:6,cat:7,qty:9,unit:10,price:11,total:12}:b.w===12?{who:1,date:2,desc:3,loc:4,bank:-1,cat:7,qty:8,unit:9,price:10,total:11}:{who:1,date:2,desc:3,loc:4,bank:6,cat:7,qty:-1,unit:-1,price:-1,total:9};
+      for(const r of impor.slice(2)){const g=k=>k<0?'':r[b.o+k];const total=impNum(g(L.total));if(!total)continue;const v={who:String(g(L.who)||'').trim(),desc:String(g(L.desc)||'').trim(),qty:impNum(g(L.qty)),unit:String(g(L.unit)||'').trim(),price:impNum(g(L.price)),bank:String(g(L.bank)||'').trim(),used:false};const date=impDate(g(L.date)),loc=impKey(g(L.loc));push(`${b.src}|${date}|${loc}|${total}`,v);push(`${b.src}|${loc}|${total}`,v);push(`${b.src}|${impKey(v.desc)}|${total}`,v);}}
+  }else warn.push('Sheet "IMPOR BELANJA" tidak ada — nama toko, jumlah, dan harga satuan tidak ikut.');
+  const take=keys=>{for(const k of keys){const q=enrich.get(k);if(q){const v=q.find(x=>!x.used);if(v){v.used=true;return v;}}}return null;};
+  // --- Belanja ---
+  const bh=impHeader(belanja,['Sumber','Tanggal']);if(bh<0)throw new Error('Header DATA BELANJA PROYEK tidak dikenali (butuh kolom Sumber, Tanggal, …).');
+  const h=belanja[bh];const c={src:impCol(h,'Sumber'),date:impCol(h,'Tanggal'),loc:impCol(h,'Lokasi'),cat:impCol(h,'Kategori'),desc:impCol(h,'Uraian'),total:impCol(h,'Total'),no:impCol(h,'No. Proyek'),name:impCol(h,'Nama Proyek'),count:impCol(h,'Dihitung')};
+  const groups=new Map();const skipped={count:0,total:0,reasons:{}};let rowsIn=0;const enriched={hit:0,miss:0};
+  for(const r of belanja.slice(bh+1)){const total=impNum(r[c.total]);if(!total)continue;rowsIn++;const src=String(r[c.src]||'').trim();const date=impDate(r[c.date]);const no=String(r[c.no]??'').trim();const cnt=impKey(r[c.count]);const catRaw=impKey(r[c.cat]);const desc=String(r[c.desc]||'').trim();const loc=String(r[c.loc]||'').trim();
+    const reason=c.count>=0&&cnt!=='ya'?(no?'Kategori tidak dihitung ke proyek':'Lokasi belum dipetakan ke proyek'):!projects.has(no)?'No. proyek tidak ada di REKAP':!date?'Tanggal tidak terbaca':'';
+    if(reason){skipped.count++;skipped.total+=total;skipped.reasons[reason]=(skipped.reasons[reason]||0)+1;continue;}
+    const e=take([`${src}|${date}|${impKey(loc)}|${total}`,`${src}|${impKey(desc)}|${total}`,`${src}|${impKey(loc)}|${total}`]);if(e)enriched.hit++;else enriched.miss++;
+    const text=impKey(`${desc} ${e?.desc||''}`);const cat=catRaw.startsWith('gaji')?'TUKANG':catRaw.startsWith('material')?(/subkon/.test(text)?'SUBKON':'MATERIAL'):'OPERASIONAL';
+    const who=(e?.who||'').replace(/\s+/g,' ').trim();const gk=`${src}|${date}|${no}|${cat}|${impKey(who)}`;
+    let g=groups.get(gk);if(!g){g={id:impHash(gk)+impHash(gk+'#'),src,date,no,cat,partnerName:who,location:loc,bank:e?.bank||'',items:[],amount:0};groups.set(gk,g);}
+    g.items.push({name:e?.desc&&e.desc.length>desc.length?e.desc:desc,qty:e?.qty||1,unit:e?.unit||'',price:e?.price||total,total});g.amount+=total;}
+  const tx=[...groups.values()].map(g=>({...g,description:[...new Set(g.items.map(x=>x.name))].slice(0,4).join(', ')+(g.items.length>4?` +${g.items.length-4} item`:'')}));
+  return {projects:[...projects.values()],tx,skipped,rowsIn,enriched,warn};
+}
+async function openFinanceImport(){
+  openModal('Impor dari Google Sheet / Excel','Pemasukan & pengeluaran proyek dari file rekap Anda.',`<div class="imp-steps"><div class="notice"><b>1.</b> Di Google Sheet: <b>File → Download → Microsoft Excel (.xlsx)</b>.<br><b>2.</b> Pilih file tersebut di bawah. Yang dibaca: <i>REKAP DANA PROYEK</i>, <i>Keuangan PROYEK</i>, <i>DATA BELANJA PROYEK</i>, dan <i>IMPOR BELANJA</i>.<br><b>3.</b> Periksa ringkasannya, lalu klik <b>Impor</b>. Impor ulang file yang sama hanya memperbarui data (tidak dobel).</div><label>File Excel (.xlsx)<input type="file" name="file" accept=".xlsx,.xls" required></label><div id="impStatus" class="tiny muted"></div></div><div id="impPreview"></div>`,async()=>{await impRun();});
+  $('#modalSave').textContent='Baca file';$('.modal')?.classList.add('dir-detail-modal');state.imp=null;
+  $('#modalForm [name=file]').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('#impStatus').textContent='Membaca file… (file besar bisa 10–30 detik)';try{const XLSX=await impLoadXlsx();const buf=await f.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true});const parsed=impParse(XLSX,wb);parsed.fileName=f.name;state.imp=parsed;$('#impStatus').textContent='';impPreview();}catch(err){$('#impStatus').innerHTML=`<span class="text-danger">${esc(err.message)}</span>`;}};
+}
+function impPreview(){
+  const P=state.imp;const nara=state.projects||[];const byName=new Map(nara.map(p=>[impKey(p.data.name),p.id]));
+  P.projects.forEach(p=>{if(p.choice===undefined)p.choice=byName.get(impKey(p.name))||byName.get(impKey(p.sheetName))||'__new';});
+  const txBy={};for(const t of P.tx){txBy[t.no]=(txBy[t.no]||0)+t.amount;}
+  const cat={};for(const t of P.tx)cat[t.cat]=(cat[t.cat]||0)+t.amount;const total=P.tx.reduce((s,t)=>s+t.amount,0);
+  const suppliers=new Set(P.tx.filter(t=>t.cat==='MATERIAL'&&t.partnerName).map(t=>impKey(t.partnerName)));
+  const opts=sel=>`<option value="__new" ${sel==='__new'?'selected':''}>+ Buat proyek baru</option><option value="__skip" ${sel==='__skip'?'selected':''}>Lewati</option>${nara.map(p=>`<option value="${esc(p.id)}" ${p.id===sel?'selected':''}>${esc(p.data.name)}</option>`).join('')}`;
+  $('#impPreview').innerHTML=`${P.warn.length?`<div class="notice orange">${P.warn.map(esc).join('<br>')}</div>`:''}
+  <div class="kpis">${kpi('Proyek di file',fmtNum(P.projects.length,0),'blue')}${kpi('Transaksi pengeluaran',fmtNum(P.tx.length,0),'')}${kpi('Total pengeluaran diimpor',finRpShort(total),'red')}${kpi('Baris dilewati',fmtNum(P.skipped.count,0),'orange')}</div>
+  <div class="fin-kv">${Object.entries(cat).map(([k,v])=>`<span>${FIN_CAT[k]}</span><b>${fmtRp(v)}</b>`).join('')}<span>Detail toko/qty/harga cocok</span><b>${fmtNum(P.enriched.hit,0)} dari ${fmtNum(P.enriched.hit+P.enriched.miss,0)} baris</b><span>Toko material baru (Database Mitra)</span><b>${fmtNum(suppliers.size,0)} nama</b></div>
+  ${P.skipped.count?`<div class="notice">Tidak diimpor <b>${fmtNum(P.skipped.count,0)} baris (${fmtRp(P.skipped.total)})</b> — sama dengan sheet Anda: ${Object.entries(P.skipped.reasons).map(([k,v])=>`${esc(k)} ${fmtNum(v,0)}`).join(' · ')}. Baris ini juga tidak dihitung di REKAP DANA PROYEK.</div>`:''}
+  <div class="form-grid"><label>Nama impor<input name="batch" value="${esc('Google Sheet — '+(P.fileName||'').replace(/\.xlsx?$/i,''))}"></label><label class="check-line"><input type="checkbox" name="overwrite"> Timpa nilai kontrak/HPP/tanggal proyek yang sudah terisi</label><label class="check-line span-2"><input type="checkbox" name="suppliers" checked> Daftarkan nama toko pada belanja material ke Database Mitra (Toko Material) beserta nominalnya</label></div>
+  <h4>Pencocokan proyek <span class="tiny muted">— pilih proyek Nara System yang sama, buat baru, atau lewati</span></h4>
+  <div class="table-wrap dir-scroll" style="max-height:340px"><table class="table"><thead><tr><th>No</th><th>Proyek di sheet</th><th>Nilai kontrak</th><th>HPP</th><th>Dana keluar (REKAP)</th><th>Akan diimpor</th><th>Proyek di Nara System</th></tr></thead><tbody>${P.projects.map((p,i)=>{const imp=txBy[p.no]||0;const ok=!p.sheetOut||Math.abs(imp-p.sheetOut)<=Math.max(1000,p.sheetOut*0.001);return `<tr><td>${esc(p.no)}</td><td><b>${esc(p.name)}</b><div class="tiny muted">${esc([p.status,p.client,p.location].filter(Boolean).join(' · '))}</div></td><td class="num">${p.contractValue?fmtRp(p.contractValue):'-'}</td><td class="num">${p.budget?fmtRp(p.budget):'-'}</td><td class="num">${p.sheetOut?fmtRp(p.sheetOut):'-'}</td><td class="num ${ok?'':'text-danger'}">${fmtRp(imp)} ${p.sheetOut?(ok?'✓':'≠'):''}</td><td><select data-imp-p="${i}">${opts(p.choice)}</select></td></tr>`;}).join('')}</tbody></table></div>
+  <div id="impProgress"></div>`;
+  $$('[data-imp-p]').forEach(s=>s.onchange=()=>{P.projects[Number(s.dataset.impP)].choice=s.value;});
+  $('#modalSave').textContent='Impor sekarang';
+}
+async function impRun(){
+  const P=state.imp;if(!P)throw new Error('Pilih file Excel terlebih dahulu.');const f=$('#modalForm');const batch=(f.batch.value||'Google Sheet').trim().slice(0,80);
+  const bar=(t,pct)=>{$('#impProgress').innerHTML=`<div class="imp-bar"><span style="width:${pct}%"></span></div><div class="tiny">${esc(t)}</div>`;};
+  $('#modalSave').disabled=true;
+  try{
+    bar('Menyimpan proyek…',3);
+    const list=P.projects.map(p=>({key:p.no,mode:p.choice==='__skip'?'skip':p.choice==='__new'?'new':'existing',existingId:p.choice.startsWith('__')?'':p.choice,overwrite:f.overwrite.checked,data:p}));
+    const pr=await api('/api/finance/import/projects',{method:'POST',body:{batch,projects:list}});
+    const rows=P.tx.filter(t=>pr.map[t.no]).map(t=>({id:t.id,projectId:pr.map[t.no],date:t.date,category:t.cat,partnerName:t.partnerName,description:t.description,items:t.items,amount:t.amount,source:t.src,location:t.location,bank:t.bank}));
+    let done=0,res={cashOut:0,payments:0,skipped:0,newPartners:0};
+    for(let i=0;i<rows.length;i+=250){const chunk=rows.slice(i,i+250);const r=await api('/api/finance/import/transactions',{method:'POST',body:{batch,rows:chunk,createSuppliers:f.suppliers.checked}});for(const k in res)res[k]+=num(r[k]);done+=chunk.length;bar(`Mengimpor transaksi ${fmtNum(done,0)} / ${fmtNum(rows.length,0)}…`,5+Math.round(done/rows.length*95));}
+    bar('Selesai',100);state.cache.clear();
+    toast(`Impor selesai: ${pr.created} proyek baru, ${pr.updated} diperbarui, ${fmtNum(res.cashOut,0)} transaksi pengeluaran, ${fmtNum(res.newPartners,0)} toko baru.`);
+    closeModal();if(typeof fullRefresh==='function')await fullRefresh();else await renderView();
+  }catch(e){$('#modalSave').disabled=false;throw e;}
+}
+async function impHistoryCard(){
+  if(!cap('financeImport'))return '';let b=[];try{b=(await api('/api/finance/import')).batches||[];}catch{}
+  return `<div class="card"><div class="card-head"><div><h3>Impor dari Google Sheet / Excel</h3><p>Masukkan data pengeluaran & proyek dari file rekap lama. Impor ulang file yang sama hanya memperbarui.</p></div><div class="card-actions"><button class="btn primary" id="impOpen">Impor file…</button></div></div>${b.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Nama impor</th><th>Transaksi</th><th>Total</th><th>Periode</th><th>Diimpor</th><th></th></tr></thead><tbody>${b.map(x=>`<tr><td><b>${esc(x.batch)}</b></td><td class="num">${fmtNum(x.n,0)}</td><td class="num">${fmtRp(x.total)}</td><td>${fmtDate(x.first)} – ${fmtDate(x.last)}</td><td>${fmtDate(x.at)}</td><td><button class="btn small danger" data-imp-del="${esc(x.batch)}">Hapus hasil impor</button></td></tr>`).join('')}</tbody></table></div>`:''}</div>`;
+}
+const v3428BaseRenderFinance=renderFinance;
+renderFinance=async function(){await v3428BaseRenderFinance();const html=await impHistoryCard();if(!html)return;const ledger=$('.fin-ledger');if(ledger)ledger.insertAdjacentHTML('beforebegin',html);else $('#content').insertAdjacentHTML('beforeend',html);
+  if($('#impOpen'))$('#impOpen').onclick=openFinanceImport;
+  $$('[data-imp-del]').forEach(b=>b.onclick=async()=>{if(!(await confirmAsk(`Hapus semua transaksi hasil impor "${b.dataset.impDel}"? Proyek dan toko yang terbentuk tetap ada.`)))return;try{const r=await api(`/api/finance/import/${encodeURIComponent(b.dataset.impDel)}`,{method:'DELETE'});toast(`${fmtNum(r.deleted,0)} catatan hasil impor dihapus.`);state.cache.clear();renderView();}catch(e){toast(e.message,'err');}});};

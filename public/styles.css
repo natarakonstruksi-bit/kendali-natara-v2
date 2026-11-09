@@ -240,3 +240,5 @@ input:focus,select:focus,textarea:focus{border-color:#c48a7b;box-shadow:0 0 0 3p
 .arch-note{max-width:320px;white-space:normal;margin-top:4px}
 @media(max-width:820px){.arch-toolbar{grid-template-columns:1fr 1fr}.arch-toolbar input{grid-column:1/-1}}
 .arch-actions .btn.primary{background:#f05a22;border-color:#f05a22;color:#fff}.arch-actions .btn.danger{background:transparent;color:#dc2626;border-color:#fca5a5}
+/* V3.4.28 — Impor */
+.imp-bar{height:10px;border-radius:99px;background:rgba(100,116,139,.2);overflow:hidden;margin:12px 0 4px}.imp-bar span{display:block;height:100%;background:#16a34a;transition:width .2s}

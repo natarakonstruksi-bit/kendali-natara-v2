@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="Nara System" />
   <meta name="application-name" content="Nara System" />
   <title>Nara System — Natara Konstruksi</title>
-  <link rel="stylesheet" href="/styles.css?v=3.4.27" />
+  <link rel="stylesheet" href="/styles.css?v=3.4.28" />
 </head>
 <body>
   <div id="loginScreen" class="login-screen hidden">
@@ -47,7 +47,7 @@
 
   <div id="app" class="app hidden">
     <aside id="sidebar" class="sidebar">
-      <div class="brand"><div class="brand-logo-wrap"><img src="/assets/natara-mark.png" alt="Natara Konstruksi" /></div><div><b>NARA SYSTEM</b><span>Natara Konstruksi • V3.4.27</span></div></div>
+      <div class="brand"><div class="brand-logo-wrap"><img src="/assets/natara-mark.png" alt="Natara Konstruksi" /></div><div><b>NARA SYSTEM</b><span>Natara Konstruksi • V3.4.28</span></div></div>
       <nav id="nav">
         <button data-view="dashboard" class="nav-item active">▦ Dashboard</button>
         <button data-view="tasks" class="nav-item task-nav">✓ Tugas Saya <span id="taskBadge" class="task-badge hidden">0</span></button>
@@ -113,10 +113,10 @@
       if (login && app && login.classList.contains('hidden') && app.classList.contains('hidden')) {
         login.classList.remove('hidden');
         var card = login.querySelector('.login-card');
-        if (card) card.innerHTML = '<img src="/assets/natara-mark.png" alt="Natara" style="width:64px;height:64px;border-radius:16px;margin-bottom:14px"><h1>Nara System</h1><p>Aplikasi gagal dimuat.</p><div class="form-error" style="display:block">Frontend tidak berhasil dijalankan. Muat ulang halaman. Jika tetap muncul, gunakan build V3.4.27 atau periksa Console browser.</div><button class="btn primary wide" type="button" onclick="location.reload()">Muat Ulang</button>';
+        if (card) card.innerHTML = '<img src="/assets/natara-mark.png" alt="Natara" style="width:64px;height:64px;border-radius:16px;margin-bottom:14px"><h1>Nara System</h1><p>Aplikasi gagal dimuat.</p><div class="form-error" style="display:block">Frontend tidak berhasil dijalankan. Muat ulang halaman. Jika tetap muncul, gunakan build V3.4.28 atau periksa Console browser.</div><button class="btn primary wide" type="button" onclick="location.reload()">Muat Ulang</button>';
       }
     }, 3500);
   </script>
-  <script src="/app.js?v=3.4.27" type="module"></script>
+  <script src="/app.js?v=3.4.28" type="module"></script>
 </body>
 </html>
