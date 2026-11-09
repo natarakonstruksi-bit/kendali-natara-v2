@@ -228,3 +228,15 @@ input:focus,select:focus,textarea:focus{border-color:#c48a7b;box-shadow:0 0 0 3p
 @media(max-width:720px){.dir-types{grid-template-columns:1fr 1fr}.v31-newworker{grid-template-columns:1fr 1fr}}
 .dir-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 170px 230px}.dir-toolbar>*{width:100%;min-width:0}
 @media(max-width:720px){.dir-toolbar{grid-template-columns:1fr 1fr}.dir-toolbar input{grid-column:1/-1}}
+
+/* V3.4.27 — Arsip Laporan QC */
+.arch-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 190px 190px 170px;gap:8px;padding:0 18px 12px}.arch-toolbar>*{width:100%;min-width:0}
+.arch-table td{vertical-align:top}.arch-table td:nth-child(2){min-width:260px}
+.arch-tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:600;background:#f1f5f9;color:#334155;border:1px solid #e2e8f0}
+.arch-tag.inspeksi{background:#e0f2fe;color:#0369a1;border-color:#bae6fd}.arch-tag.temuan{background:#ffedd5;color:#c2410c;border-color:#fed7aa}
+.arch-badge{display:inline-block;min-width:26px;text-align:center;padding:2px 7px;border-radius:6px;background:#dc2626;color:#fff;font-weight:700;font-size:12px}
+.arch-score{font-size:18px}.arch-score.good{color:#15803d}.arch-score.mid{color:#b45309}.arch-score.low{color:#b91c1c}
+.arch-actions{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:110px}
+.arch-note{max-width:320px;white-space:normal;margin-top:4px}
+@media(max-width:820px){.arch-toolbar{grid-template-columns:1fr 1fr}.arch-toolbar input{grid-column:1/-1}}
+.arch-actions .btn.primary{background:#f05a22;border-color:#f05a22;color:#fff}.arch-actions .btn.danger{background:transparent;color:#dc2626;border-color:#fca5a5}
