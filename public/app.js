@@ -968,7 +968,7 @@ async function refreshTaskBadge(){
   const badge=$('#taskBadge');if(!badge||!canView('tasks'))return;
   try{const r=await api('/api/tasks/my');const n=(r.rows||[]).filter(x=>['OPEN','IN_PROGRESS'].includes(String(x.data.status||'').toUpperCase())).length;badge.textContent=n;badge.classList.toggle('hidden',!n);}catch{badge.classList.add('hidden');}
 }
-function v34TaskButtons(t){const d=t.data||{};const st=String(d.status||'OPEN').toUpperCase();let html='';const mine=String(d.assigneeUserId||'')===String(state.user?.id||'');const roleQueue=!d.assigneeUserId&&String(d.assigneeRole||'')===String(state.access?.roleKey||'');if(st==='OPEN'&&roleQueue)html+=`<button class="btn small" data-task-action="claim" data-id="${esc(t.id)}">Ambil</button>`;if(st==='OPEN'&&(mine||roleQueue||cap('workflowOversight')))html+=`<button class="btn small" data-task-action="start" data-id="${esc(t.id)}">Mulai</button>`;html+=`<button class="btn small primary" data-task-open="${esc(t.id)}">Buka & Proses</button>`;return html;}
+function v34TaskButtons(t){const d=t.data||{};const st=String(d.status||'OPEN').toUpperCase();let html='';const mine=String(d.assigneeUserId||'')===String(state.user?.id||'');const roleQueue=!d.assigneeUserId&&String(d.assigneeRole||'').split(',').includes(String(state.access?.roleKey||''));if(st==='OPEN'&&roleQueue)html+=`<button class="btn small" data-task-action="claim" data-id="${esc(t.id)}">Ambil</button>`;if(st==='OPEN'&&(mine||roleQueue||cap('workflowOversight')))html+=`<button class="btn small" data-task-action="start" data-id="${esc(t.id)}">Mulai</button>`;html+=`<button class="btn small primary" data-task-open="${esc(t.id)}">Buka & Proses</button>`;return html;}
 async function v34OpenTask(t){const d=t.data||{};if(d.projectId){state.selectedProjectId=String(d.projectId);populateProjectFilter();$('#globalProjectFilter').value=state.selectedProjectId;}setView(d.targetView||'dashboard');toast(`Tugas: ${d.actionLabel||d.waitingFor||d.title||''}`);}
 async function v34TaskAction(id,action){try{await api(`/api/tasks/${encodeURIComponent(id)}/action`,{method:'POST',body:{action}});toast(action==='claim'?'Tugas diambil.':'Tugas dimulai.');await renderTasks();await refreshTaskBadge();}catch(e){toast(e.message,'err');}}
 async function renderTasks(){
@@ -2020,4 +2020,29 @@ async function dirMove(ids,to,quiet=false){
   try{const r=await api('/api/finance/directory/move',{method:'POST',body:{ids,toType:to}});state.dirSel?.clear();
     toast(`${fmtNum(r.moved,0)} dipindahkan ke ${label}${r.merged?`, ${fmtNum(r.merged,0)} digabung dengan nama yang sama`:''}.${r.blocked?.length?` Tidak dipindah: ${r.blocked.slice(0,3).join(', ')} — pihak ber-SPK hanya bisa Vendor/Subkon.`:''}`,r.blocked?.length?'err':'');
     closeModal();state.cache.clear();await renderDirectory();}catch(e){toast(e.message,'err');}
+}
+
+/* V3.4.30 — Verifikasi hasil perbaikan temuan oleh QC & Head of Supporting (satu-satu atau sekaligus) */
+const v3430BaseRenderQc=renderQc;
+renderQc=async function(){
+  await v3430BaseRenderQc();if(state.view!=='qc'||!cap('qcVerify'))return;
+  let rows=[];try{rows=(await loadCollection('defects',true)).filter(r=>String(r.data.status||'').toUpperCase()==='WAITING QC CHECK');}catch{}
+  state.qcWaiting=rows;
+  const html=`<div class="card qc-verify-card"><div class="card-head"><div><h3>Menunggu verifikasi hasil perbaikan</h3><p>${rows.length?`${fmtNum(rows.length,0)} temuan sudah dikerjakan Site Manager dan menunggu dicek QC / Head of Supporting.`:'Tidak ada hasil perbaikan yang menunggu verifikasi.'}</p></div>${rows.length?'<div class="card-actions"><button class="btn primary" id="qcVerifyAll">Verifikasi hasil perbaikan</button></div>':''}</div></div>`;
+  const content=$('#content');const first=content.querySelector('.kpis');if(first)first.insertAdjacentHTML('afterend',html);else content.insertAdjacentHTML('afterbegin',html);
+  if($('#qcVerifyAll'))$('#qcVerifyAll').onclick=openQcBulkVerify;
+};
+function openQcBulkVerify(){
+  const rows=(state.qcWaiting||[]).slice().sort((a,b)=>String(a.data.submittedFixAt||'').localeCompare(String(b.data.submittedFixAt||'')));
+  const img=(id,cap)=>id?`<figure><a href="/api/documents/${encodeURIComponent(id)}/file" target="_blank"><img src="/api/documents/${encodeURIComponent(id)}/file" loading="lazy"></a><figcaption>${cap}</figcaption></figure>`:`<figure class="nofoto"><div>Tidak ada foto</div><figcaption>${cap}</figcaption></figure>`;
+  const html=`<div class="notice">Centang temuan yang hasil perbaikannya <b>sudah sesuai</b>, lalu klik <b>Sesuai — tutup temuan</b>. Untuk yang belum sesuai, klik <b>Tidak sesuai</b> pada barisnya dan isi catatan; temuan kembali ke Site Manager untuk diperbaiki ulang.</div>
+  <label class="check-line"><input type="checkbox" id="qvAll"> Pilih semua (${fmtNum(rows.length,0)})</label>
+  <div class="qv-list">${rows.map(r=>{const d=r.data;return `<div class="qv-item"><label class="qv-check"><input type="checkbox" class="qv-sel" value="${esc(r.id)}"></label><div class="qv-photos">${img(d.beforeDocumentId,'Sebelum')}${img(d.lastFixDocumentId,'Sesudah')}</div><div class="qv-info"><b>${esc(d.item||d.area||'Temuan QC')}</b><div class="tiny muted">${esc(projectName(d.projectId))} · ${esc(d.severity||'')} · PIC ${esc(employeeName(d.picUserId)||'-')}</div><div class="tiny">${esc(d.description||d.issue||'')}</div>${d.lastFixNote?`<div class="tiny qv-fix"><b>Perbaikan:</b> ${esc(d.lastFixNote)}</div>`:''}<div class="tiny muted">Dikirim ${fmtDate(d.submittedFixAt)}${d.deadline?` · deadline ${fmtDate(d.deadline)}`:''}</div><button type="button" class="btn small danger" data-qv-reject="${esc(r.id)}">Tidak sesuai</button></div></div>`;}).join('')}</div><div id="qvProgress" class="tiny"></div>`;
+  openModal('Verifikasi Hasil Perbaikan Temuan',`${fmtNum(rows.length,0)} temuan menunggu verifikasi`,html,async()=>{
+    const ids=$$('.qv-sel:checked').map(x=>x.value);if(!ids.length)throw new Error('Centang minimal satu temuan yang sudah sesuai.');
+    let ok=0,fail=[];$('#modalSave').disabled=true;for(let i=0;i<ids.length;i+=40){$('#qvProgress').textContent=`Memverifikasi ${Math.min(i+40,ids.length)} / ${ids.length}…`;try{const r=await api('/api/qc/findings/verify-bulk',{method:'POST',body:{ids:ids.slice(i,i+40)}});ok+=num(r.closed);fail.push(...(r.failed||[]));}catch(e){fail.push(e.message);}}
+    toast(`${fmtNum(ok,0)} temuan ditutup (sesuai).${fail.length?` ${fail.length} gagal: ${fail[0]}`:''}`,fail.length?'err':'');state.cache.clear();await renderView();});
+  $('#modalSave').textContent='Sesuai — tutup temuan';$('.modal')?.classList.add('dir-detail-modal');
+  $('#qvAll').onchange=e=>$$('.qv-sel').forEach(c=>c.checked=e.target.checked);
+  $$('[data-qv-reject]').forEach(b=>b.onclick=()=>{const id=b.dataset.qvReject;const box=b.closest('.qv-info');if(box.querySelector('.qv-reject'))return;box.insertAdjacentHTML('beforeend',`<div class="qv-reject"><textarea placeholder="Catatan untuk Site Manager — apa yang belum sesuai (wajib)"></textarea><button type="button" class="btn small danger">Kirim: tidak sesuai</button></div>`);const z=box.querySelector('.qv-reject');z.querySelector('textarea').focus();z.querySelector('button').onclick=async()=>{const note=z.querySelector('textarea').value.trim();if(!note){toast('Isi catatan yang belum sesuai.','err');return;}try{await api(`/api/qc/findings/${encodeURIComponent(id)}/action`,{method:'POST',body:{action:'verify',result:'TIDAK SESUAI',note}});b.closest('.qv-item').classList.add('qv-done');b.closest('.qv-item').innerHTML=`<div class="tiny">↩ Dikembalikan ke Site Manager: ${esc(note)}</div>`;state.cache.clear();toast('Temuan dikembalikan ke Site Manager untuk diperbaiki ulang.');}catch(e){toast(e.message,'err');}};});
 }
