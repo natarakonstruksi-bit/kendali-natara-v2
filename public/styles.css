@@ -242,3 +242,8 @@ input:focus,select:focus,textarea:focus{border-color:#c48a7b;box-shadow:0 0 0 3p
 .arch-actions .btn.primary{background:#f05a22;border-color:#f05a22;color:#fff}.arch-actions .btn.danger{background:transparent;color:#dc2626;border-color:#fca5a5}
 /* V3.4.28 — Impor */
 .imp-bar{height:10px;border-radius:99px;background:rgba(100,116,139,.2);overflow:hidden;margin:12px 0 4px}.imp-bar span{display:block;height:100%;background:#16a34a;transition:width .2s}
+/* V3.4.29 — pindah jenis mitra */
+.dir-chk{width:34px;text-align:center}.dir-chk input{width:16px;height:16px}
+.dir-movebar{display:none;align-items:center;gap:10px;flex-wrap:wrap;margin:0 18px 10px;padding:10px 12px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;position:sticky;top:0;z-index:2}
+.dir-movebar.show{display:flex}.dir-movebar label{display:flex;align-items:center;gap:8px;font-size:13px}.dir-movebar select{width:auto;min-width:170px}
+.dir-types{grid-template-columns:repeat(5,1fr)}@media(max-width:900px){.dir-types{grid-template-columns:repeat(3,1fr)}}@media(max-width:560px){.dir-types{grid-template-columns:1fr 1fr}}
