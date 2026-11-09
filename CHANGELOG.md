@@ -1,3 +1,14 @@
+## V3.4.29 — Pindah jenis mitra
+
+- Database Mitra punya tab baru **Reimburse** (perorangan/karyawan yang menalangi belanja), di samping Tukang, Vendor, Subkon, Toko Material.
+- **Pindahkan**: centang satu atau banyak baris (atau "pilih semua yang tampil" setelah mencari) → pilih tujuan → Pindahkan. Bisa juga dari tombol Edit → Jenis.
+  - Riwayat pembayaran ikut pindah. Pembayaran lunas tanpa SPK ikut ganti kategori pengeluaran (Toko/Reimburse = Material, Vendor = Vendor, Subkon = Subkon) sehingga rekap Keuangan per kategori ikut benar.
+  - Nama yang sama di tab tujuan otomatis digabung.
+  - Pihak yang punya SPK hanya bisa dipindah antara Vendor dan Subkon.
+- Vendor/Subkon kini juga menampilkan **pembayaran tanpa SPK** (mis. hasil impor) di kolom Sudah dibayar.
+- Impor ulang dari Google Sheet mengikuti jenis yang sudah dipindah/digabung (tidak memunculkan lagi sebagai toko).
+- Endpoint `POST /api/finance/directory/move {ids, toType}` (Head of Operational, Finance, pimpinan).
+
 ## V3.4.28 — Impor Keuangan dari Google Sheet / Excel
 
 - Menu **Keuangan → Impor file…** (Finance & pimpinan): baca file .xlsx hasil unduhan Google Sheet rekap proyek. Sheet yang dibaca: REKAP DANA PROYEK, Keuangan PROYEK, DATA BELANJA PROYEK, IMPOR BELANJA.

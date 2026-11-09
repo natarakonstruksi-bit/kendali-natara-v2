@@ -22,8 +22,8 @@ try{
   must(await m.partyInUse(env(false),'partners','PTN-1')==='','Pihak tanpa transaksi boleh dihapus');
   must(/sudah terdaftar/.test(await m.partyDuplicate(env(false),'tukang','',{name:'udin  saputra',phone:'0812'})),'Tukang dobel harus ditolak');
   must(await m.partyDuplicate(env(false),'tukang','',{name:'Udin Saputra',phone:'0899'})==='','Nama sama dengan HP berbeda boleh (orang berbeda)');
-  for(const mk of ['/api/finance/directory/merge','partyHistoryHandler','PARTY_COLLECTIONS.has(collection)','unlinked:!master']) must(worker.includes(mk),`Backend marker hilang: ${mk}`);
-  for(const mk of ['renderDirectory','openTukangForm','openPartnerForm','openMergeForm','openPartyDetail','v31NewWorker','directory:renderDirectory']) must(app.includes(mk),`Frontend marker hilang: ${mk}`);
+  for(const mk of ['/api/finance/directory/move','async function partyMoveHandler','REIMBURSE:"Reimburse / Perorangan"','directPaid','known.has(nameKey(name))','/api/finance/directory/merge','partyHistoryHandler','PARTY_COLLECTIONS.has(collection)','unlinked:!master']) must(worker.includes(mk),`Backend marker hilang: ${mk}`);
+  for(const mk of ['dirMove','dirMoveBar','dirIsBuy','renderDirectory','openTukangForm','openPartnerForm','openMergeForm','openPartyDetail','v31NewWorker','directory:renderDirectory']) must(app.includes(mk),`Frontend marker hilang: ${mk}`);
   must(html.includes('data-view="directory"'),'Menu Database Mitra hilang');
   console.log('Directory smoke OK — Database Mitra, hak akses, cegah duplikat & hapus data terpakai, gabung, tukang baru dari absensi.');
 } finally { try{fs.unlinkSync(tmp)}catch{} }

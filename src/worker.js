@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.28 — Impor Keuangan dari Google Sheet/Excel
+ * Nara System V3.4.29 — Pindah jenis mitra (Toko/Vendor/Subkon/Reimburse)
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.28";
+const APP_VERSION = "APP-V3.4.29";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -2248,7 +2248,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.28"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.29"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -2724,14 +2724,14 @@ async function emailRetryHandler(env,user) {
  * ==========================================================================*/
 const PAYMENT_CATEGORIES = ["VENDOR","SUBKON","TUKANG","MATERIAL"];
 const PAYMENT_CATEGORY_LABEL = {VENDOR:"Vendor",SUBKON:"Subkon",TUKANG:"Tukang",MATERIAL:"Material",OPERASIONAL:"Operasional"};
-const PARTNER_TYPES = {VENDOR:"Vendor",SUBKON:"Subkon",SUPPLIER:"Toko Material"};
+const PARTNER_TYPES = {VENDOR:"Vendor",SUBKON:"Subkon",SUPPLIER:"Toko Material",REIMBURSE:"Reimburse / Perorangan"};
 const FINANCE_SETTINGS_ID = "finance";
 const DEFAULT_MATERIAL_HUB_THRESHOLD = 5000000;
 const rp = v => `Rp ${Math.round(num(v)).toLocaleString("id-ID")}`;
 const nameKey = v => String(v||"").toLowerCase().replace(/\b(pt|cv|ud|tb|toko)\.?\s+/g,"").replace(/[^a-z0-9]+/g," ").trim();
 
 function normalizePartner(d) {
-  const t=String(d.partnerType||"").toUpperCase(); if(!PARTNER_TYPES[t]) throw new Error("Jenis pihak harus Vendor, Subkon, atau Toko Material.");
+  const t=String(d.partnerType||"").toUpperCase(); if(!PARTNER_TYPES[t]) throw new Error("Jenis pihak harus Vendor, Subkon, Toko Material, atau Reimburse.");
   const name=String(d.name||"").trim(); if(!name) throw new Error("Nama pihak wajib diisi.");
   return {partnerType:t,name,nameKey:nameKey(name),phone:String(d.phone||"").trim(),address:String(d.address||"").trim(),bankName:String(d.bankName||"").trim(),accountNo:String(d.accountNo||"").trim(),accountName:String(d.accountName||"").trim(),specialty:String(d.specialty||"").trim(),notes:String(d.notes||"").trim(),aliases:Array.isArray(d.aliases)?d.aliases.map(String).slice(0,20):[],createdByUserId:d.createdByUserId||"",createdByName:d.createdByName||"",status:String(d.status||"ACTIVE").toUpperCase()==="INACTIVE"?"INACTIVE":"ACTIVE"};
 }
@@ -3007,9 +3007,10 @@ async function financeSummaryHandler(env,user,url) {
         const retHeld=sum(cp.filter(x=>x.data.status==="PAID"&&!x.data.isRetentionRelease),x=>x.data.retentionAmount)-sum(cp.filter(x=>x.data.status==="PAID"&&x.data.isRetentionRelease),x=>x.data.grossAmount);
         const worked=Math.round(value*prog/100);
         return {contractId:c.id,number:c.data.number||c.id,projectId:c.data.projectId,projectName:pname.get(c.data.projectId)||"-",description:c.data.description||"",value,progress:prog,worked,paidGross,paidNet,retentionHeld:retHeld,inProcess:sum(cp.filter(x=>["SUBMITTED","OPS_APPROVED","APPROVED"].includes(x.data.status)),x=>x.data.netAmount),unpaidWorked:Math.max(0,worked-paidGross),notWorked:Math.max(0,value-worked)};});
-      if(!contracts.length && projectFilter) continue;
-      partnerRows.push({id:pt.id,type:t,name,...partnerInfo(pt),phone:pt.data.phone||"",bank:[pt.data.bankName,pt.data.accountNo,pt.data.accountName].filter(Boolean).join(" · "),contracts,totals:{value:sum(contracts,x=>x.value),worked:sum(contracts,x=>x.worked),paid:sum(contracts,x=>x.paidNet),paidGross:sum(contracts,x=>x.paidGross),retentionHeld:sum(contracts,x=>x.retentionHeld),inProcess:sum(contracts,x=>x.inProcess),unpaidWorked:sum(contracts,x=>x.unpaidWorked),notWorked:sum(contracts,x=>x.notWorked)}});
-    } else if(t==="SUPPLIER"){
+      const direct=PAY.filter(x=>x.data.partnerId===pt.id&&!x.data.contractId&&live(x)); const directPaid=sum(direct.filter(x=>x.data.status==="PAID"),x=>x.data.paidAmount||x.data.netAmount);
+      if(!contracts.length && !direct.length && projectFilter) continue;
+      partnerRows.push({id:pt.id,type:t,name,...partnerInfo(pt),phone:pt.data.phone||"",bank:[pt.data.bankName,pt.data.accountNo,pt.data.accountName].filter(Boolean).join(" · "),contracts,direct:{count:direct.length,paid:directPaid,inProcess:sum(direct.filter(x=>x.data.status!=="PAID"),x=>x.data.netAmount),projects:[...new Set(direct.map(x=>pname.get(x.data.projectId)||"-"))]},totals:{value:sum(contracts,x=>x.value),worked:sum(contracts,x=>x.worked),paid:sum(contracts,x=>x.paidNet)+directPaid,directPaid,paidGross:sum(contracts,x=>x.paidGross),retentionHeld:sum(contracts,x=>x.retentionHeld),inProcess:sum(contracts,x=>x.inProcess),unpaidWorked:sum(contracts,x=>x.unpaidWorked),notWorked:sum(contracts,x=>x.notWorked)}});
+    } else if(t==="SUPPLIER"||t==="REIMBURSE"){
       const ps=PAY.filter(x=>x.data.partnerId===pt.id&&live(x));
       if(!ps.length && projectFilter) continue;
       const byProject={}; for(const x of ps){ const k=x.data.projectId; byProject[k]=byProject[k]||{projectId:k,projectName:pname.get(k)||"-",purchased:0,paid:0}; byProject[k].purchased+=num(x.data.grossAmount); if(x.data.status==="PAID") byProject[k].paid+=num(x.data.paidAmount||x.data.netAmount); }
@@ -3078,17 +3079,20 @@ async function importTransactionsHandler(request,env,user){
   const b=await parseJson(request)||{}; const batch=String(b.batch||"").slice(0,80)||"SHEET"; const rows=Array.isArray(b.rows)?b.rows.slice(0,600):[];
   const createSuppliers=b.createSuppliers!==false; const projectIds=new Set((await rowsWhere(env,"projects")).map(r=>r.id));
   const partnerCache=new Map(); const items=[]; let co=0, pp=0, bad=0, newPartners=0; const now=new Date().toISOString();
+  // Nama yang sudah dipindah (Vendor/Subkon/Reimburse) atau digabung (alias) tetap dipakai — impor ulang tidak memunculkan lagi sebagai toko.
+  const known=new Map(); for(const r of await rowsWhere(env,"partners")){ for(const nm of [r.data.name,...(r.data.aliases||[])]){ const k=nameKey(nm); if(k&&(!known.has(k)||nameKey(r.data.name)===k)) known.set(k,{id:r.id,data:r.data}); } }
   for(const r of rows){
     const id=String(r.id||"").replace(/[^A-Za-z0-9_-]/g,"").slice(0,60); const pid=String(r.projectId||""); const amount=num(r.amount); const cat=["MATERIAL","TUKANG","SUBKON","VENDOR","OPERASIONAL"].includes(String(r.category))?String(r.category):"OPERASIONAL";
     if(!id||!projectIds.has(pid)||!amount||!/^\d{4}-\d{2}-\d{2}$/.test(String(r.date||""))){ bad++; continue; }
-    const name=String(r.partnerName||"").trim(); let partner=null;
-    if(cat==="MATERIAL"&&createSuppliers&&name){
+    const name=String(r.partnerName||"").trim(); let partner=null; let cat2=cat;
+    if(cat==="MATERIAL"&&name&&known.has(nameKey(name))){ partner=known.get(nameKey(name)); cat2=MOVE_CATEGORY[partner.data.partnerType]||cat; }
+    else if(cat==="MATERIAL"&&createSuppliers&&name){
       const k=nameKey(name); if(partnerCache.has(k)) partner=partnerCache.get(k); else { const before=await env.DB.prepare(`SELECT id FROM app_records WHERE collection='partners' AND json_extract(data_json,'$.partnerType')='SUPPLIER' AND json_extract(data_json,'$.nameKey')=? LIMIT 1`).bind(k).first(); partner=await findOrCreatePartner(env,user,"SUPPLIER",{name,notes:"Dibuat dari impor Google Sheet"}); if(!before) newPartners++; partnerCache.set(k,partner); }
     }
     const itemsArr=(Array.isArray(r.items)?r.items:[]).slice(0,80).map(x=>({name:String(x.name||"").slice(0,160),qty:num(x.qty),unit:String(x.unit||"").slice(0,20),price:num(x.price),total:num(x.total)||Math.round(num(x.qty)*num(x.price))}));
     const desc=String(r.description||"").slice(0,400); const coId=`IMP-CO-${id}`; const ppId=partner?`IMP-PP-${id}`:"";
-    items.push({collection:"cash_out",id:coId,data:{projectId:pid,date:r.date,category:PAYMENT_CATEGORY_LABEL[cat],categoryKey:cat,partnerId:partner?.id||"",partnerName:name,vendor:name,amount,status:"PAID",description:desc,notes:desc,items:itemsArr,account:String(r.bank||""),reference:String(r.source||""),paymentId:ppId,imported:true,importBatch:batch,importSource:String(r.source||""),importLocation:String(r.location||""),createdBy:"Impor Google Sheet"}}); co++;
-    if(partner){ items.push({collection:"partner_payments",id:ppId,data:{projectId:pid,category:"MATERIAL",partnerId:partner.id,partnerName:partner.data?.name||name,items:itemsArr.length?itemsArr:[{name:desc||"Belanja material",qty:1,unit:"",price:amount,total:amount}],grossAmount:amount,retentionAmount:0,netAmount:amount,paidAmount:amount,status:"PAID",submittedAt:r.date,paidAt:r.date,paidAccount:String(r.bank||""),cashOutId:coId,requesterName:"Impor Google Sheet",notes:desc,imported:true,importBatch:batch,history:[{action:"IMPORTED",byName:user.name||user.username||"",at:now,note:`Dari ${r.source||"Google Sheet"}`}]}}); pp++; }
+    items.push({collection:"cash_out",id:coId,data:{projectId:pid,date:r.date,category:PAYMENT_CATEGORY_LABEL[cat2],categoryKey:cat2,partnerId:partner?.id||"",partnerName:name,vendor:name,amount,status:"PAID",description:desc,notes:desc,items:itemsArr,account:String(r.bank||""),reference:String(r.source||""),paymentId:ppId,imported:true,importBatch:batch,importSource:String(r.source||""),importLocation:String(r.location||""),createdBy:"Impor Google Sheet"}}); co++;
+    if(partner){ items.push({collection:"partner_payments",id:ppId,data:{projectId:pid,category:cat2,partnerId:partner.id,partnerName:partner.data?.name||name,items:itemsArr.length?itemsArr:[{name:desc||"Belanja material",qty:1,unit:"",price:amount,total:amount}],grossAmount:amount,retentionAmount:0,netAmount:amount,paidAmount:amount,status:"PAID",submittedAt:r.date,paidAt:r.date,paidAccount:String(r.bank||""),cashOutId:coId,requesterName:"Impor Google Sheet",notes:desc,imported:true,importBatch:batch,history:[{action:"IMPORTED",byName:user.name||user.username||"",at:now,note:`Dari ${r.source||"Google Sheet"}`}]}}); pp++; }
   }
   await importPutMany(env,items);
   return json({ok:true,cashOut:co,payments:pp,skipped:bad,newPartners});
@@ -3160,6 +3164,29 @@ async function partyHistoryHandler(env,user,kind,id) {
     contracts:contracts.map(c=>({id:c.id,number:c.data.number||c.id,projectName:pname.get(c.data.projectId)||"-",date:c.data.date||"",description:c.data.description||"",value:num(c.data.contractValue||c.data.amount),retentionPct:num(c.data.retentionPct),terms:c.data.terms||[],spkDocId:c.data.spkDocId||""})),
     payments:pays.map(p=>({id:p.id,projectName:pname.get(p.data.projectId)||"-",category:p.data.category,contractNumber:p.data.contractNumber||"",termLabel:p.data.termLabel||"",items:(p.data.items||[]).map(x=>`${x.name} ${num(x.qty)} ${x.unit||""}`.trim()),date:p.data.submittedAt||p.data.createdAt||"",gross:num(p.data.grossAmount),retention:num(p.data.retentionAmount),net:num(p.data.netAmount),status:p.data.status,paidAmount:num(p.data.paidAmount),paidAt:p.data.paidAt||"",proofDocId:p.data.proofDocId||"",attachmentDocIds:p.data.attachmentDocIds||[]})).sort((a,b)=>String(b.date).localeCompare(String(a.date)))});
 }
+const MOVE_CATEGORY={VENDOR:"VENDOR",SUBKON:"SUBKON",SUPPLIER:"MATERIAL",REIMBURSE:"MATERIAL"};
+async function partyMoveHandler(request,env,user) {
+  if(!buildAccess(user).capabilities.directoryMerge) return json({ok:false,message:"Hanya Head of Operational/Finance yang dapat memindahkan jenis mitra."},403);
+  const b=await parseJson(request)||{}; const to=String(b.toType||"").toUpperCase(); if(!PARTNER_TYPES[to]) return json({ok:false,message:"Jenis tujuan tidak dikenal."},400);
+  const ids=[...new Set((b.ids||[]).map(String))].slice(0,500); if(!ids.length) return json({ok:false,message:"Pilih minimal satu data."},400);
+  const pays=await rowsWhere(env,"partner_payments","json_extract(data_json,'$.partnerId') IS NOT NULL"); const cos=await rowsWhere(env,"cash_out","json_extract(data_json,'$.partnerId') IS NOT NULL"); const pos=await rowsWhere(env,"po","json_extract(data_json,'$.partnerId') IS NOT NULL");
+  const all=await rowsWhere(env,"partners"); const byKey=new Map(all.filter(r=>r.data.partnerType===to).map(r=>[r.data.nameKey,r]));
+  const updates=[]; let moved=0, merged=0, blocked=[];
+  for(const id of ids){
+    const pt=all.find(r=>r.id===id); if(!pt||pt.data.partnerType===to) continue;
+    const spk=pos.filter(x=>x.data.partnerId===id);
+    if(spk.length&&!["VENDOR","SUBKON"].includes(to)){ blocked.push(`${pt.data.name} (punya ${spk.length} SPK)`); continue; }
+    const target=byKey.get(pt.data.nameKey); const newId=target?target.id:id; const newName=target?target.data.name:pt.data.name; const cat=MOVE_CATEGORY[to];
+    for(const x of pays.filter(x=>x.data.partnerId===id)){ const d={...x.data,partnerId:newId,partnerName:newName}; if(!d.contractId&&String(d.status).toUpperCase()==="PAID") d.category=cat; updates.push({collection:"partner_payments",id:x.id,data:d}); }
+    for(const x of cos.filter(x=>x.data.partnerId===id)){ const d={...x.data,partnerId:newId,partnerName:newName,vendor:newName}; const linked=pays.find(p=>p.id===d.paymentId); if(!linked?.data?.contractId){ d.categoryKey=cat; d.category=PAYMENT_CATEGORY_LABEL[cat]; } updates.push({collection:"cash_out",id:x.id,data:d}); }
+    for(const x of spk) updates.push({collection:"po",id:x.id,data:{...x.data,partnerId:newId,partnerName:newName,vendor:newName,partnerType:to}});
+    if(target){ const patch={}; for(const k of ["phone","address","bankName","accountNo","accountName","specialty"]) if(!target.data[k]&&pt.data[k]) patch[k]=pt.data[k]; updates.push({collection:"partners",id:target.id,data:{...target.data,...patch,aliases:[...new Set([...(target.data.aliases||[]),pt.data.name])].slice(0,20)}}); await deleteRecord(env,"partners",id,user); merged++; }
+    else { updates.push({collection:"partners",id,data:{...pt.data,partnerType:to,movedFrom:pt.data.partnerType,movedAt:new Date().toISOString()}}); byKey.set(pt.data.nameKey,{id,data:{...pt.data,partnerType:to}}); moved++; }
+  }
+  await batchPut(env,updates);
+  await audit(env,user,"PARTY_MOVE","partners",to,"",{ids:ids.slice(0,50),moved,merged,blocked});
+  return json({ok:true,moved,merged,blocked,records:updates.length});
+}
 async function partyMergeHandler(request,env,user) {
   if(!buildAccess(user).capabilities.directoryMerge) return json({ok:false,message:"Hanya Head of Operational/Finance yang dapat menggabungkan data."},403);
   const b=await parseJson(request)||{}; const kind=b.kind==="tukang"?"tukang":"partners"; const keepId=String(b.keepId||""); const mergeIds=[...new Set((b.mergeIds||[]).map(String))].filter(x=>x&&x!==keepId);
@@ -3212,7 +3239,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.28-finance-import"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.29-partner-move"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3254,6 +3281,7 @@ async function handleRequest(request, env) {
     const partyHistMatch = path.match(/^\/api\/finance\/directory\/(tukang|partners)\/([^/]+)\/history$/);
     if (partyHistMatch && request.method === "GET") return partyHistoryHandler(env,auth.user,partyHistMatch[1],decodeURIComponent(partyHistMatch[2]));
     if (path === "/api/finance/directory/merge" && request.method === "POST") return partyMergeHandler(request,env,auth.user);
+    if (path === "/api/finance/directory/move" && request.method === "POST") return partyMoveHandler(request,env,auth.user);
     if (path === "/api/finance/summary" && request.method === "GET") return financeSummaryHandler(env,auth.user,url);
     if (path === "/api/finance/settings" && ["GET","PUT"].includes(request.method)) return financeSettingsHandler(request,env,auth.user);
     if (path === "/api/finance/contracts" && request.method === "POST") return contractSaveHandler(request,env,auth.user,"");
