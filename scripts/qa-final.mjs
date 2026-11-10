@@ -10,9 +10,9 @@ const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 function must(cond,msg){ if(!cond) throw new Error(msg); }
 function has(text,needle,msg=needle){ must(text.includes(needle),`QA marker hilang: ${msg}`); }
 
-must(pkg.version==='3.4.31','Versi package harus 3.4.31');
-has(worker,'APP-V3.4.31','APP version 3.4.31');
-has(html,'Natara Konstruksi • V3.4.31','label frontend 3.4.31');
+must(pkg.version==='3.4.34','Versi package harus 3.4.34');
+has(worker,'APP-V3.4.34','APP version 3.4.34');
+has(html,'Natara Konstruksi • V3.4.34','label frontend 3.4.34');
 has(html,'NARA SYSTEM','branding Nara System');
 has(html,'Masuk ke Nara System','login branding Nara System');
 has(worker,'const SERVICE_NAME = "Nara System";','service branding Nara System');

@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.31 — QC disederhanakan (alur 1-2-3-4 & tab)
+ * Nara System V3.4.34 — Tampilan HP (tabel jadi kartu, navigasi bawah)
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.31";
+const APP_VERSION = "APP-V3.4.34";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -234,12 +234,12 @@ function collectionPermission(user, collection) {
   if (collection === "qc_inspections") return allow(["manager_operasional","koordinator_supporting","admin_teknik","site_manager","qs","qc"],["manager_operasional","koordinator_supporting","qc"],["manager_operasional","koordinator_supporting","qc"]);
   if (collection === "cco") return allow(["manager_operasional","koordinator_engineering","admin_teknik","site_manager","estimator","qs"],["manager_operasional","koordinator_engineering","admin_teknik","qs","site_manager"],["manager_operasional"]);
   if (collection === "approvals") return allow(["manager_operasional","admin_teknik","finance"],["manager_operasional","admin_teknik","finance"]);
-  if (collection === "procurement") return allow(["manager_operasional","koordinator_engineering","admin_teknik","site_manager","procurement","finance"],["manager_operasional","admin_teknik","site_manager","procurement"]);
+  if (collection === "procurement") return allow(["manager_operasional","koordinator_engineering","admin_teknik","site_manager","procurement","finance"],["manager_operasional","admin_teknik","site_manager","procurement"],["manager_operasional","site_manager"]);
   // V3.4.24 — Keuangan proyek
   if (collection === "partners") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance","koordinator_engineering"],["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","finance"]);
   if (collection === "project_terms") return allow(["manager_operasional","admin_teknik","finance","site_manager"],["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
   if (collection === "partner_payments") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],[],[]);
-  if (collection === "po") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","admin_teknik","procurement","finance"]);
+  if (collection === "po") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","admin_teknik","procurement","finance"],["manager_operasional","admin_teknik"]);
   if (collection === "project_documents") return allow(projectReaders,["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager","qs","drafter","qc","finance","procurement"],["manager_operasional","koordinator_engineering","admin_teknik"]);
   if (["retention","closeout"].includes(collection)) return allow(["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager","finance"],["manager_operasional","admin_teknik","finance"]);
   if (collection === "rabs") return allow(["manager_operasional","koordinator_engineering","admin_teknik","site_manager","estimator","qs"],["manager_operasional","koordinator_engineering","admin_teknik","estimator","qs"]);
@@ -1484,6 +1484,9 @@ async function afterRecordUpsert(env, collection, record, user) {
           const pd={...pr.data,status:"SPK_CREATED",poId:record.id,poNumber:d.number||record.id,spkCreatedAt:new Date().toISOString(),spkCreatedByUserId:user?.id||"",spkCreatedByName:user?.name||user?.username||""};
           await upsertRecord(env,"procurement",pr.id,pd,user);
           await syncWorkflowTask(env,"procurement",pr.id,pd,user);
+        } else if (String(pr.data.poId||"")===String(record.id) && String(pr.data.poNumber||"")!==String(d.number||record.id)) {
+          // V3.4.32: edit No. SPK/PO ikut memperbarui referensi di PR.
+          await upsertRecord(env,"procurement",pr.id,{...pr.data,poNumber:d.number||record.id},user);
         }
       }
     }
@@ -2271,7 +2274,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.31"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.34"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -3138,6 +3141,41 @@ async function rowsWhere(env,collection,sql="",binds=[]) {
   const q=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection=?${sql?` AND ${sql}`:""}`).bind(collection,...binds).all();
   return (q.results||[]).map(r=>({id:r.id,data:safeJsonParse(r.data_json,{})}));
 }
+// V3.4.32 — Hapus PR / SPK-PO dengan pengaman relasi.
+async function procurementDeleteGuard(env,user,collection,id,old) {
+  if(!old || !["procurement","po"].includes(collection)) return "";
+  const d=old.data||{}; const rk=normalizeRole(user);
+  if(collection==="procurement") {
+    const st=String(d.status||"DRAFT").toUpperCase();
+    if(rk==="site_manager") {
+      const pm=await projectAssignment(env,d.projectId,"pm");
+      if(String(pm||d.projectManagerUserId||"")!==String(user.id||"")) return "Anda hanya dapat menghapus PR pada proyek yang Anda tangani.";
+      if(!["DRAFT","REJECTED"].includes(st)) return "PR yang sudah dikirim ke Head hanya dapat dihapus oleh Head of Operational atau Administrator.";
+    }
+    const pos=await rowsWhere(env,"po","json_extract(data_json,'$.prId')=?",[String(id)]);
+    if(pos.length) return `PR ini sudah memiliki SPK/PO ${pos.map(p=>p.data.number||p.id).join(", ")}. Hapus SPK/PO tersebut terlebih dahulu.`;
+  }
+  if(collection==="po") {
+    const pays=await rowsWhere(env,"partner_payments","json_extract(data_json,'$.contractId')=?",[String(id)]);
+    if(pays.length) return `SPK/PO ini sudah dipakai pada ${pays.length} pembayaran. Hapus atau batalkan pembayarannya terlebih dahulu di menu Pembayaran Proyek.`;
+    if(rk==="admin_teknik" && d.prId) {
+      const pr=await getRecord(env,"procurement",String(d.prId));
+      if(pr && ["ORDERED","RECEIVED"].includes(String(pr.data.status||"").toUpperCase())) return "SPK/PO yang sudah ditindaklanjuti ke vendor hanya dapat dihapus oleh Head of Operational atau Administrator.";
+    }
+  }
+  return "";
+}
+async function procurementAfterDelete(env,user,collection,id,old) {
+  if(collection!=="po" || !old) return;
+  await deleteRecord(env,"payables",`AUTO-PO-${id}`,user);
+  const prId=String(old.data?.prId||"");
+  if(!prId) return;
+  const pr=await getRecord(env,"procurement",prId);
+  if(!pr || (pr.data.poId && String(pr.data.poId)!==String(id))) return;
+  const pd={...pr.data,status:"APPROVED",poId:"",poNumber:"",spkCreatedAt:"",orderedAt:"",orderedByUserId:"",receivedAt:"",receivedByUserId:""};
+  await upsertRecord(env,"procurement",pr.id,pd,user);
+  await syncWorkflowTask(env,"procurement",pr.id,pd,user);
+}
 async function partyInUse(env,collection,id) {
   if(collection==="partners"){
     const n=await env.DB.prepare(`SELECT COUNT(*) AS n FROM app_records WHERE collection IN ('partner_payments','po','cash_out') AND json_extract(data_json,'$.partnerId')=?`).bind(id).first();
@@ -3262,7 +3300,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.31-qc-simple"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.34-mobile"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3535,8 +3573,10 @@ async function handleRequest(request, env) {
         const old = await getRecord(env,collection,id);
         if (old && !(await recordAllowedByProjectScope(env,auth.user,collection,id,old.data))) return json({ok:false,message:"Anda tidak ditugaskan pada proyek data ini."},403);
         if (PARTY_COLLECTIONS.has(collection)) { const used=await partyInUse(env,collection,id); if(used) return json({ok:false,message:used},409); }
+        { const blocked=await procurementDeleteGuard(env,auth.user,collection,id,old); if(blocked) return json({ok:false,message:blocked},409); }
         if(WORKFLOW_SOURCE_COLLECTIONS.has(collection)) await cancelWorkflowTasks(env,collection,id,auth.user);
         const ok = await deleteRecord(env,collection,id,auth.user);
+        if (ok) await procurementAfterDelete(env,auth.user,collection,id,old);
         return ok ? json({ok:true}) : json({ok:false,message:"Data tidak ditemukan."},404);
       }
     }
@@ -3585,7 +3625,9 @@ async function handleRequest(request, env) {
           const old = await getRecord(env,collection,m[1]);
           if (old && !(await recordAllowedByProjectScope(env,auth.user,collection,m[1],old.data))) return json({message:"Forbidden: project scope"},403);
           if (PARTY_COLLECTIONS.has(collection)) { const used=await partyInUse(env,collection,m[1]); if(used) return json({message:used},409); }
-          await deleteRecord(env,collection,m[1],auth.user);
+          { const blocked=await procurementDeleteGuard(env,auth.user,collection,m[1],old); if(blocked) return json({message:blocked},409); }
+          if(WORKFLOW_SOURCE_COLLECTIONS.has(collection)) await cancelWorkflowTasks(env,collection,m[1],auth.user);
+          if (await deleteRecord(env,collection,m[1],auth.user)) await procurementAfterDelete(env,auth.user,collection,m[1],old);
         }
         return new Response(null,{status:204});
       }

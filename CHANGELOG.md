@@ -1,3 +1,31 @@
+## V3.4.34 — Tampilan HP
+
+- **Tabel otomatis menjadi kartu** di layar HP (≤640px): setiap baris tampil sebagai kartu dengan label kolom, sehingga tidak perlu geser ke samping dan tombol Aksi selalu terlihat. Berlaku untuk semua menu & tabel di dalam form.
+- **Navigasi bawah** di HP: Beranda · Tugas (dengan angka) · 2 menu utama sesuai jabatan · Menu. Contoh: Site Manager → Progress & QC; QC → QC & Arsip QC; Finance → Keuangan & Bayar; Head of Operational → Proyek & Bayar.
+- Header HP: judul satu baris, pilihan proyek selebar layar; header tetap di atas saat menggulir.
+- Menu samping: latar gelap di belakang, ketuk di luar menu untuk menutup.
+- Form (modal) tampil sebagai lembar penuh dari bawah; tombol Batal/Simpan besar dan selalu terlihat.
+- Tombol & isian lebih besar untuk jari; ukuran huruf isian 16px (HP tidak lagi zoom otomatis saat mengetik).
+- Kotak angka (KPI) tidak lagi membuat halaman melebar (Dashboard Finance).
+- **Tugas Saya**: daftar panjang dibagi per halaman (8 di HP / 15 di desktop) + pencarian + filter status.
+
+## V3.4.33 — Rute QC: Jumat hari kondisional
+
+- Kolom **Jumat** di Jadwal mingguan diberi tanda **KONDISIONAL** dan keterangan "QC bebas berkunjung ke proyek mana saja sesuai kebutuhan" (tidak lagi "Tidak ada kunjungan").
+- Saat hari Jumat, bagian **Rute hari ini** menampilkan pilihan proyek + tombol **Mulai Inspeksi** untuk proyek mana pun.
+- Kunjungan wajib tetap bisa dijadwalkan di hari Jumat bila perlu; di form, Jumat ditandai * (kondisional).
+
+## V3.4.32 — PR / Vendor: edit & hapus
+
+- Tabel **Purchase Request**: tombol **Edit** kini tersedia untuk Head of Operational / Head Unit Bisnis / Direktur / Administrator di semua tahap (sebelumnya hanya saat Draft). Tombol **Hapus** untuk Head & Administrator; Site Manager hanya bisa menghapus PR miliknya yang masih Draft / Ditolak.
+- Tabel **PO / SPK**: tombol **Hapus** untuk Head of Operational, Admin Teknik, dan Administrator.
+- Pengaman:
+  - PR yang sudah punya SPK/PO tidak bisa dihapus sebelum SPK/PO-nya dihapus.
+  - SPK/PO yang sudah dipakai di Pembayaran Proyek tidak bisa dihapus.
+  - Admin Teknik tidak bisa menghapus SPK/PO yang sudah ditindaklanjuti ke vendor (Ordered/Diterima).
+  - Menghapus SPK/PO dari PR mengembalikan PR ke "Vendor disetujui" (tugas kembali ke Admin Teknik) dan menghapus hutang otomatis (AUTO-PO).
+  - Mengubah No. SPK/PO ikut memperbarui referensi di PR.
+
 ## V3.4.31 — QC disederhanakan
 
 - Halaman QC kini diawali **alur 1-2-3-4**: Inspeksi → Konfirmasi → Perbaikan → Verifikasi → Selesai, masing-masing dengan jumlahnya; klik langkah untuk langsung ke bagiannya, arahkan kursor untuk penjelasan.
