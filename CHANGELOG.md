@@ -1,3 +1,16 @@
+## V3.4.37 — Halaman Proyek
+
+- Kartu proyek di **Dashboard**, baris tabel **Kontrol Semua Proyek**, dan tombol **Buka** di menu **Proyek** kini bisa diklik → membuka **halaman proyek** berisi semua data proyek tersebut, tanpa perlu memilih proyek di filter atas.
+- Kepala halaman: nama, status & schedule, Site Manager, owner, lokasi, tanggal mulai/target, progress aktual, tombol **← Semua proyek**.
+- Tab (menyesuaikan hak akses jabatan):
+  - **Ringkasan**: angka utama, angka keuangan (bila berhak), kurva progress, tahap proyek & hambatannya, kelengkapan dokumen inti.
+  - **Dokumen**: semua dokumen/link Drive dikelompokkan per kategori, sekali klik terbuka; tambah link langsung.
+  - **Anggaran & Keuangan**: kontrak, HPP, uang masuk/keluar, saldo, sisa anggaran, pemakaian anggaran, pengeluaran per kategori, termin client.
+  - **Progress**: kurva, laporan harian terbaru, kendala lapangan terbuka.
+  - **QC**: ringkasan temuan & daftar temuan belum selesai.
+  - **Pembelian & Bayar**: PR, SPK/PO, pembayaran ke mitra.
+- Setiap tab punya tombol ke menu lengkapnya; filter proyek ikut terpilih sehingga menu lain langsung menampilkan proyek tersebut.
+
 ## V3.4.36 — Impor link dokumen dari sheet DATA PROYEK
 
 - Impor link kini bisa dari **file .xlsx** (Google Sheet → File → Download → Microsoft Excel): **hyperlink** di balik tulisan sel (mis. "Ada", "Vendor") ikut terbaca; sheet yang paling banyak berisi link dipilih otomatis.
