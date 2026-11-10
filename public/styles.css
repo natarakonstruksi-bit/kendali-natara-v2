@@ -377,3 +377,23 @@ input:focus,select:focus,textarea:focus{border-color:#c48a7b;box-shadow:0 0 0 3p
   table.m-cards td.mc-nolabel,table.m-cards td.mc-full,table.m-cards td.mc-check{padding-left:0}
   table.m-cards td.mc-actions{display:flex;padding-left:0}
 }
+
+/* V3.4.35 — Dokumen link Google Drive */
+.notice.orange{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+.doc-core-list{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+.doc-core small{display:block;margin-top:4px}
+.doc-src{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.doc-src.link{background:#eff8ff;color:#175cd3}.doc-src.link.folder{background:#fef6e7;color:#b54708}.doc-src.file{background:#f2f4f7;color:#344054}
+.doc-mode{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.doc-mode-opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}
+.doc-mode-opt:has(input:checked){border-color:#175cd3;background:#f5faff}
+.doc-mode-opt span{display:flex;flex-direction:column;gap:2px}.doc-mode-opt small{color:#667085;font-size:11.5px}
+.doc-imp-bar{display:flex;align-items:center;gap:12px;margin:10px 0}
+.doc-imp-table{max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.doc-imp-table select,.doc-imp-table input:not([type=checkbox]){width:100%;min-width:150px}
+.doc-imp-table tr.doc-imp-warn{background:#fffaeb}
+#docPaste{width:100%;font-family:ui-monospace,monospace;font-size:12px}
+@media(max-width:640px){.doc-mode{grid-template-columns:1fr}.doc-imp-table{max-height:none;border:0}}
+.doc-imp-file{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:10px 0}
+.doc-imp-file select{min-width:200px}
+.doc-imp-or{text-align:center;color:#98a2b3;font-size:12px;margin:6px 0;text-transform:uppercase;letter-spacing:.08em}

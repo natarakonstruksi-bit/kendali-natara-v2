@@ -2276,3 +2276,189 @@ renderTasks=async function(...args){
   }catch(_){}
   return out;
 };
+
+/* ========================================================================== */
+/* NARA SYSTEM V3.4.35 — DOKUMEN LINK GOOGLE DRIVE                            */
+/* Dokumen bisa berupa file (R2) atau link (file/folder Google Drive, dll).   */
+/* Impor banyak link sekaligus: tempel dari Google Sheet / Excel.             */
+/* ========================================================================== */
+DOC_CATEGORIES.push(...['RAB_HPP','PROGRESS_REPORT'].filter(x=>!DOC_CATEGORIES.includes(x)));
+const DOC_LABEL={RAB_HPP:'RAB HPP (internal)',PROGRESS_REPORT:'Laporan Progress',CONTRACT:'Kontrak / SPK Client',RAB_BASELINE:'RAB Baseline',DED_FINAL:'DED Final',TIME_SCHEDULE:'Time Schedule',PCM:'PCM',MC0:'MC-0',
+  PAYMENT_PROOF_IN:'Bukti Pembayaran Masuk',PAYMENT_PROOF_OUT:'Bukti Pembayaran Keluar',OPNAME_BA:'BA Opname',QC_EVIDENCE:'Foto / Bukti QC',
+  CCO_RAB:'RAB CCO',CCO_ADDENDUM:'Addendum',PO_SPK:'PO / SPK Vendor',DELIVERY_RECEIPT:'Surat Jalan / Tanda Terima',PHO_BAST:'BAST / PHO',
+  AS_BUILT:'As-Built',RETENTION:'Retensi',FHO_BAST:'BAST / FHO',FINAL_RECONCILIATION:'Rekonsiliasi Akhir',PUBLIC_MEDIA:'Media Publik',OTHER:'Lainnya / Folder Berkas'};
+const docLabel=c=>DOC_LABEL[String(c||'').toUpperCase()]||String(c||'-');
+function docCategoryOptions(sel){const list=state.access?.roleKey==='drafter'?['AS_BUILT']:DOC_CATEGORIES;return list.map(x=>`<option value="${x}" ${x===sel?'selected':''}>${esc(docLabel(x))}</option>`).join('');}
+function docGuessCategory(text){
+  const t=String(text||'').toLowerCase();
+  const rules=[[/rab.*(adendum|addendum)|(adendum|addendum).*rab/,'CCO_RAB'],[/addendum|adendum|amandemen/,'CCO_ADDENDUM'],[/laporan\s*(progress|progres|mingguan|harian)/,'PROGRESS_REPORT'],[/rab\s*hpp|\bhpp\b/,'RAB_HPP'],[/\bcco\b|change order|pekerjaan tambah/,'CCO_RAB'],[/as[\s-]?built/,'AS_BUILT'],[/\bfho\b|serah terima (ii|2|kedua)|bast\s*(ii|2)/,'FHO_BAST'],[/\bpho\b|bast|serah terima/,'PHO_BAST'],
+    [/time\s*schedule|jadwal|kurva\s*s|schedule|timeline/,'TIME_SCHEDULE'],[/\brab\b|anggaran|boq|bill of quantit/,'RAB_BASELINE'],[/\bded\b|gambar|drawing|desain|design/,'DED_FINAL'],
+    [/kontrak|contract|perjanjian|spk client|surat perintah kerja/,'CONTRACT'],[/\bpcm\b|pre[\s-]?construction meeting|rapat pra/,'PCM'],[/\bmc[\s-]?0\b|mutual check/,'MC0'],[/opname/,'OPNAME_BA'],
+    [/\bpo\b|purchase order|spk vendor|spk subkon|vendor/,'PO_SPK'],[/\bspk\b/,'CONTRACT'],[/surat jalan|tanda terima|delivery/,'DELIVERY_RECEIPT'],[/retensi|retention|pemeliharaan/,'RETENTION'],[/rekonsiliasi|reconciliation/,'FINAL_RECONCILIATION'],
+    [/bukti (bayar|transfer|pembayaran) masuk|termin masuk|pembayaran client/,'PAYMENT_PROOF_IN'],[/bukti (bayar|transfer|pembayaran)|kwitansi|invoice vendor/,'PAYMENT_PROOF_OUT'],[/\bqc\b|foto|dokumentasi|temuan/,'QC_EVIDENCE']];
+  for(const [re,c] of rules)if(re.test(t))return c;
+  const up=String(text||'').trim().toUpperCase().replace(/[\s-]+/g,'_');if(DOC_CATEGORIES.includes(up))return up;
+  return '';
+}
+function docLinkInfo(url){const u=String(url||'');if(/drive\.google\.com\/.*folders\//.test(u))return {type:'DRIVE_FOLDER',label:'Folder Drive',icon:'📁'};if(/drive\.google\.com/.test(u))return {type:'DRIVE_FILE',label:'File Drive',icon:'🔗'};
+  const m=u.match(/docs\.google\.com\/(document|spreadsheets|presentation|forms)\//);if(m)return {type:'GOOGLE_DOC',label:{document:'Google Docs',spreadsheets:'Google Sheets',presentation:'Google Slides',forms:'Google Forms'}[m[1]],icon:'🔗'};return {type:'URL',label:'Link',icon:'🔗'};}
+function docSourceHtml(d){if(d.externalUrl&&!d.objectKey){const i=docLinkInfo(d.externalUrl);return `<span class="doc-src link ${i.type==='DRIVE_FOLDER'?'folder':''}">${i.icon} ${esc(i.label)}</span>`;}return `<span class="doc-src file">⬆ ${esc(d.originalName||'File')}</span>`;}
+function docOpen(row){const d=row?.data||{};if(d.externalUrl&&!d.objectKey){window.open(d.externalUrl,'_blank','noopener');return;}window.open(`/api/documents/${encodeURIComponent(row.id)}/file`,'_blank');}
+function docNormName(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+function docMatchProjectExact(text){const n=docNormName(text);if(!n)return '';const m=state.projects.filter(p=>docNormName(projectDisplayName(p))===n||docNormName(p.data?.name||'')===n);return m.length===1?m[0].id:'';}
+function docMatchProject(text){
+  const raw=String(text||'').trim();if(!raw)return '';
+  const byId=state.projects.find(p=>String(p.id)===raw);if(byId)return byId.id;
+  const n=docNormName(raw);if(!n)return '';
+  const names=state.projects.map(p=>({id:p.id,n:docNormName(projectDisplayName(p)),n2:docNormName(p.data?.name||'')}));
+  const exact=names.filter(x=>x.n===n||x.n2===n);if(exact.length===1)return exact[0].id;
+  const part=names.filter(x=>(x.n2&&(x.n2.includes(n)||n.includes(x.n2)))||(x.n&&(x.n.includes(n)||n.includes(x.n))));if(part.length===1)return part[0].id;
+  return '';
+}
+openDocumentForm=function(row=null,preset={}){
+  const d=row?.data||preset;const isLink=row?Boolean(d.externalUrl&&!d.objectKey):preset.mode==='link';
+  const html=`<div class="doc-mode"><label class="doc-mode-opt"><input type="radio" name="mode" value="link" ${isLink?'checked':''}><span><b>🔗 Link Google Drive</b><small>File atau folder tetap di Drive — cukup tempel link-nya</small></span></label><label class="doc-mode-opt"><input type="radio" name="mode" value="file" ${isLink?'':'checked'}><span><b>⬆ Upload file</b><small>File disimpan di server Nara (maks. 25 MB)</small></span></label></div>
+  <div class="form-grid"><label>Proyek<select name="projectId" required><option value="">Pilih proyek</option>${state.projects.map(p=>`<option value="${esc(p.id)}" ${p.id===(d.projectId||state.selectedProjectId)?'selected':''}>${esc(projectDisplayName(p))}</option>`).join('')}</select></label><label>Kategori<select name="category" required>${docCategoryOptions(d.category||(state.access?.roleKey==='drafter'?'AS_BUILT':'OTHER'))}</select></label>
+  <label class="span-2 doc-link-field">Link Google Drive<input name="externalUrl" type="url" inputmode="url" placeholder="https://drive.google.com/…" value="${esc(d.externalUrl||'')}"><small class="muted" id="docLinkHint">Pastikan di Google Drive sudah di-share ke tim (mis. "Siapa saja yang memiliki link").</small></label>
+  <label class="span-2 doc-file-field">${row?'Ganti file (opsional)':'File'}<input type="file" name="file"></label>
+  <label class="span-2">Judul<input name="title" value="${esc(d.title||(d.objectKey?d.originalName:'')||'')}" placeholder="Contoh: Kontrak Kerja Losari 16 & 18"></label><label class="span-2">Catatan<textarea name="notes">${esc(d.notes||'')}</textarea></label><input type="hidden" name="relatedCollection" value="${esc(d.relatedCollection||'')}"><input type="hidden" name="relatedId" value="${esc(d.relatedId||'')}"></div>`;
+  openModal(row?'Edit Dokumen':'Tambah Dokumen','Dokumen bisa berupa link Google Drive (file / folder) atau file yang diunggah.',html,async form=>{
+    const mode=form.querySelector('input[name="mode"]:checked')?.value||'file';
+    const base={projectId:form.projectId.value,category:form.category.value,title:form.title.value.trim(),notes:form.notes.value,relatedCollection:form.relatedCollection.value,relatedId:form.relatedId.value};
+    if(!base.projectId)throw new Error('Pilih proyek.');
+    if(mode==='link'){
+      const url=form.externalUrl.value.trim();if(!/^https?:\/\//i.test(url))throw new Error('Tempel link lengkap yang diawali https://');
+      if(row)await api(`/api/documents/${encodeURIComponent(row.id)}`,{method:'PUT',body:{...base,externalUrl:url}});
+      else await api('/api/documents/link',{method:'POST',body:{...base,url}});
+    }else{
+      const file=form.elements.file.files[0];if(!row&&!file)throw new Error('Pilih file yang akan diunggah.');
+      const fd=new FormData();for(const k of Object.keys(base))fd.append(k,base[k]||(k==='title'&&file?file.name:''));if(file)fd.append('file',file);
+      if(row)await api(`/api/documents/${encodeURIComponent(row.id)}`,{method:'PUT',body:fd});else await api('/api/documents',{method:'POST',body:fd});
+    }
+    toast('Dokumen disimpan.');state.cache.clear();await renderView();
+  });
+  const sync=()=>{const m=$('#modalForm input[name="mode"]:checked')?.value;$('#modalForm .doc-link-field').classList.toggle('hidden',m!=='link');$('#modalForm .doc-file-field').classList.toggle('hidden',m==='link');};
+  $$('#modalForm input[name="mode"]').forEach(r=>r.onchange=sync);sync();
+  const u=$('#modalForm input[name="externalUrl"]');if(u)u.oninput=()=>{const v=u.value.trim();if(!v){$('#docLinkHint').textContent='Pastikan di Google Drive sudah di-share ke tim (mis. "Siapa saja yang memiliki link").';return;}const i=docLinkInfo(v);$('#docLinkHint').textContent=/^https?:\/\//i.test(v)?`Terdeteksi: ${i.icon} ${i.label}`:'Link harus diawali https://';};
+};
+/* Parser TSV (hasil salin dari Google Sheet/Excel), mendukung sel bertanda kutip & baris baru. */
+function docParseTsv(text){
+  const rows=[];let row=[],cell='',q=false;const s=String(text||'').replace(/\r\n?/g,'\n');
+  for(let i=0;i<s.length;i++){const ch=s[i];
+    if(q){if(ch==='"'){if(s[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=ch;continue;}
+    if(ch==='"'&&cell==='')q=true;else if(ch==='\t'){row.push(cell);cell='';}else if(ch==='\n'){row.push(cell);rows.push(row);row=[];cell='';}else cell+=ch;}
+  if(cell!==''||row.length){row.push(cell);rows.push(row);}
+  return rows.filter(r=>r.some(c=>String(c).trim()));
+}
+const DOC_URL_RE=/https?:\/\/[^\s"'<>]+/gi;
+const DOC_SKIP_TEXT=/^(ada|vendor|link|lihat|buka|file|folder|-|v|✓|ok|peta)$/i;
+function docCellParts(cell){const str=String(cell??'');const urls=str.match(DOC_URL_RE)||[];const text=str.replace(DOC_URL_RE,' ').replace(/\s+/g,' ').trim();return {urls,text};}
+function docTitleFrom(hdr,text,k,n){const same=hdr&&text.toLowerCase().replace(/[\s\d]+$/,'').trim()===hdr.toLowerCase().trim();const t=(DOC_SKIP_TEXT.test(text)||same)?'':text;let title=hdr&&t?`${hdr} — ${t}`:(t||hdr||'');if(n>1)title=`${title} (${k+1})`;return title;}
+function docIsMapUrl(u){return /google\.[a-z.]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps|maps\.google/i.test(u);}
+function docBuildRows(table){
+  if(!table.length)return {rows:[],format:'-'};
+  // Baris judul = baris pertama (dalam 10 baris awal) yang memuat kolom proyek; baris catatan di atasnya diabaikan.
+  let hi=table.slice(0,10).findIndex(r=>r.some(c=>/^(nama\s*)?(proyek|project)\b/i.test(String(c||'').trim())));
+  const hasUrlInFirst=table[0].some(h=>/https?:\/\//i.test(String(h||'')));
+  if(hi<0)hi=hasUrlInFirst?-1:0;
+  const head=hi>=0?table[hi].map(h=>String(h||'').replace(/\s+/g,' ').trim()):[];const low=head.map(h=>h.toLowerCase());
+  const body=table.slice(hi+1);
+  const find=re=>low.findIndex(h=>re.test(h));
+  let pCol=hi<0?-1:find(/^(nama\s*)?(proyek|project)\b|nama proyek/);
+  const linkCol=hi<0?-1:find(/^(link|url|tautan)( dokumen| file| drive)?$/);
+  const catCol=hi<0?-1:find(/^(kategori|category|jenis)( dokumen)?$/);const titleCol=hi<0?-1:find(/^(judul|nama dokumen|dokumen|nama file|title|keterangan)$/);const noteCol=hi<0?-1:find(/^catatan|^note/);
+  const skipCol=ci=>/maps|peta|lokasi|whatsapp|\bwa\b|email|foto profil/.test(low[ci]||'');
+  const noCol=hi<0?-1:find(/^no\.?$|^nomor$/);
+  const projOf=(r)=>{const name=pCol>=0?docCellParts(r[pCol]).text:'';const no=noCol>=0?docCellParts(r[noCol]).text:'';return no&&name?{name,hint:`${name} (No ${no})`}:{name,hint:''};};
+  const out=[];const defProject=state.selectedProjectId||'';
+  const push=(r,projText,category,title,url,notes,hint='')=>{if(docIsMapUrl(url))return;const projectId=(hint&&docMatchProjectExact(hint))||docMatchProject(projText)||(!projText?defProject:'');out.push({row:r,projectText:projText,projectId,category:category||'OTHER',title,url,notes:notes||''});};
+  const rowNo=i=>hi+2+i;
+  let format='';
+  if(linkCol>=0){format='Satu baris per dokumen';
+    body.forEach((r,i)=>{const {urls,text}=docCellParts(r[linkCol]);const title=titleCol>=0?docCellParts(r[titleCol]).text:text;const cat=(catCol>=0?docGuessCategory(docCellParts(r[catCol]).text):'')||docGuessCategory(title)||'OTHER';
+      const pj=projOf(r);urls.forEach((u,k)=>push(rowNo(i),pj.name,cat,title?(urls.length>1?`${title} (${k+1})`:title):'',u,noteCol>=0?docCellParts(r[noteCol]).text:'',pj.hint));});
+  }else{
+    format='Satu baris per proyek (kolom = jenis dokumen)';if(pCol<0&&hi>=0)pCol=0;
+    body.forEach((r,i)=>{const pj=projOf(r);const proj=pj.name;if(hi>=0&&!proj&&!r.some(c=>/https?:\/\//i.test(String(c||''))))return;
+      r.forEach((cell,ci)=>{if(ci===pCol||skipCol(ci))return;const {urls,text}=docCellParts(cell);if(!urls.length)return;const hdr=head[ci]||'';const cat=docGuessCategory(hdr)||docGuessCategory(text)||'OTHER';
+        urls.forEach((u,k)=>push(rowNo(i),proj,cat,docTitleFrom(hdr,text,k,urls.length),u,'',pj.hint));});});
+  }
+  return {rows:out,format};
+}
+/* Tempel dari Google Sheet: ambil versi HTML clipboard supaya hyperlink (sel "Ada") ikut terbaca. */
+function docHtmlToMatrix(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');const t=doc.querySelector('table');if(!t)return null;
+  const grid=[];[...t.rows].forEach((tr,ri)=>{grid[ri]=grid[ri]||[];let ci=0;[...tr.cells].forEach(td=>{while(grid[ri][ci]!==undefined)ci++;
+    const links=[...td.querySelectorAll('a[href]')].map(a=>a.getAttribute('href')).filter(h=>/^https?:/i.test(h));const text=(td.textContent||'').replace(/\s+/g,' ').trim();
+    const val=links.length?`${text} ${links.join(' ')}`:text;const rs=Number(td.rowSpan)||1,cs=Number(td.colSpan)||1;
+    for(let a=0;a<rs;a++){grid[ri+a]=grid[ri+a]||[];for(let b2=0;b2<cs;b2++)grid[ri+a][ci+b2]=(a===0&&b2===0)?val:'';}ci+=cs;});});
+  return grid.map(r=>Array.from(r,x=>x??''));
+}
+/* Unggah .xlsx (File → Download → Microsoft Excel): hyperlink sel ikut terbaca. */
+async function docXlsxToMatrices(file){
+  const X=await impLoadXlsx();const wb=X.read(await file.arrayBuffer(),{type:'array',cellFormula:true,cellHTML:false});
+  return wb.SheetNames.map(name=>{const ws=wb.Sheets[name];if(!ws['!ref'])return {name,rows:[]};const R=X.utils.decode_range(ws['!ref']);const rows=[];
+    for(let r=R.s.r;r<=R.e.r;r++){const row=[];for(let c=R.s.c;c<=R.e.c;c++){const cell=ws[X.utils.encode_cell({r,c})];if(!cell){row.push('');continue;}
+      let text=cell.w!=null?String(cell.w):(cell.v!=null?String(cell.v):'');let link=cell.l?.Target||'';
+      if(!link&&cell.f){const m=String(cell.f).match(/HYPERLINK\(\s*"([^"]+)"(?:\s*[,;]\s*"([^"]*)")?/i);if(m){link=m[1];if(m[2])text=m[2];}}
+      row.push(link&&/^https?:/i.test(link)?`${text} ${link}`:text);}
+      rows.push(row);}
+    return {name,rows};});
+}
+function openDocLinkImport(){
+  const html=`<div class="notice blue"><b>Cara pakai:</b> unggah file .xlsx hasil download Google Sheet, <b>atau</b> blok tabelnya (termasuk baris judul) → salin → tempel. Bisa dua bentuk:<br>• <b>Satu baris per dokumen</b>: kolom <i>Proyek | Kategori | Judul | Link</i><br>• <b>Satu baris per proyek</b>: kolom <i>Proyek | Kontrak | RAB | DED | Time Schedule | Folder …</i> (isi sel = link)<br>Link file maupun folder Google Drive sama-sama bisa.</div>
+  <div class="doc-imp-file"><label class="btn" for="docXlsx">📄 Pilih file .xlsx</label><input type="file" id="docXlsx" accept=".xlsx,.xlsm,.xls,.csv" hidden><select id="docXlsxSheet" class="hidden"></select><span class="muted" id="docXlsxInfo">Di Google Sheet: File → Download → Microsoft Excel (.xlsx). Hyperlink pada sel (mis. tulisan "Ada") ikut terbaca.</span></div>
+  <div class="doc-imp-or">atau</div>
+  <label class="span-2">Tempel di sini<textarea id="docPaste" rows="6" placeholder="Blok tabel di Google Sheet (termasuk baris judul) → Ctrl+C → tempel di sini"></textarea></label>
+  <div class="doc-imp-bar"><button type="button" class="btn primary" id="docPreviewBtn">Periksa data</button><span class="muted" id="docImpInfo"></span></div><div id="docImpPreview"></div>`;
+  openModal('Impor Link Dokumen dari Google Sheet','Proyek & kategori dikenali otomatis dan bisa dikoreksi per baris sebelum disimpan.',html,async()=>{
+    const rows=(state.docImport||[]).filter(r=>r.include);
+    if(!rows.length)throw new Error('Belum ada baris yang siap disimpan. Klik "Periksa data" dulu.');
+    const bad=rows.filter(r=>!r.projectId);if(bad.length)throw new Error(`${bad.length} baris belum punya proyek. Pilih proyeknya atau hilangkan centangnya.`);
+    let created=0,skipped=0,errs=[];
+    for(let i=0;i<rows.length;i+=200){const chunk=rows.slice(i,i+200).map(r=>({row:r.row,projectId:r.projectId,category:r.category,title:r.title,url:r.url,notes:r.notes}));
+      $('#docImpInfo').textContent=`Menyimpan ${Math.min(i+200,rows.length)} / ${rows.length}…`;
+      const res=await api('/api/documents/links/bulk',{method:'POST',body:{rows:chunk}});created+=res.created;skipped+=res.skipped;errs=errs.concat(res.errors||[]);}
+    toast(`${created} link dokumen tersimpan${skipped?`, ${skipped} dilewati (sudah ada)`:''}${errs.length?`, ${errs.length} gagal`:''}.`,errs.length?'err':undefined);
+    if(errs.length)console.warn('Impor link gagal',errs);
+    state.docImport=null;state.cache.clear();await renderView();
+  });
+  $('#modalSave').textContent='Simpan semua';
+  const draw=()=>{const rows=state.docImport||[];const ok=rows.filter(r=>r.include&&r.projectId).length;
+    $('#docImpInfo').textContent=rows.length?`${rows.length} link ditemukan · ${ok} siap disimpan`:'Tidak ada link yang ditemukan.';
+    $('#docImpPreview').innerHTML=rows.length?`<div class="table-wrap doc-imp-table"><table class="table"><thead><tr><th><input type="checkbox" id="docImpAll" checked></th><th>Baris</th><th>Proyek</th><th>Kategori</th><th>Judul</th><th>Link</th></tr></thead><tbody>${rows.map((r,i)=>{const inf=docLinkInfo(r.url);return `<tr class="${r.projectId?'':'doc-imp-warn'}"><td><input type="checkbox" data-di-inc="${i}" ${r.include?'checked':''}></td><td>${r.row}</td><td><select data-di-proj="${i}"><option value="">${r.projectText?`⚠ "${esc(r.projectText)}" tidak dikenali — pilih`:'Pilih proyek'}</option>${v31ProjectOptions(r.projectId)}</select></td><td><select data-di-cat="${i}">${docCategoryOptions(r.category)}</select></td><td><input data-di-title="${i}" value="${esc(r.title)}" placeholder="${esc(docLabel(r.category))}"></td><td><a href="${esc(r.url)}" target="_blank" rel="noopener">${inf.icon} ${esc(inf.label)}</a></td></tr>`;}).join('')}</tbody></table></div>`:'';
+    $$('[data-di-inc]').forEach(x=>x.onchange=()=>{rows[x.dataset.diInc].include=x.checked;draw();});
+    $$('[data-di-proj]').forEach(x=>x.onchange=()=>{rows[x.dataset.diProj].projectId=x.value;draw();});
+    $$('[data-di-cat]').forEach(x=>x.onchange=()=>{rows[x.dataset.diCat].category=x.value;});
+    $$('[data-di-title]').forEach(x=>x.oninput=()=>{rows[x.dataset.diTitle].title=x.value;});
+    if($('#docImpAll'))$('#docImpAll').onchange=e=>{rows.forEach(r=>r.include=e.target.checked);draw();};
+  };
+  let pastedMatrix=null,xlsxSheets=null;
+  const runPreview=(matrix)=>{const parsed=docBuildRows(matrix);state.docImport=parsed.rows.map(r=>({...r,include:Boolean(r.projectId),title:r.title||''}));draw();if(parsed.rows.length)toast(`Format terdeteksi: ${parsed.format}.`);else toast('Tidak ada link yang ditemukan. Pastikan baris judul ikut disalin.','err');};
+  $('#docPaste').addEventListener('paste',e=>{const html=e.clipboardData?.getData('text/html');if(html&&/<table/i.test(html)){const m=docHtmlToMatrix(html);if(m){pastedMatrix=m;setTimeout(()=>runPreview(pastedMatrix),30);}}else pastedMatrix=null;});
+  $('#docPaste').addEventListener('input',e=>{if(e.inputType&&e.inputType!=='insertFromPaste')pastedMatrix=null;});
+  const pickSheet=()=>{const sh=xlsxSheets[Number($('#docXlsxSheet').value)||0];if(sh)runPreview(sh.rows);};
+  $('#docXlsx').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{$('#docXlsxInfo').textContent='Membaca file…';xlsxSheets=(await docXlsxToMatrices(f)).filter(x=>x.rows.length);
+    const score=sh=>docBuildRows(sh.rows).rows.length;let best=0,bs=-1;xlsxSheets.forEach((sh,i)=>{const sc=score(sh);sh.count=sc;if(sc>bs){bs=sc;best=i;}});
+    const sel=$('#docXlsxSheet');sel.innerHTML=xlsxSheets.map((sh,i)=>`<option value="${i}" ${i===best?'selected':''}>${esc(sh.name)} (${sh.count} link)</option>`).join('');sel.classList.remove('hidden');sel.onchange=pickSheet;
+    $('#docXlsxInfo').textContent=`${f.name} — pilih sheet yang berisi daftar berkas.`;pickSheet();}catch(err){$('#docXlsxInfo').textContent='';toast(err.message,'err');}};
+  $('#docPreviewBtn').onclick=()=>{if(pastedMatrix){runPreview(pastedMatrix);return;}const parsed=docBuildRows(docParseTsv($('#docPaste').value));state.docImport=parsed.rows.map(r=>({...r,include:true,title:r.title||''}));draw();if(parsed.rows.length)toast(`Format terdeteksi: ${parsed.format}.`);};
+  state.docImport=null;
+}
+renderDocuments=async function(){
+  const q=state.selectedProjectId?`?projectId=${encodeURIComponent(state.selectedProjectId)}`:'';const r=await api('/api/documents'+q);const rows=r.documents||[];
+  const canAdd=canCollection('project_documents','create'),canEdit=canCollection('project_documents','update'),canDel=canCollection('project_documents','delete');
+  let core='';
+  if(state.selectedProjectId){const have=new Set(rows.filter(x=>String(x.data.projectId)===String(state.selectedProjectId)).map(x=>String(x.data.category||'').toUpperCase()));
+    const list=['CONTRACT','RAB_BASELINE','DED_FINAL','TIME_SCHEDULE'];const miss=list.filter(c=>!have.has(c));
+    core=`<div class="notice ${miss.length?'orange':'green'} doc-core"><b>Dokumen inti proyek ${miss.length?`— kurang ${miss.length}`:'— lengkap ✓'}</b><div class="doc-core-list">${list.map(c=>`<span class="pill ${have.has(c)?'green':'gray'}">${have.has(c)?'✓':'✗'} ${esc(docLabel(c))}</span>`).join('')}</div>${miss.length?'<small>Proyek tetap berstatus SETUP sampai keempat dokumen inti ada (boleh berupa link Google Drive).</small>':''}</div>`;}
+  const links=rows.filter(x=>x.data.externalUrl&&!x.data.objectKey).length;
+  $('#content').innerHTML=`${core}<div class="card"><div class="card-head"><div><h3>Dokumen Proyek</h3><p>${rows.length} dokumen · ${links} berupa link Google Drive · ${rows.length-links} file diunggah.</p></div>${canAdd?'<div class="card-actions"><button class="btn primary" id="docAddLink">🔗 Tambah Link Drive</button><button class="btn" id="docImport">⇪ Impor dari Google Sheet</button><button class="btn ghost" id="uploadDoc">⬆ Upload File</button></div>':''}</div><div class="table-wrap"><table class="table"><thead><tr><th>Proyek</th><th>Kategori</th><th>Judul</th><th>Sumber</th><th>Versi</th><th>Aksi</th></tr></thead><tbody>${rows.map(d=>`<tr><td>${esc(projectName(d.data.projectId))}</td><td><span class="pill blue">${esc(docLabel(d.data.category))}</span></td><td><b>${esc(d.data.title||d.data.originalName||'-')}</b>${d.data.notes?`<div class="tiny muted">${esc(d.data.notes)}</div>`:''}</td><td>${docSourceHtml(d.data)}</td><td>v${fmtNum(d.data.version||1,0)}</td><td class="actions"><button class="btn small primary" data-doc-open="${esc(d.id)}">Buka</button>${canEdit?`<button class="btn small" data-doc-edit="${esc(d.id)}">Edit</button>`:''}${canDel?`<button class="btn small danger" data-doc-delete="${esc(d.id)}">Hapus</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Belum ada dokumen.</td></tr>'}</tbody></table></div></div>`;
+  if($('#docAddLink'))$('#docAddLink').onclick=()=>openDocumentForm(null,{projectId:state.selectedProjectId,mode:'link'});
+  if($('#uploadDoc'))$('#uploadDoc').onclick=()=>openDocumentForm(null,{projectId:state.selectedProjectId});
+  if($('#docImport'))$('#docImport').onclick=openDocLinkImport;
+  $$('[data-doc-open]').forEach(b=>b.onclick=()=>docOpen(rows.find(x=>x.id===b.dataset.docOpen)));
+  $$('[data-doc-edit]').forEach(b=>b.onclick=()=>openDocumentForm(rows.find(x=>x.id===b.dataset.docEdit)));
+  $$('[data-doc-delete]').forEach(b=>b.onclick=async()=>{const row=rows.find(x=>x.id===b.dataset.docDelete);const isLink=row?.data.externalUrl&&!row?.data.objectKey;if(await confirmAsk(isLink?'Hapus link dokumen ini dari Nara? File di Google Drive TIDAK ikut terhapus.':'Hapus dokumen ini? File di server juga akan dihapus.')){await api(`/api/documents/${encodeURIComponent(b.dataset.docDelete)}`,{method:'DELETE'});toast('Dokumen dihapus.');await renderDocuments();}});
+  const card=$('#content > .card');if(card)qcPaginate(card,{pageSize:20,key:'docs'});
+};
