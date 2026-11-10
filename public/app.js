@@ -2462,3 +2462,148 @@ renderDocuments=async function(){
   $$('[data-doc-delete]').forEach(b=>b.onclick=async()=>{const row=rows.find(x=>x.id===b.dataset.docDelete);const isLink=row?.data.externalUrl&&!row?.data.objectKey;if(await confirmAsk(isLink?'Hapus link dokumen ini dari Nara? File di Google Drive TIDAK ikut terhapus.':'Hapus dokumen ini? File di server juga akan dihapus.')){await api(`/api/documents/${encodeURIComponent(b.dataset.docDelete)}`,{method:'DELETE'});toast('Dokumen dihapus.');await renderDocuments();}});
   const card=$('#content > .card');if(card)qcPaginate(card,{pageSize:20,key:'docs'});
 };
+
+/* ========================================================================== */
+/* NARA SYSTEM V3.4.37 — HALAMAN PROYEK                                       */
+/* Klik proyek di Dashboard / menu Proyek → satu halaman berisi semua data:   */
+/* Ringkasan · Dokumen · Anggaran · Progress · QC · Pembelian & Bayar         */
+/* ========================================================================== */
+TITLES.project_detail=['Detail Proyek','Semua data proyek dalam satu halaman.'];
+const PD_TABS=[
+  {key:'ringkasan',label:'Ringkasan',show:()=>true},
+  {key:'dokumen',label:'Dokumen',show:()=>canView('documents')},
+  {key:'anggaran',label:'Anggaran & Keuangan',show:()=>canView('finance')},
+  {key:'progress',label:'Progress',show:()=>canView('progress')},
+  {key:'qc',label:'QC',show:()=>canView('qc')},
+  {key:'pembelian',label:'Pembelian & Bayar',show:()=>canView('procurement')||canView('payments')}
+];
+function openProjectPage(id,tab){
+  if(!id)return;state.selectedProjectId=String(id);state.cache.clear();
+  try{populateProjectFilter();$('#globalProjectFilter').value=state.selectedProjectId;}catch(_){}
+  state.pdTab=tab||state.pdTab||'ringkasan';if(state.pdProject!==String(id)){state.pdTab=tab||'ringkasan';state.pdProject=String(id);}
+  state.view='project_detail';$$('#nav .nav-item').forEach(b=>b.classList.remove('active'));$('#sidebar')?.classList.remove('open');
+  window.scrollTo({top:0});renderView();
+}
+function pdGo(view){setView(view);}
+function pdField(label,val){return val?`<div class="pd-field"><span>${esc(label)}</span><b>${esc(val)}</b></div>`:'';}
+function pdMore(view,label){return canView(view)?`<button class="btn small ghost" data-pd-go="${view}" type="button">${esc(label||'Buka menu lengkap')} →</button>`:'';}
+async function renderProjectPage(){
+  const id=state.selectedProjectId;const proj=state.projects.find(p=>String(p.id)===String(id));
+  if(!id||!proj){state.view='dashboard';return renderView();}
+  const d=proj.data||{};const name=projectDisplayName(proj);
+  $('#pageTitle').textContent=name;$('#pageSubtitle').textContent='Semua data proyek dalam satu halaman.';
+  if(!state.dashboard?.projects)state.dashboard=await api('/api/dashboard').catch(()=>({projects:[]}));
+  const m=(state.dashboard.projects||[]).find(x=>String(x.id)===String(id))||{};
+  const tabs=PD_TABS.filter(t=>t.show());if(!tabs.some(t=>t.key===state.pdTab))state.pdTab='ringkasan';
+  const sm=employeeName(v31AssignedPm(id))||'-';
+  const pct=Math.max(0,Math.min(100,num(m.progress)));
+  $('#content').innerHTML=`<div class="pd-head card"><div class="pd-head-top"><button class="btn small ghost" id="pdBack" type="button">← Semua proyek</button><div class="pd-status">${statusPill(m.evaluatedStatus||d.status||'-')}${m.scheduleStatus?statusPill(m.scheduleStatus):''}</div></div>
+    <h2 class="pd-name">${esc(name)}</h2>
+    <div class="pd-fields">${pdField('Site Manager',sm)}${pdField('Owner / Client',d.owner||d.client||d.clientName)}${pdField('Lokasi',d.location||d.lokasi)}${pdField('Mulai',d.startDate?fmtDate(d.startDate):'')}${pdField('Target selesai',(d.endDate||d.targetFinish||d.targetDate)?fmtDate(d.endDate||d.targetFinish||d.targetDate):'')}${pdField('No. Kontrak',d.contractNo||d.noKontrak)}</div>
+    <div class="pd-progress"><div class="pd-progress-bar"><i style="width:${pct}%"></i></div><b>${fmtNum(pct)}%</b><span class="muted">progress aktual</span></div></div>
+    <div class="pd-tabs" role="tablist">${tabs.map(t=>`<button type="button" role="tab" class="${t.key===state.pdTab?'active':''}" data-pd-tab="${t.key}">${esc(t.label)}</button>`).join('')}</div>
+    <div id="pdBody"><div class="loading"><div class="spinner"></div>Memuat…</div></div>`;
+  $('#pdBack').onclick=()=>{state.selectedProjectId='';state.cache.clear();try{$('#globalProjectFilter').value='';}catch(_){}setView('dashboard');};
+  $$('[data-pd-tab]').forEach(b=>b.onclick=()=>{state.pdTab=b.dataset.pdTab;$$('[data-pd-tab]').forEach(x=>x.classList.toggle('active',x===b));pdRenderTab(proj,m);});
+  await pdRenderTab(proj,m);
+}
+async function pdRenderTab(proj,m){
+  const body=$('#pdBody');if(!body)return;const id=proj.id;const tab=state.pdTab;const seq=(state.pdSeq=(state.pdSeq||0)+1);
+  body.innerHTML='<div class="loading"><div class="spinner"></div>Memuat…</div>';
+  let html='';
+  try{
+    if(tab==='ringkasan')html=await pdRingkasan(proj,m);
+    else if(tab==='dokumen')html=await pdDokumen(proj);
+    else if(tab==='anggaran')html=await pdAnggaran(proj,m);
+    else if(tab==='progress')html=await pdProgress(proj,m);
+    else if(tab==='qc')html=await pdQc(proj,m);
+    else if(tab==='pembelian')html=await pdPembelian(proj);
+  }catch(e){html=`<div class="card"><div class="card-body"><b>Gagal memuat:</b> ${esc(e.message)}</div></div>`;}
+  if(seq!==state.pdSeq||state.view!=='project_detail')return;
+  body.innerHTML=html;
+  $$('[data-pd-go]',body).forEach(b=>b.onclick=()=>pdGo(b.dataset.pdGo));
+  $$('[data-pd-doc]',body).forEach(b=>b.onclick=()=>docOpen((state.pdDocs||[]).find(x=>x.id===b.dataset.pdDoc)));
+  if($('#pdAddLink'))$('#pdAddLink').onclick=()=>openDocumentForm(null,{projectId:id,mode:'link'});
+  if($('#pdTabLink'))$('#pdTabLink').onclick=()=>{state.pdTab='dokumen';renderProjectPage();};
+}
+async function pdRingkasan(proj,m){
+  const fin=canView('finance');const flow=await api(`/api/projects/${encodeURIComponent(proj.id)}/flow`).catch(()=>null);const e=flow?.evaluation;
+  const docs=canView('documents')?((await api(`/api/documents?projectId=${encodeURIComponent(proj.id)}`).catch(()=>({documents:[]}))).documents||[]):[];
+  const have=new Set(docs.map(x=>String(x.data.category||'').toUpperCase()));const core=['CONTRACT','RAB_BASELINE','DED_FINAL','TIME_SCHEDULE'];
+  const k1=`<div class="kpis">${kpi('Progress',`${fmtNum(m.progress)}%`,'blue')}${kpi('Schedule',esc(m.scheduleStatus||'-'),String(m.scheduleStatus).toUpperCase()==='DELAY'?'red':'green')}${kpi('Temuan QC terbuka',fmtNum(num(m.openQc)+num(m.openDefects),0),'orange')}${kpi('CCO pending',fmtNum(m.pendingCco,0),'purple')}</div>`;
+  const k2=fin?`<div class="kpis">${kpi('Nilai Kontrak',fmtRp(m.contract),'blue')}${kpi('Anggaran (HPP)',fmtRp(m.budget),'purple')}${kpi('Uang Masuk',fmtRp(m.income),'green')}${kpi('Uang Keluar',fmtRp(m.expense),'red')}${kpi('Sisa Anggaran',fmtRp(m.remainingBudget),num(m.remainingBudget)<0?'red':'green')}${kpi('Perkiraan Margin',`${fmtRp(m.marginForecast)} (${fmtNum(m.marginPercent)}%)`,num(m.marginForecast)<0?'red':'green')}</div>`:'';
+  const chart=(m.progressSeries||[]).length?`<div class="card"><div class="card-head"><div><h3>Kurva Progress</h3><p>Rencana vs aktual dari laporan progress.</p></div>${pdMore('progress','Buka Progress')}</div><div class="card-body">${progressChart(m.progressSeries)}</div></div>`:'';
+  const gate=e?`<div class="card"><div class="card-head"><div><h3>Tahap Proyek — ${esc(e.gate||e.status||'-')}</h3><p>Yang masih menghambat proyek naik ke tahap berikutnya.</p></div>${pdMore('flow','Buka Alur Proyek')}</div><div class="card-body"><div class="flow-strip pd-flow">${(e.flow||[]).map(x=>`<div class="flow-step ${x.done?'done':(x.code===e.status?'current':'')}"><b>${esc(x.label)}</b>${x.done?'✓ Selesai':x.code===e.status?'Sedang berjalan':'Belum'}</div>`).join('')}</div>${(e.blockers||[]).length?`<ul class="blockers">${e.blockers.slice(0,8).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<span class="pill green">Tidak ada hambatan</span>'}</div></div>`:'';
+  const coreHtml=canView('documents')?`<div class="card"><div class="card-head"><div><h3>Dokumen Inti</h3><p>${docs.length} dokumen tersimpan untuk proyek ini.</p></div><button class="btn small ghost" id="pdTabLink" type="button">Lihat semua dokumen →</button></div><div class="card-body"><div class="doc-core-list">${core.map(c=>`<span class="pill ${have.has(c)?'green':'gray'}">${have.has(c)?'✓':'✗'} ${esc(docLabel(c))}</span>`).join('')}</div></div></div>`:'';
+  return k1+k2+chart+gate+coreHtml;
+}
+async function pdDokumen(proj){
+  const r=await api(`/api/documents?projectId=${encodeURIComponent(proj.id)}`);const rows=r.documents||[];state.pdDocs=rows;
+  const groups={};rows.forEach(x=>{const c=String(x.data.category||'OTHER').toUpperCase();(groups[c]=groups[c]||[]).push(x);});
+  const order=[...DOC_CATEGORIES,...Object.keys(groups)].filter((c,i,a)=>a.indexOf(c)===i&&groups[c]);
+  const add=canCollection('project_documents','create')?'<button class="btn primary small" id="pdAddLink" type="button">🔗 Tambah Link Drive</button>':'';
+  return `<div class="card"><div class="card-head"><div><h3>Dokumen Proyek</h3><p>${rows.length} dokumen, dikelompokkan per kategori.</p></div><div class="card-actions">${add}${pdMore('documents','Kelola di menu Dokumen')}</div></div><div class="card-body pd-docs">${order.map(c=>`<div class="pd-doc-group"><h4>${esc(docLabel(c))} <span class="muted">(${groups[c].length})</span></h4>${groups[c].map(x=>`<button type="button" class="pd-doc" data-pd-doc="${esc(x.id)}"><span class="pd-doc-title">${esc(x.data.title||x.data.originalName||'-')}</span>${docSourceHtml(x.data)}</button>`).join('')}</div>`).join('')||'<div class="empty">Belum ada dokumen untuk proyek ini.</div>'}</div></div>`;
+}
+async function pdAnggaran(proj,m){
+  let fin=null;if(canView('finance')||canView('payments'))fin=await api(`/api/finance/summary?projectId=${encodeURIComponent(proj.id)}`).catch(()=>null);
+  const terms=canCollection('project_terms','read')?await loadCollection('project_terms',true).catch(()=>[]):[];
+  const t=fin?.totals||{};const pr=(fin?.projects||[])[0]||{};const cat=t.byCategory||{};const catMax=Math.max(1,...Object.values(cat).map(num));
+  const kp=`<div class="kpis">${kpi('Nilai Kontrak',fmtRp(pr.contractValue||m.contract),'blue')}${kpi('Anggaran (HPP)',fmtRp(m.budget),'purple')}${kpi('Uang Masuk',fmtRp(t.cashIn??m.income),'green')}${kpi('Uang Keluar',fmtRp(t.cashOut??m.expense),'red')}${kpi('Saldo Proyek',fmtRp(t.balance??(num(m.income)-num(m.expense))),num(t.balance??0)<0?'red':'green')}${kpi('Sisa Anggaran',fmtRp(m.remainingBudget),num(m.remainingBudget)<0?'red':'green')}${t.payablesInApproval!=null?kpi('Pengajuan bayar diproses',fmtRp(t.payablesInApproval),'orange'):''}${t.retentionHeldByClient!=null?kpi('Retensi ditahan client',fmtRp(t.retentionHeldByClient),'orange'):''}</div>`;
+  const used=num(m.budget)>0?Math.min(100,num(t.cashOut??m.expense)/num(m.budget)*100):0;
+  const bud=num(m.budget)>0?`<div class="card"><div class="card-head"><div><h3>Pemakaian Anggaran</h3><p>Uang keluar dibanding anggaran HPP.</p></div></div><div class="card-body"><div class="pd-progress"><div class="pd-progress-bar ${used>=100?'over':used>=85?'warn':''}"><i style="width:${used}%"></i></div><b>${fmtNum(used)}%</b><span class="muted">${fmtRp(t.cashOut??m.expense)} dari ${fmtRp(m.budget)}</span></div></div></div>`:'';
+  const catHtml=Object.keys(cat).length?`<div class="card"><div class="card-head"><div><h3>Pengeluaran per Kategori</h3><p>Pembayaran yang sudah dibayar Finance.</p></div>${pdMore('finance','Buka Keuangan')}</div><div class="card-body">${Object.entries(cat).map(([k,v])=>`<div class="pd-bar-row"><span>${esc({VENDOR:'Vendor',SUBKON:'Subkon',TUKANG:'Tukang',MATERIAL:'Material',OPERASIONAL:'Operasional'}[k]||k)}</span><div class="pd-bar"><i style="width:${num(v)/catMax*100}%"></i></div><b>${fmtRp(v)}</b></div>`).join('')}</div></div>`:'';
+  const termHtml=terms.length?`<div class="card"><div class="card-head"><div><h3>Termin Client</h3><p>Tagihan ke client dan status pembayarannya.</p></div>${pdMore('payments','Buka Pembayaran')}</div><div class="table-wrap"><table class="table"><thead><tr><th>Termin</th><th>Nilai</th><th>Status</th><th>Tanggal</th></tr></thead><tbody>${terms.sort((a,b)=>num(a.data.termNo)-num(b.data.termNo)).map(x=>`<tr><td><b>${esc(x.data.title||`Termin ${x.data.termNo||''}`)}</b></td><td class="num">${fmtRp(x.data.netAmount||x.data.amount)}</td><td>${statusPill(x.data.status||'PLANNED')}</td><td>${fmtDate(x.data.receivedAt||x.data.billedAt||x.data.dueDate||'')}</td></tr>`).join('')}</tbody></table></div></div>`:'';
+  return kp+bud+catHtml+termHtml;
+}
+async function pdProgress(proj,m){
+  const [daily,weekly,issues,workers]=await Promise.all(['daily_progress','weekly_progress','issues','daily_workers'].map(c=>canCollection(c,'read')?loadCollection(c,true).catch(()=>[]):Promise.resolve([])));
+  const wc=id=>workers.filter(x=>x.data.dailyProgressId===id).length||num(x0(id));const x0=id=>daily.find(x=>x.id===id)?.data?.manpower||0;
+  const byDate=(a,b)=>String(b.data.date||b.data.weekStart||'').localeCompare(String(a.data.date||a.data.weekStart||''));
+  const chart=(m.progressSeries||[]).length?`<div class="card"><div class="card-head"><div><h3>Kurva Progress</h3><p>Rencana vs aktual.</p></div></div><div class="card-body">${progressChart(m.progressSeries)}</div></div>`:'';
+  const dl=`<div class="card"><div class="card-head"><div><h3>Laporan Harian Terbaru</h3><p>${daily.length} laporan harian · ${weekly.length} laporan mingguan.</p></div>${pdMore('progress','Buka Progress')}</div><div class="table-wrap"><table class="table"><thead><tr><th>Tanggal</th><th>Pekerjaan</th><th>Aktual</th><th>Rencana</th><th>Tukang</th><th>Status</th></tr></thead><tbody>${daily.sort(byDate).slice(0,10).map(x=>`<tr><td>${fmtDate(x.data.date)}</td><td>${esc(x.data.work||x.data.workItem||x.data.activity||'-')}</td><td>${fmtNum(x.data.progress??x.data.actualProgress??0)}%</td><td>${fmtNum(x.data.planProgress??0)}%</td><td>${fmtNum(wc(x.id),0)}</td><td>${progressStatusPill(x.data.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Belum ada laporan harian.</td></tr>'}</tbody></table></div></div>`;
+  const openIss=issues.filter(x=>!/closed|selesai|done/i.test(String(x.data.status||'')));
+  const iss=openIss.length?`<div class="card"><div class="card-head"><div><h3>Kendala Lapangan Terbuka</h3><p>${openIss.length} kendala belum selesai.</p></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Kendala</th><th>PIC</th><th>Status</th></tr></thead><tbody>${openIss.slice(0,10).map(x=>`<tr><td>${esc(x.data.title||x.data.description||'-')}</td><td>${esc(employeeName(x.data.picUserId)||'-')}</td><td>${statusPill(x.data.status||'OPEN')}</td></tr>`).join('')}</tbody></table></div></div>`:'';
+  return chart+dl+iss;
+}
+async function pdQc(proj,m){
+  const defects=canCollection('defects','read')?await loadCollection('defects',true).catch(()=>[]):[];
+  const st=x=>String(x.data.status||'OPEN').toUpperCase();const lbl=s=>(typeof QC_STATUS_ID!=='undefined'&&QC_STATUS_ID[s])||s;
+  const cnt={};defects.forEach(x=>{const s=st(x);cnt[s]=(cnt[s]||0)+1;});
+  const open=defects.filter(x=>!['CLOSED','DONE','SELESAI'].includes(st(x)));
+  const k=`<div class="kpis">${kpi('Total temuan',fmtNum(defects.length,0),'blue')}${kpi('Belum selesai',fmtNum(open.length,0),'orange')}${kpi('Menunggu verifikasi',fmtNum(cnt['WAITING QC CHECK']||0,0),'purple')}${kpi('Selesai',fmtNum(defects.length-open.length,0),'green')}</div>`;
+  const tbl=`<div class="card"><div class="card-head"><div><h3>Temuan QC Belum Selesai</h3><p>Diurutkan dari deadline terdekat.</p></div>${pdMore('qc','Buka QC Dashboard')}</div><div class="table-wrap"><table class="table"><thead><tr><th>Temuan</th><th>Area</th><th>Tingkat</th><th>Deadline</th><th>Status</th></tr></thead><tbody>${open.sort((a,b)=>String(a.data.dueDate||'9').localeCompare(String(b.data.dueDate||'9'))).slice(0,15).map(x=>`<tr><td><b>${esc(x.data.title||x.data.description||x.data.item||'-')}</b></td><td>${esc(x.data.area||x.data.location||'-')}</td><td>${esc(x.data.severity||'-')}</td><td>${fmtDate(x.data.dueDate||'')}</td><td><span class="pill ${st(x)==='WAITING QC CHECK'?'purple':'orange'}">${esc(lbl(st(x)))}</span></td></tr>`).join('')||'<tr><td colspan="5" class="empty">Tidak ada temuan terbuka. 👍</td></tr>'}</tbody></table></div></div>`;
+  return k+tbl;
+}
+async function pdPembelian(proj){
+  const [prs,pos,pays]=await Promise.all([canCollection('procurement','read')?loadCollection('procurement',true).catch(()=>[]):[],canCollection('po','read')?loadCollection('po',true).catch(()=>[]):[],canCollection('partner_payments','read')?loadCollection('partner_payments',true).catch(()=>[]):[]]);
+  const prH=canView('procurement')?`<div class="card"><div class="card-head"><div><h3>Purchase Request (PR)</h3><p>${prs.length} PR.</p></div>${pdMore('procurement','Buka PR / Vendor')}</div><div class="table-wrap"><table class="table"><thead><tr><th>No. PR</th><th>Tanggal</th><th>Total HPP</th><th>Vendor Terpilih</th><th>Status</th></tr></thead><tbody>${prs.slice(0,10).map(x=>`<tr><td><b>${esc(x.data.prNumber||'-')}</b></td><td>${fmtDate(x.data.date)}</td><td class="num">${fmtRp(x.data.totalHpp)}</td><td>${esc(x.data.selectedVendorName||'-')}</td><td>${statusPill(x.data.status||'DRAFT')}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">Belum ada PR.</td></tr>'}</tbody></table></div></div>`:'';
+  const poH=`<div class="card"><div class="card-head"><div><h3>SPK / PO</h3><p>${pos.length} kontrak vendor/subkon.</p></div></div><div class="table-wrap"><table class="table"><thead><tr><th>No.</th><th>Vendor</th><th>Nilai</th><th>Status</th></tr></thead><tbody>${pos.slice(0,10).map(x=>`<tr><td><b>${esc(x.data.number||'-')}</b></td><td>${esc(x.data.vendor||x.data.partnerName||'-')}</td><td class="num">${fmtRp(x.data.amount)}</td><td>${statusPill(x.data.status||'DRAFT')}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Belum ada SPK/PO.</td></tr>'}</tbody></table></div></div>`;
+  const payH=canView('payments')?`<div class="card"><div class="card-head"><div><h3>Pembayaran ke Mitra</h3><p>${pays.length} pengajuan / pembayaran.</p></div>${pdMore('payments','Buka Pembayaran')}</div><div class="table-wrap"><table class="table"><thead><tr><th>Tanggal</th><th>Kategori</th><th>Penerima</th><th>Nilai</th><th>Status</th></tr></thead><tbody>${pays.sort((a,b)=>String(b.data.date||'').localeCompare(String(a.data.date||''))).slice(0,12).map(x=>`<tr><td>${fmtDate(x.data.date||x.data.paidAt||'')}</td><td>${esc(x.data.category||'-')}</td><td>${esc(x.data.partnerName||x.data.payeeName||x.data.vendor||'-')}</td><td class="num">${fmtRp(x.data.amount)}</td><td>${statusPill(x.data.status||'DRAFT')}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">Belum ada pembayaran.</td></tr>'}</tbody></table></div></div>`:'';
+  return prH+poH+payH;
+}
+/* Navigasi: semua kartu / baris proyek bisa diklik. */
+const v3437BaseRenderView=renderView;
+renderView=async function(...args){
+  if(state.view==='project_detail'){try{mobileBuildBottomNav();}catch(_){}try{await renderProjectPage();}catch(e){$('#content').innerHTML=`<div class="card"><div class="card-body"><b>Terjadi kendala</b><p class="muted">${esc(e.message)}</p></div></div>`;}try{mobileEnhance();}catch(_){}return;}
+  const out=await v3437BaseRenderView.apply(this,args);
+  try{pdMarkClickable();}catch(_){}
+  return out;
+};
+function pdMarkClickable(){
+  const content=$('#content');if(!content)return;
+  if(state.view==='dashboard'){
+    const rows=(state.dashboard?.projects||[]);const shown=state.selectedProjectId?rows.filter(x=>x.id===state.selectedProjectId):rows;
+    $$('.project-grid .project-card',content).forEach((c,i)=>{const r=shown[i];if(!r)return;c.dataset.openProject=r.id;c.tabIndex=0;c.setAttribute('role','button');if(!c.querySelector('.pd-open-hint'))c.insertAdjacentHTML('beforeend','<div class="pd-open-hint">Lihat detail proyek →</div>');});
+    const tbl=[...$$('.card',content)].find(c=>/Kontrol Semua Proyek/.test(c.querySelector('h3')?.textContent||''));
+    if(tbl)$$('tbody tr',tbl).forEach((tr,i)=>{const r=shown[i];if(r){tr.dataset.openProject=r.id;tr.classList.add('pd-row-link');}});
+  }
+}
+const v3437BaseRenderProjects=renderProjects;
+renderProjects=async function(...args){
+  const out=await v3437BaseRenderProjects.apply(this,args);
+  try{const rows=await loadCollection('projects');const trs=$$('#content table tbody tr');
+    trs.forEach((tr,i)=>{const r=rows[i];if(!r||tr.querySelector('td.empty'))return;tr.dataset.openProject=r.id;tr.classList.add('pd-row-link');const act=tr.querySelector('td.actions');if(act&&!act.querySelector('[data-open-project]'))act.insertAdjacentHTML('afterbegin',`<button class="btn small primary" type="button" data-open-project="${esc(r.id)}">Buka</button>`);});}catch(_){}
+  return out;
+};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-open-project]');if(!el||!el.closest('#content'))return;if(e.target.closest('a,input,select,textarea')||(e.target.closest('button')&&e.target.closest('button')!==el))return;e.preventDefault();openProjectPage(el.dataset.openProject);});
+document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;const el=e.target.closest?.('[data-open-project]');if(el&&el.closest('#content')){e.preventDefault();openProjectPage(el.dataset.openProject);}});
