@@ -1,3 +1,27 @@
+## V3.4.36 — Impor link dokumen dari sheet DATA PROYEK
+
+- Impor link kini bisa dari **file .xlsx** (Google Sheet → File → Download → Microsoft Excel): **hyperlink** di balik tulisan sel (mis. "Ada", "Vendor") ikut terbaca; sheet yang paling banyak berisi link dipilih otomatis.
+- **Tempel langsung dari Google Sheet** juga membaca hyperlink (dari versi HTML clipboard), tidak hanya tulisannya.
+- Baris judul dikenali otomatis walau ada baris catatan di atasnya (contoh: sheet DATA PROYEK, judul di baris 4).
+- Kolom peta/lokasi (Link Maps) dilewati; link Google Maps tidak dijadikan dokumen.
+- Nama proyek kembar (mis. "Sumur Bor" No 16 & No 46) dicocokkan memakai kolom **No** → "Sumur Bor (No 16)".
+- Kategori baru: **RAB HPP (internal)** dan **Laporan Progress**. Pemetaan judul kolom: SPK → Kontrak/SPK Client, RAB JUAL → RAB Baseline, Kurva S → Time Schedule, SPK Vendor → PO/SPK Vendor, SPK/RAB Adendum → Addendum/RAB CCO, Gambar → DED Final, PHO/FHO → BAST.
+- Link "Https://" (huruf besar) tetap terbaca. Baris yang proyeknya tidak dikenali tidak dicentang otomatis.
+
+## V3.4.35 — Dokumen berupa link Google Drive
+
+- Menu **Dokumen**: dokumen kini bisa berupa **link** (file Google Drive, folder Google Drive, Google Docs/Sheets/Slides, atau URL https lain) — file tetap di Drive, Nara hanya menyimpan link-nya. Upload file tetap tersedia.
+- Tombol **🔗 Tambah Link Drive**, **⇪ Impor dari Google Sheet**, **⬆ Upload File**. Tombol **Buka** membuka link langsung di Google Drive.
+- **Impor banyak link sekaligus**: salin tabel dari Google Sheet/Excel lalu tempel. Dua format dikenali otomatis:
+  - satu baris per dokumen (Proyek | Kategori | Judul | Link)
+  - satu baris per proyek (Proyek | Kontrak | RAB | DED | Time Schedule | Folder …, isi sel = link)
+  Proyek & kategori dikenali dari nama (bisa dikoreksi per baris), pratinjau sebelum disimpan, link duplikat dilewati, maks. 500 per simpan.
+- Link dengan kategori Kontrak / RAB Baseline / DED Final / Time Schedule dihitung sebagai **dokumen inti** → proyek otomatis keluar dari status SETUP.
+- Saat satu proyek dipilih, halaman Dokumen menampilkan kelengkapan 4 dokumen inti.
+- Kategori ditampilkan dalam bahasa Indonesia; daftar dokumen per halaman + pencarian.
+- Menghapus link di Nara tidak menghapus file di Google Drive.
+- API: `POST /api/documents/link`, `POST /api/documents/links/bulk`; `GET /api/documents/:id/file` mengarahkan (302) ke link.
+
 ## V3.4.34 — Tampilan HP
 
 - **Tabel otomatis menjadi kartu** di layar HP (≤640px): setiap baris tampil sebagai kartu dengan label kolom, sehingga tidak perlu geser ke samping dan tombol Aksi selalu terlihat. Berlaku untuk semua menu & tabel di dalam form.

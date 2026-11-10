@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.34 — Tampilan HP (tabel jadi kartu, navigasi bawah)
+ * Nara System V3.4.36 — Impor link dokumen: hyperlink sel, file .xlsx, kolom No
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.34";
+const APP_VERSION = "APP-V3.4.36";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -1032,6 +1032,12 @@ async function updateDocument(request, env, user, id) {
   }
   const merged = {...old.data,...patch};
   if (patch.category) merged.category = String(patch.category).toUpperCase();
+  if (Object.prototype.hasOwnProperty.call(patch,"externalUrl") && String(patch.externalUrl||"").trim()) {
+    const link=classifyDocLink(patch.externalUrl); if(link.error) return json({ok:false,message:link.error},400);
+    if (old.data.objectKey && env.FILES) { try { await env.FILES.delete(old.data.objectKey); } catch (_) {} }
+    Object.assign(merged,{storage:"LINK",externalUrl:link.url,linkType:link.linkType,originalName:link.label,mimeType:"text/uri-list",size:0,objectKey:""});
+    if (String(old.data.externalUrl||"")!==link.url) { merged.version=num(old.data.version||1)+1; merged.replacedAt=new Date().toISOString(); merged.replacedBy=user.name||user.username; }
+  } else if (Object.prototype.hasOwnProperty.call(patch,"externalUrl")) { delete merged.externalUrl; merged.externalUrl=old.data.externalUrl||""; }
   if (normalizeRole(user)==="drafter" && String(merged.category||"").toUpperCase()!=="AS_BUILT") return json({ok:false,message:"Drafter hanya dapat mengubah dokumen kategori AS_BUILT."},403);
   const deniedNew = await requireProjectAccess(env,user,merged.projectId); if (deniedNew) return deniedNew;
   if (newFile) {
@@ -1042,6 +1048,7 @@ async function updateDocument(request, env, user, id) {
     await env.FILES.put(key,newFile.stream(),{httpMetadata:{contentType:newFile.type || "application/octet-stream"}});
     if (old.data.objectKey) { try { await env.FILES.delete(old.data.objectKey); } catch (_) {} }
     merged.objectKey = key;
+    merged.storage = "R2"; merged.externalUrl = ""; merged.linkType = "";
     merged.originalName = newFile.name;
     merged.mimeType = newFile.type || "application/octet-stream";
     merged.size = newFile.size;
@@ -1065,11 +1072,68 @@ async function deleteDocument(env,user,id) {
   return json({ok:true});
 }
 
+// V3.4.35 — Dokumen berupa link (Google Drive file/folder, Google Docs/Sheets/Slides, atau URL https lain).
+function classifyDocLink(raw) {
+  const v=String(raw||"").trim();
+  if(!v) return {error:"Link wajib diisi."};
+  let u; try { u=new URL(v); } catch { return {error:"Link tidak valid. Salin link lengkap yang diawali https://"}; }
+  if(!["https:","http:"].includes(u.protocol)) return {error:"Link harus diawali https://"};
+  const host=u.hostname.toLowerCase(), path=u.pathname;
+  let linkType="URL", label="Link";
+  if(host.endsWith("drive.google.com")) {
+    if(/\/folders\//.test(path) || /\/drive\/(u\/\d+\/)?(my-drive|shared-drives)/.test(path)) { linkType="DRIVE_FOLDER"; label="Folder Google Drive"; }
+    else { linkType="DRIVE_FILE"; label="File Google Drive"; }
+  } else if(host.endsWith("docs.google.com")) {
+    const m=path.match(/^\/(document|spreadsheets|presentation|forms)\//); linkType="GOOGLE_DOC";
+    label={document:"Google Docs",spreadsheets:"Google Sheets",presentation:"Google Slides",forms:"Google Forms"}[m?.[1]]||"Google Docs";
+  }
+  return {url:u.toString(),linkType,label};
+}
+async function createDocumentLink(env,user,body) {
+  const projectId=String(body.projectId||"").trim();
+  if(!projectId) return {error:"Proyek wajib dipilih.",status:400};
+  const project=await getRecord(env,"projects",projectId); if(!project) return {error:"Proyek tidak ditemukan.",status:400};
+  if(!(await userCanAccessProject(env,user,projectId))) return {error:"Anda tidak ditugaskan pada proyek ini.",status:403};
+  const category=String(body.category||"OTHER").trim().toUpperCase().replace(/[^A-Z0-9_]/g,"_")||"OTHER";
+  if(normalizeRole(user)==="drafter") { if(category!=="AS_BUILT") return {error:"Drafter hanya dapat menambah dokumen kategori AS_BUILT.",status:403}; const a=await projectAssignment(env,projectId,"drafter"); if(String(a||"")!==String(user.id||"")) return {error:"Anda bukan Drafter yang ditugaskan pada proyek ini.",status:403}; }
+  const link=classifyDocLink(body.url); if(link.error) return {error:link.error,status:400};
+  const dupe=await rowsWhere(env,"project_documents","json_extract(data_json,'$.projectId')=? AND json_extract(data_json,'$.externalUrl')=?",[projectId,link.url]);
+  if(dupe.length && !body.allowDuplicate) return {error:`Link ini sudah tersimpan di proyek ${project.data.name||projectId} (${dupe[0].data.title||"-"}).`,status:409,duplicate:true};
+  const id=crypto.randomUUID();
+  const title=String(body.title||"").trim()||`${category} — ${link.label}`;
+  const data={projectId,category,title,notes:String(body.notes||""),relatedCollection:String(body.relatedCollection||""),relatedId:String(body.relatedId||""),
+    storage:"LINK",externalUrl:link.url,linkType:link.linkType,originalName:link.label,mimeType:"text/uri-list",size:0,
+    version:1,status:"ACTIVE",uploadedAt:new Date().toISOString(),uploadedBy:user.name||user.username,importBatch:String(body.importBatch||"")};
+  const rec=await upsertRecord(env,"project_documents",id,data,user);
+  return {rec};
+}
+async function documentLinkHandler(request,env,user) {
+  const body=await parseJson(request); if(!body) return json({ok:false,message:"Data tidak valid."},400);
+  const r=await createDocumentLink(env,user,body);
+  if(r.error) return json({ok:false,message:r.error,duplicate:Boolean(r.duplicate)},r.status||400);
+  await audit(env,user,"ADD_DOCUMENT_LINK","project_documents",r.rec.id,r.rec.data.projectId,{category:r.rec.data.category,title:r.rec.data.title});
+  return json({ok:true,document:r.rec},201);
+}
+async function documentLinksBulkHandler(request,env,user) {
+  const body=await parseJson(request); const rows=Array.isArray(body?.rows)?body.rows:null;
+  if(!rows||!rows.length) return json({ok:false,message:"Tidak ada baris untuk disimpan."},400);
+  if(rows.length>500) return json({ok:false,message:"Maksimal 500 link per sekali simpan."},400);
+  const batch=`DOCLINK-${new Date().toISOString().slice(0,19).replace(/[-:T]/g,"")}`;
+  let created=0,skipped=0; const errors=[];
+  for(let i=0;i<rows.length;i++){
+    const r=await createDocumentLink(env,user,{...rows[i],importBatch:batch});
+    if(r.rec) created++; else if(r.duplicate) skipped++; else errors.push({row:Number(rows[i].row)||i+1,message:r.error});
+  }
+  await audit(env,user,"IMPORT_DOCUMENT_LINKS","project_documents",batch,"",{created,skipped,errors:errors.length});
+  return json({ok:true,batch,created,skipped,errors});
+}
+
 async function downloadDocument(env,user,id) {
   const old = await getRecord(env,"project_documents",id);
   if (!old) return json({ok:false,message:"Dokumen tidak ditemukan."},404);
   const denied = await requireProjectAccess(env,user,old.data.projectId); if (denied) return denied;
   if (normalizeRole(user)==="drafter") { const assigned=await projectAssignment(env,old.data.projectId,"drafter"); if(String(assigned||"")!==String(user.id||"")) return json({ok:false,message:"Anda bukan Drafter yang ditugaskan pada proyek dokumen ini."},403); }
+  if (old.data.externalUrl && !old.data.objectKey) return Response.redirect(String(old.data.externalUrl),302);
   if (!env.FILES || !old.data.objectKey) return json({ok:false,message:"File tidak tersedia."},404);
   const obj = await env.FILES.get(old.data.objectKey);
   if (!obj) return json({ok:false,message:"File tidak ditemukan di R2."},404);
@@ -2274,7 +2338,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.34"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.36"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -3300,7 +3364,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.34-mobile"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.36-doc-links-xlsx"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3426,6 +3490,14 @@ async function handleRequest(request, env) {
     if (path === "/api/documents" && request.method === "POST") {
       if (collectionDenied(auth.user,"project_documents","create")) return json({ok:false,message:"Role ini tidak dapat upload dokumen."},403);
       return uploadDocument(request,env,auth.user);
+    }
+    if (path === "/api/documents/link" && request.method === "POST") {
+      if (collectionDenied(auth.user,"project_documents","create")) return json({ok:false,message:"Role ini tidak dapat menambah dokumen."},403);
+      return documentLinkHandler(request,env,auth.user);
+    }
+    if (path === "/api/documents/links/bulk" && request.method === "POST") {
+      if (collectionDenied(auth.user,"project_documents","create")) return json({ok:false,message:"Role ini tidak dapat menambah dokumen."},403);
+      return documentLinksBulkHandler(request,env,auth.user);
     }
     const docFileMatch = path.match(/^\/api\/documents\/([^/]+)\/file$/);
     if (docFileMatch && request.method === "GET") {
