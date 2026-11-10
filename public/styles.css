@@ -275,3 +275,105 @@ input:focus,select:focus,textarea:focus{border-color:#c48a7b;box-shadow:0 0 0 3p
 @media(max-width:760px){.qc-step-arrow{display:none}.qc-step{flex:1 1 45%}}
 .qc-mytasks{display:grid;gap:8px}.qc-mytask{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px}
 .qc-mytask-act{display:flex;gap:6px;flex:none}@media(max-width:600px){.qc-mytask{flex-direction:column}}
+
+/* V3.4.32 — tombol aksi tidak terpotong: turun ke baris berikutnya */
+.table td.actions{white-space:normal;min-width:190px}
+.table td.actions .btn{margin:2px 2px}
+
+/* V3.4.33 — hari kondisional rute QC */
+.qc-route-day.is-flex{border-color:#fdba74;background:#fffaf5}
+.qc-route-day.is-flex .qc-route-day-head{background:#fff3e6}
+.qc-route-flex{font-size:11.5px;color:#9a3412;background:#fff7ed;border:1px dashed #fdba74;border-radius:10px;padding:10px;margin:6px 0;line-height:1.45}
+.qc-route-flex.today-flex{font-size:12.5px;margin:0 0 10px}
+.qc-flex-start{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.qc-flex-start select{flex:1 1 220px;min-width:0;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:#fff;font-size:12.5px}
+
+/* ========================================================================== */
+/* V3.4.34 — Tampilan HP                                                      */
+/* ========================================================================== */
+.mobile-nav{display:none}
+@media(max-width:900px){
+  /* Header: judul satu baris, pilihan proyek selebar layar di baris kedua */
+  .topbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;position:sticky;top:0;z-index:40}
+  .page-heading{flex:1 1 0;min-width:0}
+  .page-heading h2,#pageTitle{font-size:18px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0}
+  .top-actions{order:3;flex:1 1 100%;margin-left:0;display:flex;gap:6px}
+  .top-actions select,#globalProjectFilter{flex:1 1 auto;width:100%;max-width:none;min-width:0}
+  /* Menu samping: lapisan gelap di belakang, ketuk untuk menutup */
+  .sidebar{z-index:60;box-shadow:0 0 40px rgba(0,0,0,.35)}
+  .sidebar.open+.main::after{content:"";position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:55}
+  .sidebar .nav-item{padding-top:11px;padding-bottom:11px}
+  /* Navigasi bawah */
+  .mobile-nav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:50;background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(16,24,40,.08);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+  .mobile-nav button{position:relative;flex:1 1 0;min-width:0;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:10px;color:#667085;font:inherit;cursor:pointer}
+  .mobile-nav button i{font-style:normal;font-size:17px;line-height:1.1;font-weight:700}
+  .mobile-nav button span{font-size:10.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .mobile-nav button.active{color:var(--brand,#b42318);background:#fef3f2}
+  .mobile-nav .mnav-badge{position:absolute;top:2px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#d92d20;color:#fff;font-size:10px;line-height:17px;text-align:center}
+  .mobile-nav .mnav-badge.hidden{display:none}
+  .main{padding-bottom:calc(66px + env(safe-area-inset-bottom))}
+  .toast-area{bottom:calc(74px + env(safe-area-inset-bottom))}
+}
+@media(max-width:640px){
+  /* Ukuran sentuh nyaman + cegah zoom otomatis iOS saat mengetik */
+  .btn{min-height:38px}
+  .btn.small{min-height:34px;padding:7px 11px;font-size:12px}
+  input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:16px}
+  input:not([type=checkbox]):not([type=radio]):not([type=file]),select{min-height:40px}
+  input[type=checkbox],input[type=radio]{width:18px;height:18px}
+  .card-actions{display:flex;flex-wrap:wrap;gap:6px;width:100%}
+  .card-actions .btn{flex:1 1 auto}
+  .card-head h3{font-size:15px}
+  /* Tabel → kartu */
+  .table-wrap:has(> table.m-cards){overflow:visible}
+  table.m-cards{display:block;font-size:13px}
+  table.m-cards thead{display:none}
+  table.m-cards tbody{display:block}
+  table.m-cards tr{display:block;margin:10px 10px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  table.m-cards tbody tr:hover{background:#fff}
+  table.m-cards td{display:grid;grid-template-columns:minmax(92px,38%) 1fr;gap:8px;align-items:start;padding:6px 0;border:0;border-bottom:1px dashed #eef0f3;text-align:left!important;white-space:normal!important;min-width:0!important;word-break:break-word}
+  table.m-cards td:last-child{border-bottom:0}
+  table.m-cards td::before{content:attr(data-label);color:#667085;font-size:11.5px;font-weight:600;line-height:1.35}
+  table.m-cards td.mc-first{font-size:14px;font-weight:700;color:#101828}
+  table.m-cards td.mc-nolabel,table.m-cards td.mc-full{display:block}
+  table.m-cards td.mc-nolabel::before,table.m-cards td.mc-full::before{content:none}
+  table.m-cards td.mc-full{text-align:center!important;border:0}
+  table.m-cards tr:has(> td.mc-full:only-child){border-style:dashed;box-shadow:none}
+  table.m-cards td.mc-check{display:flex;grid-template-columns:none;border-bottom:0;padding-bottom:0}
+  table.m-cards td.mc-check::before{content:none}
+  table.m-cards td.mc-actions{display:flex;flex-wrap:wrap;gap:6px;padding-top:10px;border-bottom:0}
+  table.m-cards td.mc-actions::before{content:none}
+  table.m-cards td.mc-actions:empty{display:none}
+  table.m-cards td.mc-actions .btn{margin:0;flex:1 1 auto;min-height:36px}
+  table.m-cards td .pill{justify-self:start}
+  /* Modal: lembar penuh dari bawah, tombol simpan selalu terlihat */
+  .modal-backdrop{padding:0;align-items:end;place-items:end stretch}
+  .modal,.modal.qc-continuous-modal,.report-modal{width:100%!important;max-width:100%;max-height:94dvh;border-radius:16px 16px 0 0}
+  .modal-head{padding:14px 16px}
+  .modal-body{padding:14px 16px;-webkit-overflow-scrolling:touch}
+  .modal-foot{padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+  .modal-foot .btn{flex:1 1 0;min-height:44px}
+  .confirm-box{width:calc(100% - 24px)}
+  .confirm-actions .btn{flex:1 1 0;min-height:44px}
+  /* Teks panjang & isi lebar tidak memaksa halaman melebar */
+  .content{overflow-x:hidden}
+  .content img,.content canvas,.content svg{max-width:100%}
+}
+@media(max-width:640px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .kpi{min-width:0}
+  .kpi .label,.kpi .value{min-width:0;overflow-wrap:anywhere}
+  .kpi .value{font-size:17px}
+}
+@media(max-width:640px){
+  .qc-pager-bar{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 10px}
+  .qc-pager-bar input,.qc-pager-bar select,.qc-pager-bar .qc-pager-info{grid-column:1/-1}
+  .qc-pager-bar .qc-pager-info{text-align:center}
+}
+@media(max-width:640px){
+  /* label di kiri (absolut), isi sel tetap utuh di kanan walau terdiri dari beberapa elemen */
+  table.m-cards td{display:block;position:relative;padding:7px 0 7px calc(38% + 10px);min-height:20px}
+  table.m-cards td::before{position:absolute;left:0;top:7px;width:38%;overflow-wrap:anywhere}
+  table.m-cards td.mc-nolabel,table.m-cards td.mc-full,table.m-cards td.mc-check{padding-left:0}
+  table.m-cards td.mc-actions{display:flex;padding-left:0}
+}

@@ -1235,6 +1235,10 @@ if(globalThis.KENDALI_TEST_MODE&&globalThis.__kendaliQa)Object.assign(globalThis
 /* ------------------------------------------------------------------ */
 const QC_ROUTE_DAYS=['','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
 const QC_ROUTE_DAYS_SHORT=['','Sen','Sel','Rab','Kam','Jum','Sab','Min'];
+/* V3.4.33 — Hari kondisional: QC bebas berkunjung ke proyek mana saja (tidak terikat rute). 5 = Jumat. */
+const QC_ROUTE_FLEX_DAYS=[5];
+const QC_ROUTE_FLEX_TEXT='Kondisional — QC bebas berkunjung ke proyek mana saja sesuai kebutuhan.';
+function qcRouteFlexStartHtml(){if(!cap('qcInspect'))return '';return `<div class="qc-flex-start"><select id="qcFlexProject" aria-label="Pilih proyek"><option value="">Pilih proyek yang dikunjungi…</option>${v31ProjectOptions(state.selectedProjectId||'')}</select><button class="btn small primary" id="qcFlexStart" type="button">Mulai Inspeksi</button></div>`;}
 function qcRouteLocalDate(d=new Date()){const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10);}
 function qcRouteTodayDow(){const g=new Date().getDay();return g===0?7:g;}
 function qcRouteDays(r){const raw=Array.isArray(r?.data?.days)?r.data.days:String(r?.data?.days??'').split(/[,;\s]+/);return [...new Set(raw.map(Number).filter(x=>Number.isInteger(x)&&x>=1&&x<=7))].sort((a,b)=>a-b);}
@@ -1257,12 +1261,13 @@ function qcRouteSectionHtml(){
   const activeAll=(state.qcRoutes||[]).filter(qcRouteActive);const projectsCovered=new Set(activeAll.map(r=>r.data.projectId)).size;const weeklyVisits=activeAll.reduce((a,r)=>a+qcRouteDays(r).length,0);
   const officers=v31RoleEmployees(['qc','koordinator_supporting']);
   const filterHtml=`<select id="qcRouteOfficer" class="qc-route-filter" aria-label="Filter petugas"><option value="">Semua petugas</option><option value="__team" ${f.officer==='__team'?'selected':''}>Tim QC (tanpa petugas khusus)</option>${officers.map(e=>`<option value="${esc(e.id)}" ${f.officer===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select><label class="check-line qc-route-inactive"><input type="checkbox" id="qcRouteShowInactive" ${f.showInactive?'checked':''}> Tampilkan nonaktif</label>`;
-  const week=[1,2,3,4,5,6,7].map(d=>{const list=byDay(d);return `<div class="qc-route-day ${d===dow?'today':''} ${list.length?'':'is-empty'}"><div class="qc-route-day-head"><b>${QC_ROUTE_DAYS[d]}</b>${d===dow?'<span class="pill blue">HARI INI</span>':''}<span class="qc-route-day-count">${list.filter(qcRouteActive).length} kunjungan</span></div><div class="qc-route-day-body">${list.map((r,i)=>qcRouteStopHtml(r,i)).join('')||'<div class="qc-route-empty">Tidak ada kunjungan</div>'}</div></div>`;}).join('');
-  return `<div class="card qc-route-card" id="qcRouteCard"><div class="card-head"><div><h3>Rute Kunjungan QC</h3><p>Jadwal kunjungan tetap mingguan — berulang setiap minggu sampai diedit, dinonaktifkan, atau dihapus.</p></div><div class="card-actions">${filterHtml}${cap('qcRouteManage')?'<button class="btn primary" id="qcRouteAdd" type="button">+ Tambah Kunjungan</button>':''}</div></div><div class="qc-route-summary"><div><b>${activeAll.length}</b><span>Titik rute aktif</span></div><div><b>${projectsCovered}</b><span>Proyek tercakup</span></div><div><b>${weeklyVisits}</b><span>Kunjungan / minggu</span></div><div><b>${visited}/${todayStops.length}</b><span>Hari ini sudah ada inspeksi</span></div></div><div class="qc-route-today"><div class="qc-route-today-head"><b>Rute hari ini · ${QC_ROUTE_DAYS[dow]}, ${fmtDate(qcRouteLocalDate())}</b><span class="muted">Urutan mengikuti nomor urut lalu jam.</span></div>${todayStops.length?`<div class="qc-route-path">${todayStops.map((r,i)=>qcRouteStopHtml(r,i,{today:true})).join('')}</div>`:'<div class="qc-route-empty">Tidak ada kunjungan QC terjadwal hari ini.</div>'}</div><div class="qc-route-week-label">Jadwal mingguan</div><div class="qc-route-week">${week}</div></div>`;
+  const week=[1,2,3,4,5,6,7].map(d=>{const list=byDay(d),flex=QC_ROUTE_FLEX_DAYS.includes(d);return `<div class="qc-route-day ${d===dow?'today':''} ${flex?'is-flex':''} ${list.length||flex?'':'is-empty'}"><div class="qc-route-day-head"><b>${QC_ROUTE_DAYS[d]}</b>${d===dow?'<span class="pill blue">HARI INI</span>':''}${flex?'<span class="pill orange">KONDISIONAL</span>':''}<span class="qc-route-day-count">${flex&&!list.filter(qcRouteActive).length?'Bebas lokasi':`${list.filter(qcRouteActive).length} kunjungan`}</span></div><div class="qc-route-day-body">${flex?`<div class="qc-route-flex">${QC_ROUTE_FLEX_TEXT}</div>`:''}${list.map((r,i)=>qcRouteStopHtml(r,i)).join('')||(flex?'':'<div class="qc-route-empty">Tidak ada kunjungan</div>')}</div></div>`;}).join('');
+  const flexToday=QC_ROUTE_FLEX_DAYS.includes(dow);
+  return `<div class="card qc-route-card" id="qcRouteCard"><div class="card-head"><div><h3>Rute Kunjungan QC</h3><p>Jadwal kunjungan tetap mingguan — berulang setiap minggu sampai diedit, dinonaktifkan, atau dihapus.</p></div><div class="card-actions">${filterHtml}${cap('qcRouteManage')?'<button class="btn primary" id="qcRouteAdd" type="button">+ Tambah Kunjungan</button>':''}</div></div><div class="qc-route-summary"><div><b>${activeAll.length}</b><span>Titik rute aktif</span></div><div><b>${projectsCovered}</b><span>Proyek tercakup</span></div><div><b>${weeklyVisits}</b><span>Kunjungan / minggu</span></div><div><b>${visited}/${todayStops.length}</b><span>Hari ini sudah ada inspeksi</span></div></div><div class="qc-route-today"><div class="qc-route-today-head"><b>Rute hari ini · ${QC_ROUTE_DAYS[dow]}, ${fmtDate(qcRouteLocalDate())}</b><span class="muted">Urutan mengikuti nomor urut lalu jam.</span></div>${flexToday?`<div class="qc-route-flex today-flex"><b>Hari ini kondisional.</b> QC bebas berkunjung ke proyek mana saja sesuai kebutuhan — pilih proyeknya lalu mulai inspeksi.${qcRouteFlexStartHtml()}</div>`:''}${todayStops.length?`<div class="qc-route-path">${todayStops.map((r,i)=>qcRouteStopHtml(r,i,{today:true})).join('')}</div>`:(flexToday?'':'<div class="qc-route-empty">Tidak ada kunjungan QC terjadwal hari ini.</div>')}</div><div class="qc-route-week-label">Jadwal mingguan</div><div class="qc-route-week">${week}</div></div>`;
 }
 function openQcRouteForm(row=null){
   const d=row?.data||{},days=row?qcRouteDays(row):[qcRouteTodayDow()],officers=v31RoleEmployees(['qc','koordinator_supporting']);
-  const html=`<div class="form-grid"><label class="span-2">Proyek tujuan<select name="projectId" required><option value="">Pilih proyek</option>${v31ProjectOptions(d.projectId||state.selectedProjectId||'')}</select></label><div class="span-2"><label>Hari kunjungan (berulang setiap minggu)</label><div class="qc-route-daypick">${[1,2,3,4,5,6,7].map(x=>`<label class="qc-route-daychip"><input type="checkbox" name="day" value="${x}" ${days.includes(x)?'checked':''}><span>${QC_ROUTE_DAYS_SHORT[x]}</span></label>`).join('')}</div></div><label>Jam kunjungan<input type="time" name="time" value="${esc(d.time||'')}"></label><label>Nomor urut di rute<input type="number" name="order" min="1" max="99" value="${esc(d.order||1)}" required></label><label>Perkiraan durasi (menit)<input type="number" name="durationMin" min="0" max="600" step="15" value="${esc(d.durationMin||'')}" placeholder="Opsional"></label><label>Petugas QC<select name="qcUserId"><option value="">Tim QC (siapa saja)</option>${officers.map(e=>`<option value="${esc(e.id)}" ${e.id===d.qcUserId?'selected':''}>${esc(e.name)} — ${esc(e.jabatan||e.role)}</option>`).join('')}</select></label><label class="span-2">Fokus pemeriksaan<input name="focus" value="${esc(d.focus||'')}" maxlength="300" placeholder="Contoh: Pembesian kolom lt.2, kerapian pasangan bata"></label><label class="span-2">Catatan / petunjuk lokasi<textarea name="notes" maxlength="1000" placeholder="Opsional">${esc(d.notes||'')}</textarea></label><label>Status<select name="status"><option value="ACTIVE" ${qcRouteActive(row||{data:{}})?'selected':''}>Aktif — berlaku terus</option><option value="INACTIVE" ${row&&!qcRouteActive(row)?'selected':''}>Nonaktif — disimpan, tidak tampil di rute</option></select></label></div>`;
+  const html=`<div class="form-grid"><label class="span-2">Proyek tujuan<select name="projectId" required><option value="">Pilih proyek</option>${v31ProjectOptions(d.projectId||state.selectedProjectId||'')}</select></label><div class="span-2"><label>Hari kunjungan (berulang setiap minggu)</label><div class="qc-route-daypick">${[1,2,3,4,5,6,7].map(x=>`<label class="qc-route-daychip"><input type="checkbox" name="day" value="${x}" ${days.includes(x)?'checked':''}><span>${QC_ROUTE_DAYS_SHORT[x]}${QC_ROUTE_FLEX_DAYS.includes(x)?'*':''}</span></label>`).join('')}</div><small class="muted">* ${QC_ROUTE_FLEX_DAYS.map(x=>QC_ROUTE_DAYS[x]).join(', ')} adalah hari kondisional (bebas lokasi) — tidak perlu dijadwalkan, kecuali ingin menetapkan kunjungan wajib.</small></div><label>Jam kunjungan<input type="time" name="time" value="${esc(d.time||'')}"></label><label>Nomor urut di rute<input type="number" name="order" min="1" max="99" value="${esc(d.order||1)}" required></label><label>Perkiraan durasi (menit)<input type="number" name="durationMin" min="0" max="600" step="15" value="${esc(d.durationMin||'')}" placeholder="Opsional"></label><label>Petugas QC<select name="qcUserId"><option value="">Tim QC (siapa saja)</option>${officers.map(e=>`<option value="${esc(e.id)}" ${e.id===d.qcUserId?'selected':''}>${esc(e.name)} — ${esc(e.jabatan||e.role)}</option>`).join('')}</select></label><label class="span-2">Fokus pemeriksaan<input name="focus" value="${esc(d.focus||'')}" maxlength="300" placeholder="Contoh: Pembesian kolom lt.2, kerapian pasangan bata"></label><label class="span-2">Catatan / petunjuk lokasi<textarea name="notes" maxlength="1000" placeholder="Opsional">${esc(d.notes||'')}</textarea></label><label>Status<select name="status"><option value="ACTIVE" ${qcRouteActive(row||{data:{}})?'selected':''}>Aktif — berlaku terus</option><option value="INACTIVE" ${row&&!qcRouteActive(row)?'selected':''}>Nonaktif — disimpan, tidak tampil di rute</option></select></label></div>`;
   openModal(row?'Edit Kunjungan QC':'Tambah Kunjungan QC','Titik rute berlaku setiap minggu pada hari yang dipilih.',html,async form=>{
     const daysSel=[...form.querySelectorAll('input[name="day"]:checked')].map(x=>Number(x.value));
     if(!daysSel.length)throw new Error('Pilih minimal satu hari kunjungan.');
@@ -1284,6 +1289,7 @@ function bindQcRouteSection(){
   $$('[data-qc-route-toggle]').forEach(b=>b.onclick=()=>toggleQcRoute(find(b.dataset.qcRouteToggle)));
   $$('[data-qc-route-delete]').forEach(b=>b.onclick=()=>deleteQcRoute(find(b.dataset.qcRouteDelete)));
   $$('[data-qc-route-inspect]').forEach(b=>b.onclick=()=>startQcFromRoute(find(b.dataset.qcRouteInspect)));
+  if($('#qcFlexStart'))$('#qcFlexStart').onclick=async()=>{const pid=$('#qcFlexProject')?.value;if(!pid){toast('Pilih proyek yang dikunjungi terlebih dahulu.','err');return;}try{const r=await api('/api/qc/sessions',{method:'POST',body:{projectId:pid,date:qcRouteLocalDate(),note:`Kunjungan kondisional (${QC_ROUTE_DAYS[qcRouteTodayDow()]})`}});toast(r.continued?'Melanjutkan catatan inspeksi proyek ini.':'Catatan inspeksi QC dibuat.');await openQcContinuousSession(r.id);}catch(e){toast(e.message,'err');}};
 }
 const v3416PrevRenderQc=renderQc;
 renderQc=async function(){
@@ -2128,4 +2134,145 @@ renderQc=async function(){
   if(temuan)qcPaginate(temuan,{pageSize:20,statusFilter:true,defaultStatus:'__open',key:'temuan'});
   if(insp)qcPaginate(insp,{pageSize:15,statusFilter:false,key:'inspeksi'});
   if(perProject)qcPaginate(perProject,{pageSize:10,key:'perproyek'});if(smPerf)qcPaginate(smPerf,{pageSize:10,key:'sm'});if(attention)qcPaginate(attention,{pageSize:10,key:'perhatian'});
+};
+
+/* ========================================================================== */
+/* NARA SYSTEM V3.4.32 — PR / VENDOR: EDIT & HAPUS                            */
+/* ========================================================================== */
+function v3432PrIsMine(r){return String(r.data.projectManagerUserId||v31AssignedPm(r.data.projectId)||'')===String(state.user?.id||'');}
+function v3432IsHead(){return v34RoleCan('manager_operasional','head_unit_bisnis','administrator','direktur');}
+function v3432CanDeletePr(r){
+  if(!canCollection('procurement','delete'))return false;
+  const s=String(r.data.status||'DRAFT').toUpperCase();
+  if(state.access?.roleKey==='site_manager')return v3432PrIsMine(r)&&['DRAFT','REJECTED'].includes(s);
+  return true;
+}
+const v3432BasePrActions=v31PrActions;
+v31PrActions=function(r){
+  let x=v3432BasePrActions(r);
+  const s=String(r.data.status||'DRAFT').toUpperCase();
+  if(!x.includes('data-pr-edit=')&&v3432IsHead()&&canCollection('procurement','update'))x+=`<button class="btn small" data-pr-edit="${esc(r.id)}">Edit</button>`;
+  if(v3432CanDeletePr(r))x+=`<button class="btn small danger" data-pr-del="${esc(r.id)}" data-pr-label="${esc(r.data.prNumber||'PR')}" data-has-po="${r.data.poId?'1':''}">Hapus</button>`;
+  return x;
+};
+const v3432BasePoTable=poTable;
+poTable=function(rows){
+  let html=v3432BasePoTable(rows);
+  if(!canCollection('po','delete'))return html;
+  // Semua role yang boleh menghapus juga boleh mengedit, jadi tombol Hapus ditempel setelah tombol Edit.
+  rows.forEach(r=>{
+    const edit=`<button class="btn small" data-edit="po" data-id="${esc(r.id)}">Edit</button>`;
+    html=html.replace(edit,edit+`<button class="btn small danger" data-po-del="${esc(r.id)}" data-po-label="${esc(r.data.number||'SPK/PO')}" data-from-pr="${r.data.prId?'1':''}">Hapus</button>`);
+  });
+  return html;
+};
+const v3432BaseRenderProcurement=renderProcurement;
+renderProcurement=async function(){
+  await v3432BaseRenderProcurement();
+  $$('[data-pr-del]').forEach(b=>b.onclick=async()=>{
+    if(b.dataset.hasPo){toast(`PR ${b.dataset.prLabel} sudah memiliki SPK/PO. Hapus SPK/PO-nya terlebih dahulu di tabel PO / SPK.`,'err');return;}
+    if(!await confirmAsk(`Hapus Purchase Request ${b.dataset.prLabel}? Data dan tugas terkait akan dihapus permanen.`))return;
+    try{await api(`/api/records/procurement/${encodeURIComponent(b.dataset.prDel)}`,{method:'DELETE'});toast('Purchase Request dihapus.');state.cache.clear();await renderProcurement();await refreshTaskBadge();}catch(e){toast(e.message,'err');}
+  });
+  $$('[data-po-del]').forEach(b=>b.onclick=async()=>{
+    const extra=b.dataset.fromPr?' PR terkait akan kembali ke status "Vendor disetujui" agar Admin Teknik dapat membuat SPK/PO baru.':'';
+    if(!await confirmAsk(`Hapus SPK/PO ${b.dataset.poLabel}?${extra}`))return;
+    try{await api(`/api/records/po/${encodeURIComponent(b.dataset.poDel)}`,{method:'DELETE'});toast('SPK/PO dihapus.');state.cache.clear();await renderProcurement();await refreshTaskBadge();}catch(e){toast(e.message,'err');}
+  });
+};
+
+/* ========================================================================== */
+/* NARA SYSTEM V3.4.34 — TAMPILAN HP                                          */
+/* - Tabel otomatis menjadi kartu di layar kecil (label kolom di tiap baris). */
+/* - Navigasi bawah: Beranda · Tugas · menu utama per jabatan · Menu.         */
+/* - Ketuk di luar menu samping untuk menutup.                                */
+/* ========================================================================== */
+const MOBILE_FAV={
+  site_manager:['progress','qc'],qc:['qc','qc_archive'],koordinator_supporting:['qc','qc_archive'],
+  finance:['finance','payments'],manager_operasional:['projects','payments'],head_unit_bisnis:['projects','finance'],
+  direktur:['projects','finance'],administrator:['projects','finance'],admin_teknik:['procurement','cco'],
+  koordinator_engineering:['opname','asbuilt'],qs:['opname','projects'],drafter:['asbuilt','projects'],
+  procurement:['procurement','payments'],kepala_ati:['ati','projects'],estimator:['projects','documents'],mep_engineer:['qc','projects']
+};
+const MOBILE_LABEL={dashboard:['▦','Beranda'],tasks:['✓','Tugas'],projects:['▣','Proyek'],finance:['Rp','Keuangan'],payments:['⇄','Bayar'],
+  directory:['☷','Mitra'],fund_requests:['↗','Dana'],progress:['⌁','Progress'],opname:['▤','QS'],asbuilt:['▥','As-Built'],qc:['✓','QC'],
+  qc_archive:['▤','Arsip QC'],cco:['±','CCO'],procurement:['◫','PR'],ati:['♜','ATI'],documents:['⌑','Dokumen'],flow:['→','Alur'],
+  closeout:['●','Close-Out'],employees:['♙','Karyawan'],master:['⚙','Master'],audit:['☰','Audit'],public_info:['◎','Publik']};
+function mobileNavVisible(v){const b=document.querySelector(`#nav [data-view="${v}"]`);return Boolean(b&&!b.classList.contains('hidden')&&b.style.display!=='none'&&canView(v));}
+function mobileBuildBottomNav(){
+  const app=$('#app');if(!app||!state.access)return;
+  const role=state.access.roleKey||'';
+  let views=['dashboard','tasks',...(MOBILE_FAV[role]||[])].filter(mobileNavVisible);
+  if(views.length<4){const extra=$$('#nav .nav-item').map(b=>b.dataset.view).filter(v=>v&&!views.includes(v)&&mobileNavVisible(v));views=[...views,...extra].slice(0,4);}
+  views=[...new Set(views)].slice(0,4);
+  const key=role+'|'+views.join(',');
+  let bar=$('#mobileNav');
+  if(!bar||bar.dataset.key!==key){
+    if(bar)bar.remove();
+    bar=document.createElement('nav');bar.id='mobileNav';bar.className='mobile-nav';bar.dataset.key=key;bar.setAttribute('aria-label','Navigasi cepat');
+    bar.innerHTML=views.map(v=>{const [ic,lb]=MOBILE_LABEL[v]||['•',v];return `<button type="button" data-mnav="${v}"><i>${ic}</i><span>${lb}</span>${v==='tasks'?'<b class="mnav-badge hidden" id="mobileTaskBadge">0</b>':''}</button>`;}).join('')+`<button type="button" data-mnav="__menu"><i>☰</i><span>Menu</span></button>`;
+    app.appendChild(bar);
+    bar.querySelectorAll('[data-mnav]').forEach(b=>b.onclick=()=>{const v=b.dataset.mnav;if(v==='__menu'){$('#sidebar').classList.toggle('open');return;}if(v===state.view){window.scrollTo({top:0,behavior:'smooth'});return;}setView(v);window.scrollTo({top:0});});
+  }
+  bar.querySelectorAll('[data-mnav]').forEach(b=>b.classList.toggle('active',b.dataset.mnav===state.view));
+  mobileSyncBadge();
+}
+function mobileSyncBadge(){const src=$('#taskBadge'),dst=$('#mobileTaskBadge');if(!src||!dst)return;dst.textContent=src.textContent;dst.classList.toggle('hidden',src.classList.contains('hidden')||!Number(src.textContent));}
+/* Tabel → kartu (CSS hanya aktif di layar kecil). */
+function mobileTableLabels(table){
+  const headRow=table.tHead?.rows?.[table.tHead.rows.length-1];if(!headRow)return null;
+  const labels=[];[...headRow.cells].forEach(th=>{const span=Number(th.colSpan)||1;const t=(th.textContent||'').trim();for(let i=0;i<span;i++)labels.push(t);});
+  return labels;
+}
+function mobileCardifyTable(table){
+  if(table.dataset.mcards==='off')return;
+  const labels=mobileTableLabels(table);if(!labels||labels.length<3)return;
+  table.classList.add('m-cards');
+  [...table.tBodies].forEach(tb=>[...tb.rows].forEach(tr=>{
+    if(tr.dataset.mc==='1'&&tr.cells.length&&tr.cells[0].hasAttribute('data-label'))return;
+    let col=0;
+    [...tr.cells].forEach((td,i)=>{
+      const span=Number(td.colSpan)||1;const lb=labels[col]||'';col+=span;
+      if(span>=Math.max(3,labels.length-1)){td.classList.add('mc-full');return;}
+      td.setAttribute('data-label',lb);
+      const hasBtn=td.querySelector('button,a.btn');const onlyCheck=td.querySelector('input[type=checkbox]')&&!(td.textContent||'').trim();
+      if(onlyCheck)td.classList.add('mc-check');
+      else if(td.classList.contains('actions')||(/^aksi$/i.test(lb))||(!lb&&hasBtn))td.classList.add('mc-actions');
+      else if(!lb)td.classList.add('mc-nolabel');
+      if(i===0&&!onlyCheck)td.classList.add('mc-first');
+    });
+    tr.dataset.mc='1';
+  }));
+}
+let mobileTimer=0;
+function mobileEnhance(){clearTimeout(mobileTimer);mobileTimer=setTimeout(()=>{document.querySelectorAll('#content table, #modalForm table').forEach(mobileCardifyTable);mobileSyncBadge();},40);}
+(function mobileInit(){
+  try{
+    const mo=new MutationObserver(muts=>{for(const m of muts){if(m.addedNodes.length){mobileEnhance();break;}}});
+    const start=()=>{const c=$('#content'),f=$('#modalForm');if(c)mo.observe(c,{childList:true,subtree:true});if(f)mo.observe(f,{childList:true,subtree:true});const tb=$('#taskBadge');if(tb)new MutationObserver(mobileSyncBadge).observe(tb,{childList:true,attributes:true,characterData:true,subtree:true});};
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+    // Ketuk area gelap di luar menu samping → tutup menu.
+    document.addEventListener('click',e=>{const sb=$('#sidebar');if(!sb||!sb.classList.contains('open'))return;if(e.target.closest('#sidebar')||e.target.closest('#burger')||e.target.closest('[data-mnav="__menu"]'))return;sb.classList.remove('open');},true);
+  }catch(_){}
+})();
+const v3434BaseRenderView=renderView;
+renderView=async function(...args){
+  try{mobileBuildBottomNav();}catch(_){}
+  const out=await v3434BaseRenderView.apply(this,args);
+  try{mobileBuildBottomNav();mobileEnhance();}catch(_){}
+  return out;
+};
+/* V3.4.34 — Tugas Saya: daftar panjang dibagi per halaman + pencarian (nyaman di HP dan desktop). */
+const v3434BaseRenderTasks=renderTasks;
+renderTasks=async function(...args){
+  const out=await v3434BaseRenderTasks.apply(this,args);
+  try{
+    const scope=state.v34TaskScope||'mine';
+    $$('#content > .card').forEach(card=>{
+      const t=card.querySelector('h3')?.textContent.trim()||'';if(card.querySelector('.qc-pager-bar'))return;
+      if(/Menunggu Tindakan Anda|Semua Workflow Aktif/.test(t))qcPaginate(card,{pageSize:innerWidth<640?8:15,statusFilter:true,key:`tasks-${scope}`});
+      else if(/Riwayat Tugas/.test(t))qcPaginate(card,{pageSize:10,key:'tasks-history'});
+    });
+  }catch(_){}
+  return out;
 };
