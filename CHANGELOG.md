@@ -1,3 +1,11 @@
+## V3.4.38 — Rapikan alur
+
+- **Pengajuan Dana khusus operasional & kas kecil**: kategori Operasional, Transport/BBM, Konsumsi, Alat Kecil, ATK/Administrasi, Lembur, Perizinan/Retribusi, Lainnya. Material, upah tukang, vendor, dan subkon ditolak dengan arahan ke **Pembayaran Proyek** (data lama tetap aman). Halaman diberi penjelasan + tombol ke Pembayaran Proyek.
+- **Persetujuan Pengajuan Dana dipisah**: yang menyetujui Head of Operational (atau Head Unit Bisnis / Direktur / Administrator); **Finance hanya membayar** dan dapat **mengembalikan** pengajuan yang sudah disetujui bila ada masalah. Pengajuan milik sendiri tidak bisa disetujui sendiri; pengajuan Head of Operational otomatis masuk tugas Head Unit Bisnis.
+- **PR Diterima → tombol "Ajukan Pembayaran"**: langsung membuka form Pembayaran Vendor/Subkon dengan SPK terkait sudah terpilih. Bila SPK belum diatur mitra & terminnya, muncul arahan untuk melengkapinya.
+- **Proyek lama**: centang di form proyek atau sekaligus lewat tombol **Tandai Proyek Lama** di menu Proyek (ada "Centang semua yang SETUP"). Untuk proyek lama, dokumen tidak menahan status; status mengikuti progress, QC, dan keuangan. Label "Proyek lama" tampil di daftar & halaman proyek.
+- Hambatan status proyek ditulis dalam bahasa Indonesia (mis. "Dokumen DED Final (Gambar) belum ada").
+
 ## V3.4.37 — Halaman Proyek
 
 - Kartu proyek di **Dashboard**, baris tabel **Kontrol Semua Proyek**, dan tombol **Buka** di menu **Proyek** kini bisa diklik → membuka **halaman proyek** berisi semua data proyek tersebut, tanpa perlu memilih proyek di filter atas.

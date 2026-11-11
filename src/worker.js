@@ -1,9 +1,9 @@
 /**
- * Nara System V3.4.37 — Halaman Proyek (klik proyek di Dashboard → semua data proyek)
+ * Nara System V3.4.38 — Rapikan alur: Pengajuan Dana operasional, approve Head Ops, PR→Bayar, Proyek lama
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.37";
+const APP_VERSION = "APP-V3.4.38";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -25,6 +25,7 @@ const DOC_PRECON = ["PCM", "MC0"];
 const DOC_PHO = ["PHO_BAST", "AS_BUILT"];
 const DOC_FHO = ["FHO_BAST"];
 const DOC_FIN = ["FINAL_RECONCILIATION"];
+const DOC_NAME_ID = {CONTRACT:"Kontrak / SPK Client",RAB_BASELINE:"RAB Baseline",DED_FINAL:"DED Final (Gambar)",TIME_SCHEDULE:"Time Schedule / Kurva S",PCM:"PCM",MC0:"MC-0",PHO_BAST:"BAST / PHO",AS_BUILT:"As-Built",FHO_BAST:"BAST / FHO",FINAL_RECONCILIATION:"Rekonsiliasi Akhir"};
 
 
 const ROLE_LABELS = {
@@ -273,7 +274,7 @@ function buildAccess(user) {
       ccoAdmin: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
       ccoQs: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","qs"]),
       ccoEscalation: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
-      financeApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","finance"]),
+      financeApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       financePay: roleIn(user,["administrator","direktur","head_unit_bisnis","finance"]),
       partnerPaymentCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","site_manager"]),
       partnerPaymentOpsApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
@@ -885,27 +886,30 @@ function evaluateProject(projectRow, all) {
   const m = computeProjectMetrics(projectRow,all);
   const docs = docSetFor(projectRow.id,all);
   const missing = arr => arr.filter(x => !docs.has(x));
-  const coreMissing = missing(DOC_CORE);
-  const preconMissing = missing(DOC_PRECON);
-  const phoMissing = missing(["PHO_BAST"]);
+  // V3.4.38 — Proyek lama: dokumen tidak menjadi syarat gate (status mengikuti progress, QC, dan keuangan).
+  const legacyProject = truthy(p.legacyProject);
+  const coreMissing = legacyProject ? [] : missing(DOC_CORE);
+  const preconMissing = legacyProject ? [] : missing(DOC_PRECON);
+  const phoMissing = legacyProject ? [] : missing(["PHO_BAST"]);
   const asBuiltRows=all.filter(r=>r.collection==="as_built_progress"&&String(r.data.projectId||"")===String(projectRow.id));
   const asBuiltApproved=asBuiltRows.some(r=>String(r.data.status||"").toUpperCase()==="APPROVED");
   // Backward compatibility: proyek lama tanpa tracker As-Built tetap boleh memakai dokumen AS_BUILT legacy.
-  if(asBuiltRows.length ? !asBuiltApproved : !docs.has("AS_BUILT")) phoMissing.push("AS_BUILT");
+  if(!legacyProject && (asBuiltRows.length ? !asBuiltApproved : !docs.has("AS_BUILT"))) phoMissing.push("AS_BUILT");
   const qcRequired = p.qcRequired === undefined ? true : truthy(p.qcRequired);
   const qcChecklistMissing = qcRequired && m.qcTotalItems === 0;
   const retentionRequired = truthy(p.retentionRequired ?? p.retensiRequired ?? p.retention_required);
   const fhoRequired = truthy(p.fhoRequired) || retentionRequired;
   const retentionRows = all.filter(r => r.collection === "retention" && String(r.data.projectId || "") === projectRow.id);
   const retentionOpen = retentionRequired && (!retentionRows.length || retentionRows.some(r => activeLike(r.data.status)));
-  const fhoMissing = fhoRequired ? missing(DOC_FHO) : [];
-  const finMissing = missing(DOC_FIN);
+  const fhoMissing = fhoRequired && !legacyProject ? missing(DOC_FHO) : [];
+  const finMissing = legacyProject ? [] : missing(DOC_FIN);
   let status = "CLOSED";
   let gate = "Project Closed";
   let blockers = [];
 
-  if (coreMissing.length) { status="SETUP"; gate="Project Setup"; blockers=coreMissing.map(x=>`Dokumen ${x} belum ada`); }
-  else if (preconMissing.length) { status="PRECON"; gate="Pre-Construction"; blockers=preconMissing.map(x=>`Dokumen ${x} belum ada`); }
+  const docName = x => DOC_NAME_ID[x] || x;
+  if (coreMissing.length) { status="SETUP"; gate="Project Setup"; blockers=coreMissing.map(x=>`Dokumen ${docName(x)} belum ada`); }
+  else if (preconMissing.length) { status="PRECON"; gate="Pre-Construction"; blockers=preconMissing.map(x=>`Dokumen ${docName(x)} belum ada`); }
   else if (m.progress <= 0) { status="MOBILIZATION"; gate="Mobilisasi"; blockers=["Progress pelaksanaan belum dimulai"]; }
   else if (m.progress < 100) { status="EXECUTION"; gate="Pelaksanaan"; blockers=[`Progress ${m.progress.toFixed(1)}%`]; }
   else if (qcChecklistMissing || m.openQc > 0 || m.openDefects > 0 || m.openIssues > 0 || phoMissing.length) {
@@ -913,7 +917,7 @@ function evaluateProject(projectRow, all) {
     blockers=[...(qcChecklistMissing?["Checklist item pekerjaan QC belum disiapkan/sinkron dari RAB"]:[]),...(m.qcUninspected? [`${m.qcUninspected} item QC wajib belum pernah diinspeksi`]:[]),...(m.openQc-m.qcUninspected>0? [`${m.openQc-m.qcUninspected} item QC latest result belum PASS`]:[]),...(m.openDefects? [`${m.openDefects} defect masih terbuka`]:[]),...(m.openIssues? [`${m.openIssues} issue/corrective action masih terbuka`]:[]),...phoMissing.map(x=>`Dokumen ${x} belum ada`)];
   }
   else if (retentionOpen) { status="RETENTION"; gate="Retensi / Masa Pemeliharaan"; blockers=["Retensi belum selesai/released"]; }
-  else if (fhoMissing.length) { status="FHO"; gate="FHO"; blockers=fhoMissing.map(x=>`Dokumen ${x} belum ada`); }
+  else if (fhoMissing.length) { status="FHO"; gate="FHO"; blockers=fhoMissing.map(x=>`Dokumen ${docName(x)} belum ada`); }
   else if (m.receivable > 0 || m.payable > 0 || m.pendingCco > 0 || m.pendingApprovals > 0 || m.openCloseout > 0 || finMissing.length) {
     status="FINANCIAL_CLOSE"; gate="Financial Close-Out";
     blockers=[...(m.receivable>0?[`Piutang tersisa ${m.receivable}`]:[]),...(m.payable>0?[`Hutang tersisa ${m.payable}`]:[]),...(m.pendingCco>0?[`${m.pendingCco} CCO belum closed`]:[]),...(m.pendingApprovals>0?[`${m.pendingApprovals} approval/payment request belum selesai`]:[]),...(m.openCloseout>0?[`${m.openCloseout} checklist close-out belum selesai`]:[]),...finMissing.map(x=>`Dokumen ${x} belum ada`)];
@@ -1275,7 +1279,7 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
   }
   if(collection==="payment_requests"){
     if(["DRAFT","REJECTED"].includes(status)) return mk("FUND_REQUESTER","Pengajuan Dana", "Pengaju melengkapi lalu mengirim pengajuan","Ajukan Dana",d.requesterUserId,"",{priority:"NORMAL"});
-    if(status==="PENDING") return mk("FUND_APPROVAL","Approval Pengajuan Dana", "Head of Operational memeriksa kebutuhan dana","Approve / Reject","","manager_operasional");
+    if(status==="PENDING") { const rq=await employeeRoleKey(env,d.requesterUserId); return rq==="manager_operasional" ? mk("FUND_APPROVAL","Approval Pengajuan Dana", "Head Unit Bisnis memeriksa pengajuan dana Head of Operational","Approve / Reject","","head_unit_bisnis") : mk("FUND_APPROVAL","Approval Pengajuan Dana", "Head of Operational memeriksa kebutuhan dana","Approve / Reject","","manager_operasional"); }
     if(status==="APPROVED") return mk("FUND_PAY","Pembayaran Pengajuan Dana", "Finance melakukan pembayaran dan input bukti/referensi","Bayar Pengajuan","","finance",{priority:"HIGH"});
     return null;
   }
@@ -2102,14 +2106,22 @@ async function ccoActionHandler(request,env,user,id) {
   return json({ok:true,row:out});
 }
 
+// V3.4.38 — Pengajuan Dana hanya untuk kebutuhan operasional / kas kecil.
+const FUND_BLOCKED_CATEGORY = /^(material|upah tukang|tukang|subkon|vendor|upah)$/i;
+function fundCategoryError(data,old) {
+  const cat=String(data?.category??"").trim(); const before=String(old?.category??"").trim();
+  if(cat && FUND_BLOCKED_CATEGORY.test(cat) && cat.toLowerCase()!==before.toLowerCase()) return "Pengajuan Dana hanya untuk operasional / kas kecil. Pembayaran material, upah tukang, vendor, dan subkon diajukan lewat menu Pembayaran Proyek.";
+  return "";
+}
+
 async function paymentRequestActionHandler(request,env,user,id) {
   const rec=await getRecord(env,"payment_requests",id); if(!rec) return json({ok:false,message:"Payment Request tidak ditemukan."},404);
   const denied = await requireProjectAccess(env,user,rec.data.projectId); if (denied) return denied;
   const body=await parseJson(request) || {}; const action=String(body.action||"").toLowerCase(); const access=buildAccess(user).capabilities;
   const d={...rec.data}; const old=String(d.status||"DRAFT").toUpperCase(); let next=old;
   if(action==="submit") { if(!isManagementRole(user) && d.requesterUserId && d.requesterUserId!==user.id) return json({ok:false,message:"Hanya pengaju atau Manajemen yang dapat submit pengajuan ini."},403); if(!["DRAFT","REJECTED"].includes(old)) return json({ok:false,message:"Hanya DRAFT/REJECTED yang dapat diajukan."},409); next="PENDING"; d.submittedAt=new Date().toISOString(); d.requesterUserId=d.requesterUserId||user.id; }
-  else if(action==="approve") { if(!access.financeApprove) return json({ok:false,message:"Role ini tidak dapat approve pengajuan dana."},403); if(old!=="PENDING") return json({ok:false,message:"Pengajuan belum berstatus PENDING."},409); next="APPROVED"; d.approvedByUserId=user.id; d.approvedAt=new Date().toISOString(); }
-  else if(action==="reject") { if(!access.financeApprove) return json({ok:false,message:"Role ini tidak dapat reject pengajuan dana."},403); if(!["PENDING","APPROVED"].includes(old)) return json({ok:false,message:"Status pengajuan tidak dapat direject."},409); next="REJECTED"; d.rejectReason=String(body.notes||""); d.rejectedByUserId=user.id; d.rejectedAt=new Date().toISOString(); }
+  else if(action==="approve") { if(!access.financeApprove) return json({ok:false,message:"Pengajuan dana disetujui oleh Head of Operational. Finance mencatat pembayarannya setelah disetujui."},403); if(String(d.requesterUserId||"")===String(user.id||"") && !roleIn(user,["administrator","direktur"])) return json({ok:false,message:"Pengajuan milik sendiri harus disetujui oleh atasan lain."},403); if(old!=="PENDING") return json({ok:false,message:"Pengajuan belum berstatus PENDING."},409); next="APPROVED"; d.approvedByUserId=user.id; d.approvedAt=new Date().toISOString(); }
+  else if(action==="reject") { const finReject = old==="APPROVED" && access.financePay; if(!access.financeApprove && !finReject) return json({ok:false,message:"Hanya Head of Operational yang dapat menolak pengajuan yang masih menunggu persetujuan."},403); if(!["PENDING","APPROVED"].includes(old)) return json({ok:false,message:"Status pengajuan tidak dapat direject."},409); next="REJECTED"; d.rejectReason=String(body.notes||""); d.rejectedByUserId=user.id; d.rejectedAt=new Date().toISOString(); }
   else if(action==="pay") {
     if(!access.financePay) return json({ok:false,message:"Hanya Finance/Manajemen yang dapat mencatat pembayaran."},403); if(old!=="APPROVED") return json({ok:false,message:"Pengajuan harus APPROVED sebelum dibayar."},409);
     next="PAID"; d.paidAt=String(body.paymentDate||new Date().toISOString().slice(0,10)); d.paidByUserId=user.id; d.paymentReference=String(body.reference||""); d.paymentAccount=String(body.account||"");
@@ -2338,7 +2350,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.37"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.38"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -3364,7 +3376,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.37-project-page"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.38-flow-cleanup"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3564,7 +3576,7 @@ async function handleRequest(request, env) {
         if (collection === "cco") data.status="DRAFT";
         if (["daily_progress","weekly_progress","opname","ati_work_requests"].includes(collection)) data.status="DRAFT";
         if (["issues","retention","closeout","ati_field_issues"].includes(collection)) data.status="OPEN";
-        if (collection === "payment_requests") { data.status="DRAFT"; data.requesterUserId=auth.user.id; }
+        if (collection === "payment_requests") { const ce=fundCategoryError(data,null); if(ce) return json({ok:false,message:ce},400); data.status="DRAFT"; data.requesterUserId=auth.user.id; }
         if (collection === "procurement") { const assignedPm=await projectAssignment(env,data.projectId,"pm"); if(!assignedPm) return json({ok:false,message:"Proyek belum memiliki Site Manager. Tetapkan Site Manager sebelum membuat PR."},400); const rr=normalizeRole(auth.user); if(!["site_manager","manager_operasional","head_unit_bisnis","administrator","direktur"].includes(rr)) return json({ok:false,message:"Draft PR hanya dapat disiapkan oleh Site Manager proyek atau Head of Operational."},403); data.status="DRAFT"; data.preparedByUserId=auth.user.id; data.requesterUserId=assignedPm; data.projectManagerUserId=assignedPm; data.totalHpp=(data.items||[]).reduce((a,x)=>a+num(x.totalHpp),0); }
         if (collection === "defects") { data.status="OPEN"; data.picUserId=await projectAssignment(env,data.projectId,"pm"); if(!data.picUserId) return json({ok:false,message:"Proyek belum memiliki Site Manager. Tetapkan Site Manager sebelum membuat Temuan QC."},400); }
         const rec = await upsertRecord(env,collection,body.id || null,data,auth.user);
@@ -3609,6 +3621,7 @@ async function handleRequest(request, env) {
         if (collection === "procurement") data=normalizePrArrays({...old.data,...data});
         const roleKey=normalizeRole(auth.user);
         if (collection === "payment_requests") {
+          { const ce=fundCategoryError(data,old.data); if(ce) return json({ok:false,message:ce},400); }
           if (!["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","finance"].includes(roleKey)) {
             if (old.data.requesterUserId && old.data.requesterUserId !== auth.user.id) return json({ok:false,message:"Anda hanya dapat mengedit pengajuan dana milik Anda sendiri."},403);
             if (!["DRAFT","REJECTED"].includes(String(old.data.status||"DRAFT").toUpperCase())) return json({ok:false,message:"Pengajuan yang sudah diproses tidak dapat diedit oleh pengaju."},409);
