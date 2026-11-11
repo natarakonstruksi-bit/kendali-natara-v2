@@ -429,3 +429,18 @@ tr.pd-row-link{cursor:pointer}tr.pd-row-link:hover td{background:#f5faff}
 .pd-bar-row b{text-align:right;font-variant-numeric:tabular-nums}
 .pd-bar{height:10px;background:#eef2f6;border-radius:999px;overflow:hidden}.pd-bar i{display:block;height:100%;background:#7a5af8;border-radius:999px}
 @media(max-width:640px){.pd-name{font-size:19px}.pd-fields{gap:8px 16px}.pd-docs{grid-template-columns:1fr}.pd-bar-row{grid-template-columns:90px 1fr}.pd-bar-row b{grid-column:1/-1;text-align:left}.pd-tabs button{padding:10px 11px}}
+
+/* V3.4.38 */
+.fund-scope{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.legacy-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+.legacy-tools input{flex:1 1 200px;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:9px}
+.legacy-list{max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.legacy-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f2f4f7;cursor:pointer}
+.legacy-item span{flex:1;font-size:13px;font-weight:600}
+.legacy-item:hover{background:#f9fafb}
+@media(max-width:640px){.legacy-list{max-height:none}}
+#modalForm .legacy-item{display:flex!important;flex-direction:row;align-items:center;gap:10px;margin:0;grid-template-columns:none}
+#modalForm .legacy-item input[type=checkbox]{width:18px;height:18px;flex:none;margin:0}
+#modalForm .legacy-item span{flex:1 1 auto;text-align:left;min-width:0}
+#modalForm .legacy-item .pill{flex:none}
+#modalForm .legacy-item.hidden{display:none!important}

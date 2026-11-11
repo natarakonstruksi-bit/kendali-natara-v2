@@ -59,7 +59,7 @@ const configs = {
     employeeField('estimatorUserId','Estimator',['estimator'],false),employeeField('qsUserId','QS',['qs'],false),
     employeeField('drafterUserId','Drafter / BIM',['drafter'],false),employeeField('mepUserId','MEP Engineer',['mep_engineer'],false),
     employeeField('adminUserId','Admin Teknik',['admin_teknik','manager_operasional'],false),
-    f('qcRequired','QC Checklist Wajib','checkbox'),f('retentionRequired','Memakai Retensi','checkbox'),f('fhoRequired','Wajib FHO','checkbox'),
+    f('legacyProject','Proyek lama — dokumen inti tidak wajib (status mengikuti progress, QC & keuangan)','checkbox','','span-2'),f('qcRequired','QC Checklist Wajib','checkbox'),f('retentionRequired','Memakai Retensi','checkbox'),f('fhoRequired','Wajib FHO','checkbox'),
     f('forecastFinalCost','Forecast Final Cost','number'),f('notes','Catatan','textarea',false,'span-2')
   ]},
   project_budget:{label:'Budget / HPP',fields:[projectField(),f('costCode','Cost Code','text'),f('category','Kategori','text'),f('description','Uraian Budget','text',true),f('budgetAmount','Nilai Budget','number',true),f('status','Status','select',true,'',['DRAFT','APPROVED','REVISED','CLOSED']),f('notes','Catatan','textarea',false,'span-2')]},
@@ -227,10 +227,11 @@ async function renderFinance(){
 
 async function renderFundRequests(){
   const rows=await loadCollection('payment_requests',Boolean(state.selectedProjectId));
-  $('#content').innerHTML=`<div class="notice blue"><b>Alur:</b> Karyawan membuat DRAFT → Submit → PENDING → Finance/Manajemen Approve/Reject → Finance Bayar → sistem otomatis membuat Cash Out.</div><div class="card"><div class="card-head"><div><h3>Pengajuan Dana Karyawan</h3><p>Untuk material, upah, operasional, alat, transport, atau kebutuhan proyek lainnya.</p></div>${canCollection('payment_requests','create')?'<div class="card-actions"><button class="btn primary" data-add="payment_requests">+ Buat Pengajuan</button></div>':''}</div><div class="table-wrap"><table class="table"><thead><tr><th>Tanggal</th><th>Proyek</th><th>Pengaju</th><th>Kebutuhan</th><th>Nominal</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.data.date)}</td><td>${esc(projectName(r.data.projectId))}</td><td>${esc(employeeName(r.data.requesterUserId))}</td><td>${esc(r.data.description||'-')}<div class="tiny muted">${esc(r.data.category||'')}</div></td><td class="num">${fmtRp(r.data.amount)}</td><td>${statusPill(r.data.status||'DRAFT')}</td><td class="actions">${fundButtons(r)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Belum ada pengajuan.</td></tr>'}</tbody></table></div></div>`;
+  $('#content').innerHTML=`<div class="notice blue"><b>Alur:</b> Karyawan membuat pengajuan → <b>Submit</b> → <b>Head of Operational</b> menyetujui / menolak → <b>Finance</b> membayar → otomatis tercatat sebagai pengeluaran proyek.</div><div class="notice orange fund-scope"><b>Khusus operasional & kas kecil</b> (transport/BBM, konsumsi, alat kecil, ATK, lembur, perizinan). Pembayaran <b>material, upah tukang, vendor, dan subkon</b> diajukan lewat menu <b>Pembayaran Proyek</b> agar tidak tercatat dua kali.${canView('payments')?' <button class="btn small" type="button" id="fundGoPayments">Buka Pembayaran Proyek →</button>':''}</div><div class="card"><div class="card-head"><div><h3>Pengajuan Dana Karyawan</h3><p>Kebutuhan operasional & kas kecil proyek.</p></div>${canCollection('payment_requests','create')?'<div class="card-actions"><button class="btn primary" data-add="payment_requests">+ Buat Pengajuan</button></div>':''}</div><div class="table-wrap"><table class="table"><thead><tr><th>Tanggal</th><th>Proyek</th><th>Pengaju</th><th>Kebutuhan</th><th>Nominal</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.data.date)}</td><td>${esc(projectName(r.data.projectId))}</td><td>${esc(employeeName(r.data.requesterUserId))}</td><td>${esc(r.data.description||'-')}<div class="tiny muted">${esc(r.data.category||'')}</div></td><td class="num">${fmtRp(r.data.amount)}</td><td>${statusPill(r.data.status||'DRAFT')}</td><td class="actions">${fundButtons(r)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Belum ada pengajuan.</td></tr>'}</tbody></table></div></div>`;
   bindCrudActions();bindWorkflowButtons();
+  if($('#fundGoPayments'))$('#fundGoPayments').onclick=()=>setView('payments');
 }
-function fundButtons(r){const s=String(r.data.status||'DRAFT').toUpperCase();let x='';if(canCollection('payment_requests','update')&&['DRAFT','REJECTED'].includes(s))x+=`<button class="btn small" data-edit="payment_requests" data-id="${esc(r.id)}">Edit</button>`;if(['DRAFT','REJECTED'].includes(s))x+=`<button class="btn small primary" data-fund-action="submit" data-id="${esc(r.id)}">Submit</button>`;if(cap('financeApprove')&&s==='PENDING')x+=`<button class="btn small success" data-fund-action="approve" data-id="${esc(r.id)}">Approve</button><button class="btn small danger" data-fund-action="reject" data-id="${esc(r.id)}">Reject</button>`;if(cap('financePay')&&s==='APPROVED')x+=`<button class="btn small accent" data-fund-action="pay" data-id="${esc(r.id)}">Bayar</button>`;return x||'-';}
+function fundButtons(r){const s=String(r.data.status||'DRAFT').toUpperCase();let x='';if(canCollection('payment_requests','update')&&['DRAFT','REJECTED'].includes(s))x+=`<button class="btn small" data-edit="payment_requests" data-id="${esc(r.id)}">Edit</button>`;if(['DRAFT','REJECTED'].includes(s))x+=`<button class="btn small primary" data-fund-action="submit" data-id="${esc(r.id)}">Submit</button>`;if(cap('financeApprove')&&s==='PENDING')x+=`<button class="btn small success" data-fund-action="approve" data-id="${esc(r.id)}">Approve</button><button class="btn small danger" data-fund-action="reject" data-id="${esc(r.id)}">Reject</button>`;if(cap('financePay')&&s==='APPROVED')x+=`<button class="btn small accent" data-fund-action="pay" data-id="${esc(r.id)}">Bayar</button>${cap('financeApprove')?'':`<button class="btn small danger" data-fund-action="reject" data-id="${esc(r.id)}">Kembalikan</button>`}`;return x||'-';}
 
 async function renderProgress(){const scope=Boolean(state.selectedProjectId);const [daily,weekly,schedule,milestones,issues]=await Promise.all(['daily_progress','weekly_progress','schedule','milestones','issues'].map(c=>loadCollection(c,scope)));$('#content').innerHTML=`<div class="notice green">Grafik Dashboard menggunakan nilai <b>Progress Rencana</b> dan <b>Progress Aktual/Realisasi</b> dari input Harian/Mingguan berdasarkan tanggal.</div>${genericTable('daily_progress',daily,'Progress Harian','Input aktual lapangan setiap hari.')}${genericTable('weekly_progress',weekly,'Progress Mingguan','Rekap mingguan dan tindak lanjut.')}${genericTable('schedule',schedule,'Schedule / Kurva-S','Aktivitas, bobot, target waktu, dan aktual.')}${genericTable('milestones',milestones,'Milestone','Target penting proyek.')}${genericTable('issues',issues,'Masalah & Corrective Action','Masalah → Dampak → Penyebab → Pilihan → Keputusan → PIC → Deadline.')}`;bindCrudActions();}
 
@@ -389,10 +390,11 @@ function v31EmployeeOptions(keys=[],selected=''){return v31RoleEmployees(keys).m
 function v31ProjectOptions(selected=''){return state.projects.map(p=>`<option value="${esc(p.id)}" ${p.id===selected?'selected':''}>${esc(projectDisplayName(p))}</option>`).join('');}
 
 function v31CurrentEmployee(){return state.employees.find(e=>String(e.id)===String(state.user.id))||state.user;}
+const FUND_CATEGORIES=['Operasional','Transport / BBM','Konsumsi','Alat Kecil','ATK / Administrasi','Lembur','Perizinan / Retribusi','Lainnya'];
 async function openFundRequestForm(row=null){
   const d=row?.data||{};const requester=row?d.requesterUserId:state.user.id;
-  const html=`<div class="form-grid"><label>Proyek<select name="projectId" required><option value="">Pilih proyek</option>${v31ProjectOptions(d.projectId||state.selectedProjectId||'')}</select></label><label>Tanggal Pengajuan<input type="date" name="date" value="${esc(d.date||new Date().toISOString().slice(0,10))}" required></label><label>Pengaju<input value="${esc(employeeName(requester)||state.user.name||'')}" readonly><input type="hidden" name="requesterUserId" value="${esc(requester)}"></label><label>Kategori<select name="category" required>${['Material','Upah Tukang','Subkon','Operasional','Alat','Transport','Lembur','Lainnya'].map(x=>`<option ${d.category===x?'selected':''}>${x}</option>`).join('')}</select></label><label class="span-2">Kebutuhan<textarea name="description" required>${esc(d.description||'')}</textarea></label><label>Nominal<input type="number" step="any" name="amount" value="${esc(d.amount??'')}" required></label><label>Penerima / Vendor<input name="payee" value="${esc(d.payee||'')}"></label><label>Cost Code<input name="costCode" value="${esc(d.costCode||'')}"></label><label class="span-2">Catatan<textarea name="notes">${esc(d.notes||'')}</textarea></label><label class="span-2">Lampiran pendukung (opsional)<input type="file" name="attachment"></label></div>`;
-  openModal(row?'Edit Pengajuan Dana':'Buat Pengajuan Dana','Pengaju otomatis mengikuti akun yang login dan tidak dapat memilih nama karyawan lain.',html,async form=>{
+  const html=`<div class="form-grid"><label>Proyek<select name="projectId" required><option value="">Pilih proyek</option>${v31ProjectOptions(d.projectId||state.selectedProjectId||'')}</select></label><label>Tanggal Pengajuan<input type="date" name="date" value="${esc(d.date||new Date().toISOString().slice(0,10))}" required></label><label>Pengaju<input value="${esc(employeeName(requester)||state.user.name||'')}" readonly><input type="hidden" name="requesterUserId" value="${esc(requester)}"></label><label>Kategori<select name="category" required>${[...FUND_CATEGORIES,...(d.category&&!FUND_CATEGORIES.includes(d.category)?[d.category]:[])].map(x=>`<option ${d.category===x?'selected':''}>${x}</option>`).join('')}</select></label><label class="span-2">Kebutuhan<textarea name="description" required>${esc(d.description||'')}</textarea></label><label>Nominal<input type="number" step="any" name="amount" value="${esc(d.amount??'')}" required></label><label>Penerima / Vendor<input name="payee" value="${esc(d.payee||'')}"></label><label>Cost Code<input name="costCode" value="${esc(d.costCode||'')}"></label><label class="span-2">Catatan<textarea name="notes">${esc(d.notes||'')}</textarea></label><label class="span-2">Lampiran pendukung (opsional)<input type="file" name="attachment"></label></div>`;
+  openModal(row?'Edit Pengajuan Dana':'Buat Pengajuan Dana','Untuk kebutuhan operasional / kas kecil. Material, upah tukang, vendor & subkon → menu Pembayaran Proyek.',html,async form=>{
     const payload={projectId:form.projectId.value,date:form.date.value,requesterUserId:requester,category:form.category.value,description:form.description.value,amount:num(form.amount.value),payee:form.payee.value,costCode:form.costCode.value,notes:form.notes.value};const id=row?.id||crypto.randomUUID();
     if(row)await api(`/api/records/payment_requests/${encodeURIComponent(id)}`,{method:'PUT',body:payload});else await api('/api/records/payment_requests',{method:'POST',body:{id,data:payload}});
     const file=form.attachment.files?.[0];if(file)await uploadRelatedDocument(file,{projectId:payload.projectId,category:'OTHER',title:`Pengajuan Dana - ${payload.description||id}`,relatedCollection:'payment_requests',relatedId:id});toast('Pengajuan dana tersimpan.');await refreshAfterMutation();
@@ -2497,7 +2499,7 @@ async function renderProjectPage(){
   const tabs=PD_TABS.filter(t=>t.show());if(!tabs.some(t=>t.key===state.pdTab))state.pdTab='ringkasan';
   const sm=employeeName(v31AssignedPm(id))||'-';
   const pct=Math.max(0,Math.min(100,num(m.progress)));
-  $('#content').innerHTML=`<div class="pd-head card"><div class="pd-head-top"><button class="btn small ghost" id="pdBack" type="button">← Semua proyek</button><div class="pd-status">${statusPill(m.evaluatedStatus||d.status||'-')}${m.scheduleStatus?statusPill(m.scheduleStatus):''}</div></div>
+  $('#content').innerHTML=`<div class="pd-head card"><div class="pd-head-top"><button class="btn small ghost" id="pdBack" type="button">← Semua proyek</button><div class="pd-status">${d.legacyProject?'<span class="pill gray">Proyek lama</span>':''}${statusPill(m.evaluatedStatus||d.status||'-')}${m.scheduleStatus?statusPill(m.scheduleStatus):''}</div></div>
     <h2 class="pd-name">${esc(name)}</h2>
     <div class="pd-fields">${pdField('Site Manager',sm)}${pdField('Owner / Client',d.owner||d.client||d.clientName)}${pdField('Lokasi',d.location||d.lokasi)}${pdField('Mulai',d.startDate?fmtDate(d.startDate):'')}${pdField('Target selesai',(d.endDate||d.targetFinish||d.targetDate)?fmtDate(d.endDate||d.targetFinish||d.targetDate):'')}${pdField('No. Kontrak',d.contractNo||d.noKontrak)}</div>
     <div class="pd-progress"><div class="pd-progress-bar"><i style="width:${pct}%"></i></div><b>${fmtNum(pct)}%</b><span class="muted">progress aktual</span></div></div>
@@ -2607,3 +2609,60 @@ renderProjects=async function(...args){
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-open-project]');if(!el||!el.closest('#content'))return;if(e.target.closest('a,input,select,textarea')||(e.target.closest('button')&&e.target.closest('button')!==el))return;e.preventDefault();openProjectPage(el.dataset.openProject);});
 document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;const el=e.target.closest?.('[data-open-project]');if(el&&el.closest('#content')){e.preventDefault();openProjectPage(el.dataset.openProject);}});
+
+/* ========================================================================== */
+/* NARA SYSTEM V3.4.38 — Rapikan alur                                         */
+/* ========================================================================== */
+/* PR diterima → tombol "Ajukan Pembayaran" langsung ke form Pembayaran Proyek. */
+const v3438BasePrActions=v31PrActions;
+v31PrActions=function(r){
+  let x=v3438BasePrActions(r);const s=String(r.data.status||'').toUpperCase();
+  if(s==='RECEIVED'&&r.data.poId&&canView('payments')&&cap('partnerPaymentCreate'))x=`<button class="btn small accent" data-pr-pay="${esc(r.id)}">Ajukan Pembayaran</button>`+x;
+  return x;
+};
+async function prAjukanPembayaran(pr){
+  if(!pr)return;state.selectedProjectId=pr.data.projectId||'';state.cache.clear();try{$('#globalProjectFilter').value=state.selectedProjectId;}catch(_){}
+  state.payTab='pengajuan';setView('payments');
+  for(let i=0;i<40&&!(state.view==='payments'&&state.finPos);i++)await new Promise(r=>setTimeout(r,100));
+  await new Promise(r=>setTimeout(r,150));
+  const po=(state.finPos||[]).find(x=>x.id===pr.data.poId);
+  if(po&&po.data.partnerId&&Array.isArray(po.data.terms)&&po.data.terms.length){openFinContractPayment(po.id);return;}
+  toast(`SPK/PO ${po?.data?.number||pr.data.poNumber||''} belum diatur mitra & termin pembayarannya. ${canCollection('po','update')?'Lengkapi dulu di form berikut.':'Minta Admin Teknik melengkapinya di tab SPK Vendor & Subkon.'}`,'err');
+  if(po&&canCollection('po','update')){state.payTab='spk';await renderPayments();openFinContractForm(po);}
+}
+const v3438BaseRenderProcurement=renderProcurement;
+renderProcurement=async function(...args){
+  const out=await v3438BaseRenderProcurement.apply(this,args);
+  $$('[data-pr-pay]').forEach(b=>b.onclick=async()=>{const rows=await loadCollection('procurement',Boolean(state.selectedProjectId));await prAjukanPembayaran(rows.find(x=>x.id===b.dataset.prPay));});
+  return out;
+};
+/* Proyek lama — tandai massal dari menu Proyek. */
+async function openLegacyProjects(){
+  const dash=state.dashboard?.projects?state.dashboard:await api('/api/dashboard').catch(()=>({projects:[]}));const st=Object.fromEntries((dash.projects||[]).map(x=>[x.id,x.evaluatedStatus]));
+  const rows=[...state.projects].sort((a,b)=>projectDisplayName(a).localeCompare(projectDisplayName(b)));
+  const html=`<div class="notice blue">Centang proyek yang <b>sudah lama berjalan atau sudah selesai</b> sebelum memakai Nara. Untuk proyek ini, dokumen (Kontrak, RAB, DED, Time Schedule, PCM, BAST, dll.) <b>tidak lagi menahan status</b> — status mengikuti progress, QC, dan keuangan. Dokumen tetap bisa ditambahkan kapan saja.</div>
+  <div class="legacy-tools"><input id="legacySearch" placeholder="Cari proyek…"><button type="button" class="btn small" id="legacyAllSetup">Centang semua yang SETUP</button><button type="button" class="btn small ghost" id="legacyNone">Kosongkan</button><span class="muted" id="legacyCount"></span></div>
+  <div class="legacy-list">${rows.map(p=>`<label class="legacy-item" data-name="${esc(projectDisplayName(p).toLowerCase())}"><input type="checkbox" name="legacy" value="${esc(p.id)}" ${p.data.legacyProject?'checked':''}><span>${esc(projectDisplayName(p))}</span>${statusPill(st[p.id]||p.data.status||'-')}</label>`).join('')}</div>`;
+  openModal('Tandai Proyek Lama','Proyek lama tidak tertahan di status SETUP karena dokumen.',html,async form=>{
+    const want=new Set([...form.querySelectorAll('input[name="legacy"]:checked')].map(x=>x.value));
+    const changes=rows.filter(p=>Boolean(p.data.legacyProject)!==want.has(p.id));
+    if(!changes.length){toast('Tidak ada perubahan.');return;}
+    let done=0;const queue=[...changes];
+    await Promise.all(Array.from({length:4},async()=>{while(queue.length){const p=queue.shift();await api(`/api/records/projects/${encodeURIComponent(p.id)}`,{method:'PUT',body:{legacyProject:want.has(p.id)}});done++;$('#modalSave').textContent=`Menyimpan ${done}/${changes.length}…`;}}));
+    toast(`${changes.length} proyek diperbarui.`);state.cache.clear();state.dashboard=null;await refreshAfterMutation();
+  });
+  const count=()=>{$('#legacyCount').textContent=`${$$('#modalForm input[name="legacy"]:checked').length} dicentang`;};
+  $$('#modalForm input[name="legacy"]').forEach(x=>x.onchange=count);count();
+  $('#legacySearch').oninput=e=>{const q=e.target.value.toLowerCase();$$('#modalForm .legacy-item').forEach(l=>l.classList.toggle('hidden',q&&!l.dataset.name.includes(q)));};
+  $('#legacyAllSetup').onclick=()=>{rows.forEach(p=>{if(String(st[p.id]||'').toUpperCase()==='SETUP'){const c=$(`#modalForm input[name="legacy"][value="${CSS.escape(p.id)}"]`);if(c)c.checked=true;}});count();};
+  $('#legacyNone').onclick=()=>{$$('#modalForm input[name="legacy"]').forEach(c=>c.checked=false);count();};
+}
+const v3438BaseRenderProjects=renderProjects;
+renderProjects=async function(...args){
+  const out=await v3438BaseRenderProjects.apply(this,args);
+  try{
+    if(canCollection('projects','update')){const acts=$('#content .card-head .card-actions')||(()=>{const h=$('#content .card-head');if(!h)return null;h.insertAdjacentHTML('beforeend','<div class="card-actions"></div>');return h.querySelector('.card-actions');})();if(acts&&!$('#legacyBtn'))acts.insertAdjacentHTML('afterbegin','<button class="btn" id="legacyBtn" type="button">Tandai Proyek Lama</button>');if($('#legacyBtn'))$('#legacyBtn').onclick=openLegacyProjects;}
+    const rows=await loadCollection('projects');$$('#content table tbody tr').forEach((tr,i)=>{const r=rows[i];if(r?.data?.legacyProject){const td=tr.querySelector('td');if(td&&!td.querySelector('.legacy-pill'))td.insertAdjacentHTML('beforeend',' <span class="pill gray legacy-pill">Proyek lama</span>');}});
+  }catch(_){}
+  return out;
+};
