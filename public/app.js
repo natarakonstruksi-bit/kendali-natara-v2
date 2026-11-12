@@ -1073,13 +1073,13 @@ openPrForm=async function(row=null){
     const prItems=v31ReadPrItems(); if(!prItems.length)throw new Error('Minimal satu item pekerjaan/material/jasa wajib diisi.');
     const pId=form.projectId.value; const assignedPm=v31AssignedPm(pId); if(!assignedPm)throw new Error('Proyek belum memiliki Site Manager. Tetapkan Site Manager pada Master Proyek terlebih dahulu.');
     const vendorOffers=canVendorEdit?v31ReadVendorOffers():offers;
-    const payload={prNumber:form.prNumber.value,projectId:pId,date:form.date.value,requesterUserId:assignedPm,projectManagerUserId:assignedPm,deliveryLocation:form.deliveryLocation.value,workStartDate:form.workStartDate.value,workEndDate:form.workEndDate.value,items:prItems,vendorOffers,totalHpp:prItems.reduce((sum,x)=>sum+x.totalHpp,0),coiDeclaration:formalPm?form.coiDeclaration.checked:Boolean(d.coiDeclaration),notes:form.notes.value};
+    const payload={prNumber:form.prNumber.value,projectId:pId,date:form.date.value,requesterUserId:assignedPm,projectManagerUserId:assignedPm,deliveryLocation:form.deliveryLocation.value,workStartDate:form.workStartDate.value,workEndDate:form.workEndDate.value,items:prItems,vendorOffers,totalHpp:prItems.reduce((sum,x)=>sum+x.totalHpp,0),coiDeclaration:(v345IsFormalPm(pId)||v34RoleCan('manager_operasional','head_unit_bisnis','administrator','direktur'))?form.coiDeclaration.checked:Boolean(d.coiDeclaration),notes:form.notes.value};
     const id=row?.id||crypto.randomUUID();
     if(row)await api(`/api/records/procurement/${encodeURIComponent(id)}`,{method:'PUT',body:payload}); else await api('/api/records/procurement',{method:'POST',body:{id,data:payload}});
     if(canVendorEdit){const vendorRows=$$('.v31-pr-vendor','#v31PrVendors');for(let i=0;i<vendorRows.length;i++){const file=$('.pv-file',vendorRows[i]).files?.[0];if(file)await uploadRelatedDocument(file,{projectId:pId,category:'VENDOR_QUOTATION',title:`Quotation Vendor PR - ${vendorOffers[i]?.vendorName||'Vendor'}`,relatedCollection:'procurement',relatedId:id});}}
     toast('Purchase Request tersimpan.'); await refreshAfterMutation();
   });
-  $('#v31PrProject').onchange=()=>{const pId=$('#v31PrProject').value;const newPm=v31AssignedPm(pId);$('#v31PrRequester').value=employeeName(newPm);};
+  $('#v31PrProject').onchange=()=>{const pId=$('#v31PrProject').value;const newPm=v31AssignedPm(pId);$('#v31PrRequester').value=employeeName(newPm);const coi=$('#modalForm input[name="coiDeclaration"]');if(coi){const ok=v345IsFormalPm(pId)||v34RoleCan('manager_operasional','head_unit_bisnis','administrator','direktur');coi.disabled=!ok;if(!ok)coi.checked=false;}};
   $('#v31AddPrItem').onclick=()=>{$('#v31PrItems').insertAdjacentHTML('beforeend',v31PrItemRow({}));v31BindPrRows();};
   if($('#v31AddVendor'))$('#v31AddVendor').onclick=()=>{$('#v31PrVendors').insertAdjacentHTML('beforeend',v31VendorRow({}));v31BindPrRows();};
   v31BindPrRows();
@@ -2666,3 +2666,10 @@ renderProjects=async function(...args){
   }catch(_){}
   return out;
 };
+
+/* V3.4.39 — Form baru: kolom tanggal utama otomatis terisi hari ini (bisa diubah). */
+(function(){
+  const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+  const fill=()=>{const t=$('#modalTitle')?.textContent||'';if(!/^(Tambah|Buat)/i.test(t.trim()))return;['date','requestDate','reportDate'].forEach(n=>{const el=$(`#modalForm input[type="date"][name="${n}"]`);if(el&&!el.value)el.value=today();});};
+  try{const mb=$('#modalBackdrop'),mf=$('#modalForm');const go=()=>{if(mb&&!mb.classList.contains('hidden'))setTimeout(fill,0);};if(mb)new MutationObserver(go).observe(mb,{attributes:true,attributeFilter:['class']});if(mf)new MutationObserver(go).observe(mf,{childList:true});}catch(_){}
+})();
