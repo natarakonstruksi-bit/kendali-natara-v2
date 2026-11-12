@@ -18,5 +18,5 @@ must(app.includes('const perm=state.access?.collections?.[c];if(perm&&!perm.read
 must(app.includes('v3418Inflight'),'Request identik bersamaan harus digabung');
 must(app.includes('const V3418_MAX_ROWS=200;')&&app.includes('v3418Visible(daily)'),'Tabel besar harus dibatasi baris render');
 const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
-must(html.includes('/app.js?v=3.4.38')&&html.includes('/styles.css?v=3.4.38'),'Asset harus memakai versi (cache busting)');
+must(html.includes('/app.js?v=3.4.39')&&html.includes('/styles.css?v=3.4.39'),'Asset harus memakai versi (cache busting)');
 console.log('Performance smoke OK — Tugas Saya bulk+throttled, badge non-blocking, dashboard O(n), safe/deduped loads, capped tables, versioned assets.');

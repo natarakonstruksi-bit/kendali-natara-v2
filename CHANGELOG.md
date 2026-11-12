@@ -1,3 +1,8 @@
+## V3.4.39 — Perbaikan bug (ditemukan saat pembuatan video panduan)
+
+- **PR / Vendor — Deklarasi Conflict of Interest**: bila form PR dibuka saat filter atas "Semua proyek" lalu proyek dipilih di dalam form, kotak COI tetap terkunci dan nilai centangnya tidak tersimpan, sehingga PR **tidak bisa dikirim** ke Head. Kini kotak COI aktif sesuai proyek yang dipilih dan nilainya tersimpan benar.
+- **Form baru**: kolom tanggal utama (mis. Tanggal Update QS, Tanggal Pengajuan ATI) otomatis terisi tanggal hari ini — sebelumnya kosong dan form gagal disimpan tanpa pesan yang jelas.
+
 ## V3.4.38 — Rapikan alur
 
 - **Pengajuan Dana khusus operasional & kas kecil**: kategori Operasional, Transport/BBM, Konsumsi, Alat Kecil, ATK/Administrasi, Lembur, Perizinan/Retribusi, Lainnya. Material, upah tukang, vendor, dan subkon ditolak dengan arahan ke **Pembayaran Proyek** (data lama tetap aman). Halaman diberi penjelasan + tombol ke Pembayaran Proyek.
