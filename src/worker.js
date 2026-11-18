@@ -1,9 +1,35 @@
 /**
- * Nara System V3.4.39 — Perbaikan COI PR, tanggal otomatis di form baru
+ * Nara System V3.4.40 — Login dari Sipatuo (portal grup)
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
-const APP_VERSION = "APP-V3.4.39";
+// ---- SIPATUO-SSO-VERIFY:START (salinan sipatuo/docs/sso-verify.js) ----
+const SSO_ENC = new TextEncoder();
+const ssoDariB64url = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+
+async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik = 30 } = {}) {
+  if (!secret) return { ok: false, alasan: 'SSO belum dikonfigurasi (secret SSO_SECRET kosong).' };
+  if (!token || typeof token !== 'string' || token.length > 2048 || token.split('.').length !== 2) return { ok: false, alasan: 'Tiket tidak valid.' };
+  const [payload, sig] = token.split('.');
+  let sah = false;
+  try {
+    const key = await crypto.subtle.importKey('raw', SSO_ENC.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    sah = await crypto.subtle.verify('HMAC', key, ssoDariB64url(sig), SSO_ENC.encode(payload));
+  } catch { sah = false; }
+  if (!sah) return { ok: false, alasan: 'Tanda tangan tiket tidak cocok.' };
+  let d;
+  try { d = JSON.parse(new TextDecoder().decode(ssoDariB64url(payload))); } catch { return { ok: false, alasan: 'Isi tiket rusak.' }; }
+  const now = Math.floor(Date.now() / 1000);
+  if (d.v !== 1 || d.iss !== 'sipatuo') return { ok: false, alasan: 'Penerbit tiket tidak dikenal.' };
+  if (d.aud !== kodeUnit) return { ok: false, alasan: 'Tiket ini untuk unit lain.' };
+  if (typeof d.exp !== 'number' || d.exp + toleransiDetik < now) return { ok: false, alasan: 'Tiket sudah kedaluwarsa. Masuk ulang dari Sipatuo.' };
+  if (typeof d.iat !== 'number' || d.iat - toleransiDetik > now) return { ok: false, alasan: 'Waktu tiket tidak valid.' };
+  if (!d.sub || !d.jti) return { ok: false, alasan: 'Tiket tidak lengkap.' };
+  return { ok: true, username: String(d.sub), nama: String(d.name || ''), jti: String(d.jti), exp: d.exp };
+}
+// ---- SIPATUO-SSO-VERIFY:END ----
+
+const APP_VERSION = "APP-V3.4.40";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -561,6 +587,45 @@ async function loginHandler(request, env) {
   const { token, ttl } = await createSession(env, request, user, remember);
   await audit(env, publicUser(user), "LOGIN", "users", user.id, "", {});
   return json({ok:true,user:publicUser(user)},200,{"set-cookie":sessionCookie(request,token,ttl)});
+}
+
+// V3.4.40 — Login dari Sipatuo (portal grup). Tiket bertanda tangan HMAC, berlaku 60 detik, sekali pakai.
+// Akun & jabatan tetap diatur di Nara System; dicocokkan lewat username yang sama. Tidak membuat akun baru.
+const SIPATUO_PORTAL_URL = "https://sipatuo.natarakonstruksi.workers.dev/portal";
+const SIPATUO_UNIT = "NK";
+
+function ssoErrorPage(message, status = 400) {
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const body = `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Masuk dari Sipatuo — Nara System</title>
+<style>body{margin:0;font-family:system-ui,sans-serif;background:#f4f6f5;color:#1f2a2e;display:grid;place-items:center;min-height:100vh}.box{background:#fff;border:1px solid #d9dfdc;border-radius:12px;padding:28px;width:min(420px,92vw)}h1{font-size:20px;margin:0 0 10px}p{color:#4a5a5f}a{display:inline-block;margin:8px 12px 0 0;color:#1d6b5f}</style></head>
+<body><div class="box"><h1>Tidak bisa masuk otomatis</h1><p>${esc(message)}</p><a href="/">Login dengan username &amp; password</a><a href="${SIPATUO_PORTAL_URL}">Kembali ke Sipatuo</a></div></body></html>`;
+  return new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer", "x-frame-options": "DENY" } });
+}
+
+async function sipatuoSsoHandler(request, env) {
+  const url = new URL(request.url);
+  const hasil = await verifikasiTiketSipatuo(url.searchParams.get("t"), env.SSO_SECRET, SIPATUO_UNIT);
+  if (!hasil.ok) return ssoErrorPage(hasil.alasan, env.SSO_SECRET ? 400 : 503);
+  try {
+    await env.DB.prepare(`INSERT INTO sso_tiket_terpakai(jti,exp) VALUES(?,?)`).bind(hasil.jti, hasil.exp).run();
+  } catch (e) {
+    if (/UNIQUE|constraint/i.test(String(e?.message || e))) return ssoErrorPage("Tiket ini sudah pernah dipakai. Klik lagi tombol masuk di Sipatuo.");
+    console.log("sso tiket", e?.message || e);
+    return ssoErrorPage("Login dari Sipatuo belum siap (migration 0024 belum dijalankan). Hubungi Administrator.", 503);
+  }
+  const key = hasil.username.trim().toLowerCase();
+  const row = await env.DB.prepare(`
+    SELECT id, data_json FROM app_records
+    WHERE collection='users' AND (lower(id)=? OR lower(trim(COALESCE(json_extract(data_json,'$.username'),'')))=?)
+    LIMIT 1
+  `).bind(key, key).first();
+  const user = row ? { id: row.id, ...safeJsonParse(row.data_json, {}) } : null;
+  if (!user) return ssoErrorPage(`Akun "${hasil.username}" belum ada di Nara System. Minta Administrator membuat akun dengan username yang sama.`, 403);
+  if (String(user.status || "").toLowerCase() === "nonaktif") return ssoErrorPage("Akun Anda di Nara System nonaktif.", 403);
+  const { token, ttl } = await createSession(env, request, user, false);
+  await audit(env, publicUser(user), "LOGIN_SSO", "users", user.id, "", { via: "sipatuo" });
+  return new Response(null, { status: 302, headers: {
+    location: "/", "set-cookie": sessionCookie(request, token, ttl), "cache-control": "no-store", "referrer-policy": "no-referrer" } });
 }
 
 async function logoutHandler(request, env, auth) {
@@ -2350,7 +2415,7 @@ async function legacyStorageHandler(request, env, url, user=null) {
     if (existing) return json({statusCode:"409",error:"Duplicate",message:"The resource already exists"},409);
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_UPLOAD_BYTES) return json({statusCode:"413",error:"PayloadTooLarge",message:"File too large"},413);
-    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.39"}});
+    await env.FILES.put(parts.key,buf,{httpMetadata:{contentType:request.headers.get("content-type") || "application/octet-stream"},customMetadata:{source:"NARA-SYSTEM-V3.4.40"}});
     return json({Key:`${parts.bucket}/${parts.key}`,Id:crypto.randomUUID()});
   }
   if (request.method === "DELETE") { await env.FILES.delete(parts.key); return json({message:"Successfully deleted"}); }
@@ -3365,6 +3430,7 @@ export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil((async()=>{
       try { await escalateOverdueQcConfirmations(env); } catch(e) { console.log("qc escalation",e?.message||e); }
+      try { await env.DB.prepare(`DELETE FROM sso_tiket_terpakai WHERE exp < ?`).bind(Math.floor(Date.now()/1000) - 300).run(); } catch(e) { console.log("sso cleanup",e?.message||e); }
       await flushEmailOutbox(env,{retry:true,limit:100}).catch(e=>console.log("scheduled email",e?.message||e));
     })());
   }
@@ -3376,7 +3442,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.39-fixes"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.40-sipatuo-sso"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3386,6 +3452,7 @@ async function handleRequest(request, env) {
     const publicMediaMatch=path.match(/^\/api\/public\/media\/([^/]+)$/);
     if(publicMediaMatch && request.method === "GET") return publicMediaHandler(env,decodeURIComponent(publicMediaMatch[1]));
     if (path === "/api/auth/login" && request.method === "POST") return loginHandler(request,env);
+    if (path === "/sso" && request.method === "GET") return sipatuoSsoHandler(request,env);
 
     const auth = await authenticate(request,env);
     if (path === "/api/auth/me" || path === "/api/access/session") {
