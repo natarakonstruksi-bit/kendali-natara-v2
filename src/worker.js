@@ -628,6 +628,45 @@ async function sipatuoSsoHandler(request, env) {
     location: "/", "set-cookie": sessionCookie(request, token, ttl), "cache-control": "no-store", "referrer-policy": "no-referrer" } });
 }
 
+// V3.4.40 — Sipatuo memeriksa username & password karyawan ke Nara System (server ke server), supaya karyawan
+// cukup memakai satu password (password Nara System) untuk masuk Sipatuo. Tidak membuat sesi di Nara System.
+// Permintaan ditandatangani: x-sipatuo-ts (detik) + x-sipatuo-sig = HMAC-SHA256(SSO_SECRET, ts + "." + body) dalam hex.
+async function sipatuoHmacHex(secret, data) {
+  const key = await crypto.subtle.importKey("raw", SSO_ENC.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return [...new Uint8Array(await crypto.subtle.sign("HMAC", key, SSO_ENC.encode(data)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function sipatuoVerifyLoginHandler(request, env) {
+  if (!env.SSO_SECRET) return json({ ok: false, message: "SSO belum dikonfigurasi." }, 503);
+  const raw = await request.text();
+  if (raw.length > 4000) return json({ ok: false, message: "Permintaan terlalu besar." }, 413);
+  const ts = Number(request.headers.get("x-sipatuo-ts") || 0);
+  const sig = String(request.headers.get("x-sipatuo-sig") || "");
+  if (!ts || Math.abs(Math.floor(Date.now() / 1000) - ts) > 60) return json({ ok: false, message: "Waktu permintaan tidak valid." }, 401);
+  if (!timingSafeEqual(await sipatuoHmacHex(env.SSO_SECRET, `${ts}.${raw}`), sig)) return json({ ok: false, message: "Tanda tangan tidak cocok." }, 401);
+  const body = safeJsonParse(raw, {}) || {};
+  const username = String(body.username || "").trim(), password = String(body.password || "");
+  if (!username || !password) return json({ ok: false, message: "Username dan password wajib diisi." }, 400);
+  const key = username.toLowerCase();
+  if (await loginBlocked(env, key)) return json({ ok: false, message: "Terlalu banyak percobaan gagal. Coba lagi 15 menit lagi." }, 429);
+  const row = await env.DB.prepare(`
+    SELECT id, data_json FROM app_records
+    WHERE collection='users' AND (lower(id)=? OR lower(trim(COALESCE(json_extract(data_json,'$.username'),'')))=?)
+    LIMIT 1
+  `).bind(key, key).first();
+  const user = row ? { id: row.id, ...safeJsonParse(row.data_json, {}) } : null;
+  const check = user && String(user.status || "").toLowerCase() !== "nonaktif" ? await verifyPassword(password, user.password) : { ok: false };
+  if (!check.ok) {
+    await recordLoginFail(env, key);
+    return json({ ok: false, message: "Username atau password salah." }, 401);
+  }
+  await clearLoginFails(env, key);
+  if (check.upgrade) await setUserPassword(env, user.id, await hashPassword(password));
+  const pu = publicUser(user);
+  await audit(env, pu, "LOGIN_SIPATUO", "users", user.id, "", { via: "sipatuo" });
+  return json({ ok: true, username: pu.username, name: pu.name, jabatan: pu.jabatan });
+}
+
 async function logoutHandler(request, env, auth) {
   const token = getCookie(request, SESSION_COOKIE);
   if (token) {
@@ -3453,6 +3492,7 @@ async function handleRequest(request, env) {
     if(publicMediaMatch && request.method === "GET") return publicMediaHandler(env,decodeURIComponent(publicMediaMatch[1]));
     if (path === "/api/auth/login" && request.method === "POST") return loginHandler(request,env);
     if (path === "/sso" && request.method === "GET") return sipatuoSsoHandler(request,env);
+    if (path === "/api/sipatuo/verify-login" && request.method === "POST") return sipatuoVerifyLoginHandler(request,env);
 
     const auth = await authenticate(request,env);
     if (path === "/api/auth/me" || path === "/api/access/session") {
