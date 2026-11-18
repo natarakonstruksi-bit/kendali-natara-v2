@@ -3,6 +3,7 @@
 - Karyawan yang sudah login di **Sipatuo** (portal grup) bisa langsung masuk ke Nara System lewat tombol **Masuk ke Natara Konstruksi**, tanpa mengetik password lagi.
 - Akun dan jabatan **tetap diatur di Nara System**. Sipatuo hanya membuktikan identitas; akun dicocokkan lewat **username yang sama**. Bila username belum ada atau akun nonaktif, muncul pesan jelas dan tidak ada akun yang dibuat otomatis.
 - Keamanan: tiket ditandatangani HMAC-SHA256 dengan kunci khusus Natara, berlaku 60 detik, **sekali pakai** (tabel `sso_tiket_terpakai`, dibersihkan Cron). Login tercatat di audit sebagai `LOGIN_SSO`.
+- **Satu password**: karyawan masuk ke Sipatuo memakai username & password Nara System. Sipatuo memeriksanya ke `POST /api/sipatuo/verify-login` (server ke server, ditandatangani `SSO_SECRET`, berlaku 60 detik). Endpoint ini memakai batas percobaan login yang sama (5× gagal → kunci 15 menit), tidak membuat sesi, dan tercatat di audit sebagai `LOGIN_SIPATUO`.
 - Login biasa (username + password) tetap berjalan seperti sebelumnya.
 - Aktivasi: isi secret `SSO_SECRET` di Worker ini dengan nilai yang sama seperti secret `SSO_NK` di Worker `sipatuo`. Sebelum diisi, `/sso` menolak semua tiket.
 - Migration baru: `0024_sipatuo_sso.sql` (additive). File baru: `scripts/sipatuo-sso-smoke.mjs` (fungsi verifikasi tiket disalin dari `sipatuo/docs/sso-verify.js` ke dalam `src/worker.js`).
