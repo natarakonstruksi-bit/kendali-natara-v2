@@ -1,3 +1,12 @@
+## V3.4.40 — Login dari Sipatuo (portal grup)
+
+- Karyawan yang sudah login di **Sipatuo** (portal grup) bisa langsung masuk ke Nara System lewat tombol **Masuk ke Natara Konstruksi**, tanpa mengetik password lagi.
+- Akun dan jabatan **tetap diatur di Nara System**. Sipatuo hanya membuktikan identitas; akun dicocokkan lewat **username yang sama**. Bila username belum ada atau akun nonaktif, muncul pesan jelas dan tidak ada akun yang dibuat otomatis.
+- Keamanan: tiket ditandatangani HMAC-SHA256 dengan kunci khusus Natara, berlaku 60 detik, **sekali pakai** (tabel `sso_tiket_terpakai`, dibersihkan Cron). Login tercatat di audit sebagai `LOGIN_SSO`.
+- Login biasa (username + password) tetap berjalan seperti sebelumnya.
+- Aktivasi: isi secret `SSO_SECRET` di Worker ini dengan nilai yang sama seperti secret `SSO_NK` di Worker `sipatuo`. Sebelum diisi, `/sso` menolak semua tiket.
+- Migration baru: `0024_sipatuo_sso.sql` (additive). File baru: `scripts/sipatuo-sso-smoke.mjs` (fungsi verifikasi tiket disalin dari `sipatuo/docs/sso-verify.js` ke dalam `src/worker.js`).
+
 ## V3.4.39 — Perbaikan bug (ditemukan saat pembuatan video panduan)
 
 - **PR / Vendor — Deklarasi Conflict of Interest**: bila form PR dibuka saat filter atas "Semua proyek" lalu proyek dipilih di dalam form, kotak COI tetap terkunci dan nilai centangnya tidak tersimpan, sehingga PR **tidak bisa dikirim** ke Head. Kini kotak COI aktif sesuai proyek yang dipilih dan nilainya tersimpan benar.

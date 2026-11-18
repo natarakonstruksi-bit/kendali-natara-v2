@@ -15,7 +15,8 @@
       "/auth/*",
       "/info",
       "/public",
-      "/informasi"
+      "/informasi",
+      "/sso"
     ]
   },
   "d1_databases": [
