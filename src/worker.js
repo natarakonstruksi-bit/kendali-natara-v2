@@ -656,14 +656,17 @@ async function sipatuoVerifyLoginHandler(request, env) {
   `).bind(key, key).first();
   const user = row ? { id: row.id, ...safeJsonParse(row.data_json, {}) } : null;
   const check = user && String(user.status || "").toLowerCase() !== "nonaktif" ? await verifyPassword(password, user.password) : { ok: false };
+  // Pencatatan (gagal/berhasil, audit) tidak boleh mengubah hasil cek password,
+  // mis. saat database sedang tidak bisa ditulis (batas harian D1).
+  const tulis = async (label, fn) => { try { await fn(); } catch (e) { console.error("sipatuo verify: " + label + " gagal", e && e.message); } };
   if (!check.ok) {
-    await recordLoginFail(env, key);
+    await tulis("recordLoginFail", () => recordLoginFail(env, key));
     return json({ ok: false, message: "Username atau password salah." }, 401);
   }
-  await clearLoginFails(env, key);
-  if (check.upgrade) await setUserPassword(env, user.id, await hashPassword(password));
+  await tulis("clearLoginFails", () => clearLoginFails(env, key));
+  if (check.upgrade) await tulis("upgrade hash", async () => setUserPassword(env, user.id, await hashPassword(password)));
   const pu = publicUser(user);
-  await audit(env, pu, "LOGIN_SIPATUO", "users", user.id, "", { via: "sipatuo" });
+  await tulis("audit", () => audit(env, pu, "LOGIN_SIPATUO", "users", user.id, "", { via: "sipatuo" }));
   return json({ ok: true, username: pu.username, name: pu.name, jabatan: pu.jabatan });
 }
 
