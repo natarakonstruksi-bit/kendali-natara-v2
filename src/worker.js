@@ -1,5 +1,5 @@
 /**
- * Nara System V3.4.41 — Request Material ke Bangun Nusa
+ * Nara System V3.4.42 — Request Material ke Bangun Nusa + negosiasi harga
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
@@ -29,7 +29,7 @@ async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik 
 }
 // ---- SIPATUO-SSO-VERIFY:END ----
 
-const APP_VERSION = "APP-V3.4.41";
+const APP_VERSION = "APP-V3.4.42";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -1465,6 +1465,7 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
     if(status==="RETURNED") return mk("MR_FIX",ttl,`Dikembalikan: ${d.returnNote||"perlu perbaikan"}.`,"Perbaiki & Ajukan Ulang",d.requesterUserId||sm,"site_manager",{priority:"HIGH"});
     if(status==="SUBMITTED") return mk("MR_OPS_APPROVE",ttl,`Head of Operational memeriksa request ${n} barang.`,"ACC / Kembalikan","","manager_operasional");
     if(status==="OPS_APPROVED") return mk("MR_FORWARD",ttl,`Admin Logistik memilih cara bayar dan meneruskan ke Bangun Nusa.`,"Teruskan ke Bangun Nusa","","procurement",{priority:"HIGH"});
+    if(status==="BN_NEGO") return mk("MR_NEGO",ttl,`Bangun Nusa mengajukan harga berbeda dari yang diminta. Setujui, tawar balik, atau batalkan.`,"Tanggapi Penawaran Harga","","procurement",{priority:"HIGH"});
     if(status==="ARRIVED") return mk("MR_RECEIVE",ttl,`Barang dari Bangun Nusa sudah sampai. Cek jumlah, foto, lalu tekan Diterima.`,"Konfirmasi Diterima",d.requesterUserId||sm,"site_manager",{priority:"HIGH"});
     return null;
   }
@@ -3159,8 +3160,8 @@ async function partnerPaymentPayHandler(request,env,user,id) {
 // Site Manager mengajukan → Head of Operational ACC → Admin Logistik meneruskan ke Bangun Nusa (API bertanda tangan)
 // → Bangun Nusa menerima/sebagian/menolak, menyiapkan, mengirim, menandai sampai (callback /api/bangun-nusa/status)
 // → Site Manager menekan Diterima per surat jalan (qty diterima, foto, catatan).
-const MR_BN_STATUS = {masuk:"SENT_BN",diterima:"BN_ACCEPTED",sebagian:"BN_PARTIAL",ditolak:"BN_REJECTED",dibatalkan:"CANCELLED",selesai:"DONE",ada_selisih:"DONE_DIFF"};
-const MR_STATUS_LABEL = {DRAFT:"Draft",SUBMITTED:"Menunggu ACC Head of Operational",RETURNED:"Dikembalikan",REJECTED:"Ditolak",OPS_APPROVED:"Menunggu Admin Logistik",SENT_BN:"Terkirim ke Bangun Nusa",BN_ACCEPTED:"Diterima Bangun Nusa",BN_PARTIAL:"Diterima sebagian",BN_REJECTED:"Ditolak Bangun Nusa",SHIPPING:"Dalam pengiriman",ARRIVED:"Barang sampai — konfirmasi",DONE:"Selesai",DONE_DIFF:"Selesai (ada selisih)",CANCELLED:"Dibatalkan"};
+const MR_BN_STATUS = {masuk:"SENT_BN",nego:"BN_NEGO",diterima:"BN_ACCEPTED",sebagian:"BN_PARTIAL",ditolak:"BN_REJECTED",dibatalkan:"CANCELLED",selesai:"DONE",ada_selisih:"DONE_DIFF"};
+const MR_STATUS_LABEL = {DRAFT:"Draft",SUBMITTED:"Menunggu ACC Head of Operational",RETURNED:"Dikembalikan",REJECTED:"Ditolak",OPS_APPROVED:"Menunggu Admin Logistik",BN_NEGO:"Penawaran harga dari Bangun Nusa",SENT_BN:"Terkirim ke Bangun Nusa",BN_ACCEPTED:"Diterima Bangun Nusa",BN_PARTIAL:"Diterima sebagian",BN_REJECTED:"Ditolak Bangun Nusa",SHIPPING:"Dalam pengiriman",ARRIVED:"Barang sampai — konfirmasi",DONE:"Selesai",DONE_DIFF:"Selesai (ada selisih)",CANCELLED:"Dibatalkan"};
 const BN_SIG_WINDOW = 300;
 async function bnHmac(secret,data){ const key=await crypto.subtle.importKey("raw",SSO_ENC.encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]); return [...new Uint8Array(await crypto.subtle.sign("HMAC",key,SSO_ENC.encode(data)))].map(b=>b.toString(16).padStart(2,"0")).join(""); }
 function bnSafeEq(a,b){ a=String(a); b=String(b); if(a.length!==b.length) return false; let x=0; for(let i=0;i<a.length;i++) x|=a.charCodeAt(i)^b.charCodeAt(i); return x===0; }
@@ -3181,7 +3182,7 @@ async function bnCall(env,path,bodyObj){
 function mrHistory(d,user,action,note=""){ const h=Array.isArray(d.history)?d.history:[]; h.push({at:new Date().toISOString(),by:user?.id||"",byName:user?.name||user?.username||"",action,note:String(note||"")}); return h.slice(-40); }
 function mrApplyBn(d,s){
   if(!s||typeof s!=="object") return d;
-  const bn={nomor:String(s.nomor||d.bn?.nomor||""),status:String(s.status||""),label:String(s.label||""),keterangan:String(s.keterangan||""),nilai_diterima:num(s.nilai_diterima),items:Array.isArray(s.items)?s.items:[],pengiriman:Array.isArray(s.pengiriman)?s.pengiriman:[]};
+  const bn={nomor:String(s.nomor||d.bn?.nomor||""),nego_ke:num(s.nego_ke),status:String(s.status||""),label:String(s.label||""),keterangan:String(s.keterangan||""),nilai_diterima:num(s.nilai_diterima),items:Array.isArray(s.items)?s.items:[],pengiriman:Array.isArray(s.pengiriman)?s.pengiriman:[]};
   let st=MR_BN_STATUS[bn.status]||d.status;
   if(["BN_ACCEPTED","BN_PARTIAL","SENT_BN"].includes(st)){
     if(bn.pengiriman.some(k=>k.status==="sampai")) st="ARRIVED";
@@ -3191,7 +3192,7 @@ function mrApplyBn(d,s){
 }
 function mrNormalizeItems(items){
   const out=[]; for(const it of (Array.isArray(items)?items:[])){ const qty=num(it.qty); const nama=String(it.nama||it.name||"").trim().slice(0,160); const kode=String(it.kode||"").trim().slice(0,60);
-    if(!(qty>0)||(!nama&&!kode)) continue; out.push({kode,nama,satuan:String(it.satuan||it.unit||"").trim().slice(0,30),qty:Math.round(qty*10000)/10000,harga:Math.max(0,num(it.harga))}); }
+    if(!(qty>0)||(!nama&&!kode)) continue; out.push({kode,nama,spesifikasi:String(it.spesifikasi||"").trim().slice(0,300),satuan:String(it.satuan||it.unit||"").trim().slice(0,30),qty:Math.round(qty*10000)/10000,harga:Math.max(0,Math.round(num(it.harga)))}); }
   if(!out.length) throw new Error("Isi minimal satu barang dengan jumlah lebih dari 0.");
   if(out.length>80) throw new Error("Maksimal 80 baris barang per request.");
   return out;
@@ -3241,9 +3242,18 @@ async function materialRequestActionHandler(request,env,user,id){
       const mode=["per_order","rekap_bulanan"].includes(String(body.paymentMode))?String(body.paymentMode):"per_order";
       const proj=await getRecord(env,"projects",d.projectId);
       const res=await bnCall(env,"/api/unit/order",{ref:d.number,proyek:proj?.data?.name||proj?.data?.projectName||d.projectId,alamat_kirim:d.deliveryAddress||proj?.data?.location||proj?.data?.address||"",tgl_dibutuhkan:d.neededDate||"",
-        pemesan:{nama:d.requesterName||"",kontak:d.contact||""},catatan:[d.notes,note].filter(Boolean).join(" · "),cara_bayar:mode,items:d.items.map(i=>i.kode?{kode:i.kode,nama:i.nama,satuan:i.satuan,qty:i.qty}:{nama:i.nama,satuan:i.satuan,qty:i.qty})});
+        pemesan:{nama:d.requesterName||"",kontak:d.contact||""},catatan:[d.notes,note].filter(Boolean).join(" · "),cara_bayar:mode,items:d.items.map(i=>({...(i.kode?{kode:i.kode}:{}),nama:i.nama,satuan:i.satuan,qty:i.qty,harga:num(i.harga),spesifikasi:i.spesifikasi||""}))});
       d=mrApplyBn({...d,status:"SENT_BN",paymentMode:mode,forwardedAt:new Date().toISOString(),forwardedBy:user.id,forwardedByName:user.name||user.username||""},res);
       d.history=mrHistory(d,user,"TERUSKAN_KE_BANGUN_NUSA",`${mode==="rekap_bulanan"?"Rekap bulanan":"Per order"}${res.nomor?` · ${res.nomor}`:""}`); }
+    else if(action==="nego"){
+      if(!(cap.materialRequestForward||cap.materialRequestApprove)) throw new Error("Hanya Admin Logistik / Head of Operational yang dapat menanggapi penawaran harga.");
+      if(st!=="BN_NEGO") throw new Error("Tidak ada penawaran harga yang menunggu jawaban.");
+      const jawab=String(body.jawab||""); if(!["setuju","tawar","batal"].includes(jawab)) throw new Error("Pilih: setujui, tawar balik, atau batalkan.");
+      if(jawab!=="setuju"&&!note) throw new Error("Tuliskan catatan untuk Bangun Nusa.");
+      const items=(Array.isArray(body.items)?body.items:[]).map(x=>({item_id:Number(x.item_id),harga:Math.round(num(x.harga))})).filter(x=>x.item_id&&x.harga>0);
+      if(jawab==="tawar"&&!items.length) throw new Error("Isi harga tawaran.");
+      d=mrApplyBn(d,await bnCall(env,"/api/unit/order/nego",{ref:d.number,aksi:jawab,catatan:note,oleh:user.name||user.username||"",items}));
+      d.history=mrHistory(d,user,{setuju:"SETUJU_HARGA_BN",tawar:"TAWAR_BALIK",batal:"BATAL_HARGA_TIDAK_SEPAKAT"}[jawab],note); }
     else if(action==="refresh"){
       if(!d.forwardedAt) throw new Error("Request belum diteruskan ke Bangun Nusa.");
       d=mrApplyBn(d,await bnCall(env,"/api/unit/order/status",{ref:d.number})); }
@@ -3665,7 +3675,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.41-request-material-bn"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.42-nego-harga-bn"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
