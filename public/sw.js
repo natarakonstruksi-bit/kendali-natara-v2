@@ -10,7 +10,7 @@ const SHELL = [
   '/assets/natara-logo.jpeg', '/assets/natara-mark.png', '/assets/favicon.png',
   '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'
 ];
-const NETWORK_ONLY = [/^\/api\//, /^\/rest\//, /^\/storage\//, /^\/auth\//, /^\/app-build\.json/, /^\/info(\/|$)/, /^\/public(\/|$)/, /^\/informasi(\/|$)/, /^\/__/];
+const NETWORK_ONLY = [/^\/api\//, /^\/rest\//, /^\/storage\//, /^\/auth\//, /^\/app-build\.json/, /^\/info(\/|$)/, /^\/public(\/|$)/, /^\/informasi(\/|$)/, /^\/sso(\/|$)/, /^\/__/];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).catch(() => null));
