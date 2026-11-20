@@ -36,8 +36,11 @@
     "EMAIL_GAS_URL": "https://script.google.com/macros/s/AKfycbyu8pj7RSKlnmQ2JI8H-m3hdyNY0F2LUcqACty7ZoAV06UuXnQ4GI6V__M-3UjLscV_8A/exec",
     "EMAIL_FROM": "",
     "EMAIL_FROM_NAME": "Nara System — Natara Konstruksi",
-    "APP_BASE_URL": "https://kendali-natara-v2.natarakonstruksi.workers.dev"
+    "APP_BASE_URL": "https://kendali-natara-v2.natarakonstruksi.workers.dev",
+    "BANGUN_NUSA_URL": "https://bangun-nusa.natarakonstruksi.workers.dev"
   },
+  // V3.4.41 — Request Material ke Bangun Nusa. Rahasia BANGUN_NUSA_KEY (= KUNCI_NK di Bangun Nusa) diisi lewat dashboard.
+  "services": [ { "binding": "UNIT_BN", "service": "bangun-nusa" } ],
   "r2_buckets": [
     {
       "binding": "FILES",
