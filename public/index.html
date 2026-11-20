@@ -107,6 +107,16 @@
 
   <div id="toastArea" class="toast-area"></div>
   <script>
+    // Aplikasi terpasang (PWA): bila Chrome membuka jendela aplikasi untuk tautan masuk dari Sipatuo (/sso?t=...),
+    // teruskan ke alamat itu supaya login otomatis tetap jalan.
+    if ('launchQueue' in window) {
+      window.launchQueue.setConsumer(function (p) {
+        try {
+          var u = p && p.targetURL ? new URL(p.targetURL) : null;
+          if (u && u.origin === location.origin && u.pathname === '/sso' && location.pathname !== '/sso') location.replace(u.href);
+        } catch (e) { /* abaikan */ }
+      });
+    }
     window.__kendaliBootTimer = setTimeout(function () {
       var login = document.getElementById('loginScreen');
       var app = document.getElementById('app');
