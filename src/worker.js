@@ -636,6 +636,36 @@ async function sipatuoHmacHex(secret, data) {
   return [...new Uint8Array(await crypto.subtle.sign("HMAC", key, SSO_ENC.encode(data)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// V3.4.41 — MAW Group OS (dulu Sipatuo) membaca ringkasan proyek & keuangan untuk dashboard holding.
+// Baca saja, ditandatangani sama seperti verify-login. Tidak membuat sesi dan tidak mengubah data.
+async function sipatuoRingkasanHandler(request, env) {
+  if (!env.SSO_SECRET) return json({ ok: false, message: "SSO belum dikonfigurasi." }, 503);
+  const raw = await request.text();
+  if (raw.length > 4000) return json({ ok: false, message: "Permintaan terlalu besar." }, 413);
+  const ts = Number(request.headers.get("x-sipatuo-ts") || 0);
+  const sig = String(request.headers.get("x-sipatuo-sig") || "");
+  if (!ts || Math.abs(Math.floor(Date.now() / 1000) - ts) > 60) return json({ ok: false, message: "Waktu permintaan tidak valid." }, 401);
+  if (!timingSafeEqual(await sipatuoHmacHex(env.SSO_SECRET, `${ts}.${raw}`), sig)) return json({ ok: false, message: "Tanda tangan tidak cocok." }, 401);
+  const pembaca = { id: "maw-group-os", username: "maw-group-os", role: "Direktur", position: "Direktur" };
+  const all = await loadControlRows(env, pembaca);
+  const groups = groupRowsByProject(all);
+  const rows = all.filter(r => r.collection === "projects").map(p => {
+    const g = groups.get(String(p.id)) || [];
+    const m = computeProjectMetrics(p, g);
+    return { id: m.id, name: m.name, status: evaluateProject(p, g).status, scheduleStatus: m.scheduleStatus, progress: Math.round(num(m.progress) * 10) / 10,
+      contract: m.contract, budget: m.budget, income: m.income, expense: m.expense, receivable: m.receivable, payable: m.payable, committed: m.committed,
+      marginForecast: m.marginForecast, openQc: m.openQc, openDefects: m.openDefects, openIssues: m.openIssues, pendingApprovals: m.pendingApprovals,
+      client: String(p.data.client || p.data.owner || p.data.pemberiTugas || ""), siteManager: String(p.data.siteManagerName || "") };
+  });
+  const sum = k => rows.reduce((s, r) => s + num(r[k]), 0);
+  const aktif = rows.filter(r => r.status !== "CLOSED");
+  return json({ ok: true, unit: "NK", generatedAt: new Date().toISOString(),
+    totals: { projects: rows.length, active: aktif.length, closed: rows.length - aktif.length, delayed: aktif.filter(r => r.scheduleStatus === "DELAY").length,
+      contract: sum("contract"), activeContract: aktif.reduce((s, r) => s + num(r.contract), 0), income: sum("income"), expense: sum("expense"),
+      receivable: sum("receivable"), payable: sum("payable"), openQc: sum("openQc"), openDefects: sum("openDefects"), openIssues: sum("openIssues"), pendingApprovals: sum("pendingApprovals") },
+    projects: rows });
+}
+
 async function sipatuoVerifyLoginHandler(request, env) {
   if (!env.SSO_SECRET) return json({ ok: false, message: "SSO belum dikonfigurasi." }, 503);
   const raw = await request.text();
@@ -3496,6 +3526,7 @@ async function handleRequest(request, env) {
     if (path === "/api/auth/login" && request.method === "POST") return loginHandler(request,env);
     if (path === "/sso" && request.method === "GET") return sipatuoSsoHandler(request,env);
     if (path === "/api/sipatuo/verify-login" && request.method === "POST") return sipatuoVerifyLoginHandler(request,env);
+    if (path === "/api/sipatuo/ringkasan" && request.method === "POST") return sipatuoRingkasanHandler(request,env);
 
     const auth = await authenticate(request,env);
     if (path === "/api/auth/me" || path === "/api/access/session") {
