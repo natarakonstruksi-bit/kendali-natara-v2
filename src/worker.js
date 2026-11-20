@@ -591,14 +591,14 @@ async function loginHandler(request, env) {
 
 // V3.4.40 — Login dari Sipatuo (portal grup). Tiket bertanda tangan HMAC, berlaku 60 detik, sekali pakai.
 // Akun & jabatan tetap diatur di Nara System; dicocokkan lewat username yang sama. Tidak membuat akun baru.
-const SIPATUO_PORTAL_URL = "https://sipatuo.natarakonstruksi.workers.dev/portal";
+const SIPATUO_PORTAL_URL = "https://maw-group.natarakonstruksi.workers.dev/portal";
 const SIPATUO_UNIT = "NK";
 
 function ssoErrorPage(message, status = 400) {
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const body = `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Masuk dari Sipatuo — Nara System</title>
 <style>body{margin:0;font-family:system-ui,sans-serif;background:#f4f6f5;color:#1f2a2e;display:grid;place-items:center;min-height:100vh}.box{background:#fff;border:1px solid #d9dfdc;border-radius:12px;padding:28px;width:min(420px,92vw)}h1{font-size:20px;margin:0 0 10px}p{color:#4a5a5f}a{display:inline-block;margin:8px 12px 0 0;color:#1d6b5f}</style></head>
-<body><div class="box"><h1>Tidak bisa masuk otomatis</h1><p>${esc(message)}</p><a href="/">Login dengan username &amp; password</a><a href="${SIPATUO_PORTAL_URL}">Kembali ke Sipatuo</a></div></body></html>`;
+<body><div class="box"><h1>Tidak bisa masuk otomatis</h1><p>${esc(message)}</p><a href="/">Login dengan username &amp; password</a><a href="${SIPATUO_PORTAL_URL}">Kembali ke MAW Group OS</a></div></body></html>`;
   return new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer", "x-frame-options": "DENY" } });
 }
 
