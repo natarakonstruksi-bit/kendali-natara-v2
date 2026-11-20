@@ -1,5 +1,5 @@
 /**
- * Nara System V3.4.40 — Login dari Sipatuo (portal grup)
+ * Nara System V3.4.41 — Request Material ke Bangun Nusa
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
@@ -29,7 +29,7 @@ async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik 
 }
 // ---- SIPATUO-SSO-VERIFY:END ----
 
-const APP_VERSION = "APP-V3.4.40";
+const APP_VERSION = "APP-V3.4.41";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -42,9 +42,9 @@ const STORAGE_BUCKET = "kendali-natara-files-v2";
 const LOGIN_MAX_FAILS = 8;
 const LOGIN_WINDOW_SEC = 15 * 60;
 
-const COLLECTIONS = new Set(["partners","project_terms","partner_payments","projects","users","rabs","surat","tukang","pelatihan","aset","proyeksi","vendor","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","qc_inspection_sessions","qc_inspection_items","qc_work_groups","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","public_site_settings","public_portfolio","qc_reports","ati_reports","workflow_tasks","as_built_progress","qc_visit_routes"]);
+const COLLECTIONS = new Set(["partners","project_terms","partner_payments","projects","users","rabs","surat","tukang","pelatihan","aset","proyeksi","vendor","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","qc_inspection_sessions","qc_inspection_items","qc_work_groups","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","public_site_settings","public_portfolio","qc_reports","ati_reports","workflow_tasks","as_built_progress","qc_visit_routes","material_requests"]);
 
-const PROJECT_SCOPED_COLLECTIONS = new Set(["project_terms","partner_payments","projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","as_built_progress","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks","qc_visit_routes"]);
+const PROJECT_SCOPED_COLLECTIONS = new Set(["project_terms","partner_payments","projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","as_built_progress","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks","qc_visit_routes","material_requests"]);
 
 const DOC_CORE = ["CONTRACT", "RAB_BASELINE", "DED_FINAL", "TIME_SCHEDULE"];
 const DOC_PRECON = ["PCM", "MC0"];
@@ -75,23 +75,23 @@ const ROLE_LABELS = {
   viewer: "Viewer"
 };
 
-const ALL_VIEWS = ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","ati","documents","flow","closeout","public_info","employees","master","audit"];
+const ALL_VIEWS = ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","ati","documents","flow","closeout","public_info","employees","master","audit"];
 const ROLE_VIEWS = {
   administrator: ALL_VIEWS,
   direktur: ALL_VIEWS,
   head_unit_bisnis: ALL_VIEWS,
-  manager_operasional: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","ati","documents","flow","closeout","public_info","master","audit"],
+  manager_operasional: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","ati","documents","flow","closeout","public_info","master","audit"],
   koordinator_engineering: ["dashboard","tasks","projects","progress","opname","asbuilt","qc","cco","procurement","documents","flow","closeout"],
   koordinator_supporting: ["dashboard","tasks","projects","progress","qc","qc_archive","documents","flow","closeout"],
-  admin_teknik: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","ati","documents","flow","closeout","public_info","master"],
-  site_manager: ["dashboard","tasks","projects","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","ati","documents","flow","closeout"],
+  admin_teknik: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","ati","documents","flow","closeout","public_info","master"],
+  site_manager: ["dashboard","tasks","projects","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","material","ati","documents","flow","closeout"],
   estimator: ["dashboard","tasks","projects","cco","documents","flow"],
   qs: ["dashboard","tasks","projects","fund_requests","progress","opname","cco","documents","flow"],
   drafter: ["dashboard","tasks","projects","asbuilt","documents","flow"],
   qc: ["dashboard","tasks","projects","fund_requests","progress","qc","qc_archive","documents","flow"],
   mep_engineer: ["dashboard","tasks","projects","progress","qc","documents","flow"],
-  finance: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","procurement","documents","flow","closeout"],
-  procurement: ["dashboard","tasks","projects","payments","directory","fund_requests","procurement","documents","flow"],
+  finance: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","procurement","material","documents","flow","closeout"],
+  procurement: ["dashboard","tasks","projects","payments","directory","fund_requests","procurement","material","documents","flow"],
   kepala_ati: ["dashboard","tasks","ati","progress","master"],
   instruktur_ati: ["dashboard","tasks","ati","master"],
   viewer: ["dashboard","projects","documents","flow"]
@@ -265,6 +265,7 @@ function collectionPermission(user, collection) {
   // V3.4.24 — Keuangan proyek
   if (collection === "partners") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance","koordinator_engineering"],["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","finance"]);
   if (collection === "project_terms") return allow(["manager_operasional","admin_teknik","finance","site_manager"],["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
+  if (collection === "material_requests") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],[],[]);
   if (collection === "partner_payments") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],[],[]);
   if (collection === "po") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","admin_teknik","procurement","finance"],["manager_operasional","admin_teknik"]);
   if (collection === "project_documents") return allow(projectReaders,["manager_operasional","koordinator_engineering","koordinator_supporting","admin_teknik","site_manager","qs","drafter","qc","finance","procurement"],["manager_operasional","koordinator_engineering","admin_teknik"]);
@@ -302,6 +303,9 @@ function buildAccess(user) {
       ccoEscalation: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       financeApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       financePay: roleIn(user,["administrator","direktur","head_unit_bisnis","finance"]),
+      materialRequestCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","site_manager"]),
+      materialRequestApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
+      materialRequestForward: roleIn(user,["administrator","direktur","head_unit_bisnis","procurement"]),
       partnerPaymentCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","site_manager"]),
       partnerPaymentOpsApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       partnerPaymentHubApprove: roleIn(user,["administrator","direktur","head_unit_bisnis"]),
@@ -1357,14 +1361,14 @@ async function getProjectBudgetValue(env, projectId) {
 }
 
 
-const WORKFLOW_SOURCE_COLLECTIONS = new Set(["daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items","partner_payments","project_terms"]);
+const WORKFLOW_SOURCE_COLLECTIONS = new Set(["daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items","partner_payments","project_terms","material_requests"]);
 
 function workflowRoleLabel(role) { return String(role||"").split(",").filter(Boolean).map(r=>ROLE_LABELS[r]||r).join(" / "); }
 // V3.4.30: antrean tugas bisa untuk beberapa jabatan sekaligus, ditulis "qc,koordinator_supporting".
 function roleQueueHas(assigneeRole,role){ return String(assigneeRole||"").split(",").map(x=>x.trim()).filter(Boolean).includes(String(role||"")); }
 function workflowActiveStatus(status) { return ["OPEN","IN_PROGRESS"].includes(String(status||"").toUpperCase()); }
 function workflowSourceView(collection) {
-  return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc",partner_payments:"payments",project_terms:"finance"})[collection] || "dashboard";
+  return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc",partner_payments:"payments",project_terms:"finance",material_requests:"material"})[collection] || "dashboard";
 }
 async function projectRoleUser(env, projectId, roleKey, ctx=null) {
   if (!projectId) return "";
@@ -1453,6 +1457,15 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
   if(collection==="ati_field_issues"){
     if(["OPEN","IN PROGRESS"].includes(status)) return mk("ATI_ISSUE_ACTION","Masalah Lapangan ATI", "PIC menangani masalah tenaga/operasional ATI","Tangani Masalah",d.picUserId,"kepala_ati",{priority:"HIGH"});
     if(status==="WAITING EVALUATION") return mk("ATI_ISSUE_EVAL","Evaluasi Masalah ATI", "Kepala ATI melakukan evaluasi dan menutup masalah","Evaluasi Masalah","","kepala_ati");
+    return null;
+  }
+  if(collection==="material_requests"){
+    const ttl=`Request Material ${d.number||""}`; const n=(d.items||[]).length;
+    if(status==="DRAFT") return mk("MR_DRAFT",ttl,`Lengkapi lalu ajukan request ${n} barang.`,"Ajukan",d.requesterUserId||sm,"site_manager");
+    if(status==="RETURNED") return mk("MR_FIX",ttl,`Dikembalikan: ${d.returnNote||"perlu perbaikan"}.`,"Perbaiki & Ajukan Ulang",d.requesterUserId||sm,"site_manager",{priority:"HIGH"});
+    if(status==="SUBMITTED") return mk("MR_OPS_APPROVE",ttl,`Head of Operational memeriksa request ${n} barang.`,"ACC / Kembalikan","","manager_operasional");
+    if(status==="OPS_APPROVED") return mk("MR_FORWARD",ttl,`Admin Logistik memilih cara bayar dan meneruskan ke Bangun Nusa.`,"Teruskan ke Bangun Nusa","","procurement",{priority:"HIGH"});
+    if(status==="ARRIVED") return mk("MR_RECEIVE",ttl,`Barang dari Bangun Nusa sudah sampai. Cek jumlah, foto, lalu tekan Diterima.`,"Konfirmasi Diterima",d.requesterUserId||sm,"site_manager",{priority:"HIGH"});
     return null;
   }
   if(collection==="partner_payments"){
@@ -3142,6 +3155,144 @@ async function partnerPaymentPayHandler(request,env,user,id) {
   await audit(env,user,"PARTNER_PAYMENT_PAID","partner_payments",id,d.projectId,{amount:paidAmount});
   return json({ok:true,row:out});
 }
+// ===================== V3.4.41 — Request Material ke Bangun Nusa =====================
+// Site Manager mengajukan → Head of Operational ACC → Admin Logistik meneruskan ke Bangun Nusa (API bertanda tangan)
+// → Bangun Nusa menerima/sebagian/menolak, menyiapkan, mengirim, menandai sampai (callback /api/bangun-nusa/status)
+// → Site Manager menekan Diterima per surat jalan (qty diterima, foto, catatan).
+const MR_BN_STATUS = {masuk:"SENT_BN",diterima:"BN_ACCEPTED",sebagian:"BN_PARTIAL",ditolak:"BN_REJECTED",dibatalkan:"CANCELLED",selesai:"DONE",ada_selisih:"DONE_DIFF"};
+const MR_STATUS_LABEL = {DRAFT:"Draft",SUBMITTED:"Menunggu ACC Head of Operational",RETURNED:"Dikembalikan",REJECTED:"Ditolak",OPS_APPROVED:"Menunggu Admin Logistik",SENT_BN:"Terkirim ke Bangun Nusa",BN_ACCEPTED:"Diterima Bangun Nusa",BN_PARTIAL:"Diterima sebagian",BN_REJECTED:"Ditolak Bangun Nusa",SHIPPING:"Dalam pengiriman",ARRIVED:"Barang sampai — konfirmasi",DONE:"Selesai",DONE_DIFF:"Selesai (ada selisih)",CANCELLED:"Dibatalkan"};
+const BN_SIG_WINDOW = 300;
+async function bnHmac(secret,data){ const key=await crypto.subtle.importKey("raw",SSO_ENC.encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]); return [...new Uint8Array(await crypto.subtle.sign("HMAC",key,SSO_ENC.encode(data)))].map(b=>b.toString(16).padStart(2,"0")).join(""); }
+function bnSafeEq(a,b){ a=String(a); b=String(b); if(a.length!==b.length) return false; let x=0; for(let i=0;i<a.length;i++) x|=a.charCodeAt(i)^b.charCodeAt(i); return x===0; }
+function bnBaseUrl(env){ return String(env.BANGUN_NUSA_URL||"https://bangun-nusa.natarakonstruksi.workers.dev").replace(/\/+$/,""); }
+async function bnCall(env,path,bodyObj){
+  const secret=String(env.BANGUN_NUSA_KEY||"");
+  if(!secret) throw new Error("KENDALI belum tersambung ke Bangun Nusa (secret BANGUN_NUSA_KEY belum diisi).");
+  const body=JSON.stringify(bodyObj||{}); const ts=String(Math.floor(Date.now()/1000));
+  const headers={"content-type":"application/json","x-bn-unit":"NK","x-bn-ts":ts,"x-bn-sig":await bnHmac(secret,`${ts}.${body}`)};
+  const url=`${bnBaseUrl(env)}${path}`; const svc=env.UNIT_BN;
+  let r;
+  try{ r=svc&&typeof svc.fetch==="function"?await svc.fetch(url,{method:"POST",headers,body}):await fetch(url,{method:"POST",headers,body,signal:AbortSignal.timeout(10000)}); }
+  catch(e){ throw new Error(`Bangun Nusa tidak dapat dihubungi: ${e?.message||e}`); }
+  let data={}; try{ data=await r.json(); }catch(_){}
+  if(!r.ok||data.ok===false) throw new Error(data.message||data.pesan||`Bangun Nusa menjawab HTTP ${r.status}.`);
+  return data;
+}
+function mrHistory(d,user,action,note=""){ const h=Array.isArray(d.history)?d.history:[]; h.push({at:new Date().toISOString(),by:user?.id||"",byName:user?.name||user?.username||"",action,note:String(note||"")}); return h.slice(-40); }
+function mrApplyBn(d,s){
+  if(!s||typeof s!=="object") return d;
+  const bn={nomor:String(s.nomor||d.bn?.nomor||""),status:String(s.status||""),label:String(s.label||""),keterangan:String(s.keterangan||""),nilai_diterima:num(s.nilai_diterima),items:Array.isArray(s.items)?s.items:[],pengiriman:Array.isArray(s.pengiriman)?s.pengiriman:[]};
+  let st=MR_BN_STATUS[bn.status]||d.status;
+  if(["BN_ACCEPTED","BN_PARTIAL","SENT_BN"].includes(st)){
+    if(bn.pengiriman.some(k=>k.status==="sampai")) st="ARRIVED";
+    else if(bn.pengiriman.some(k=>k.status==="dikirim")) st="SHIPPING";
+  }
+  return {...d,bn,status:st,bnUpdatedAt:new Date().toISOString()};
+}
+function mrNormalizeItems(items){
+  const out=[]; for(const it of (Array.isArray(items)?items:[])){ const qty=num(it.qty); const nama=String(it.nama||it.name||"").trim().slice(0,160); const kode=String(it.kode||"").trim().slice(0,60);
+    if(!(qty>0)||(!nama&&!kode)) continue; out.push({kode,nama,satuan:String(it.satuan||it.unit||"").trim().slice(0,30),qty:Math.round(qty*10000)/10000,harga:Math.max(0,num(it.harga))}); }
+  if(!out.length) throw new Error("Isi minimal satu barang dengan jumlah lebih dari 0.");
+  if(out.length>80) throw new Error("Maksimal 80 baris barang per request.");
+  return out;
+}
+async function bnKatalogHandler(env,user){
+  if(!buildAccess(user).collections.material_requests?.read) return json({ok:false,message:"Role ini tidak dapat melihat katalog Bangun Nusa."},403);
+  try{ const d=await bnCall(env,"/api/unit/katalog",{}); return json({ok:true,materials:d.materials||[]}); }
+  catch(e){ return json({ok:false,message:e.message,materials:[]},200); }
+}
+async function materialRequestSaveHandler(request,env,user,id=""){
+  const cap=buildAccess(user).capabilities; if(!cap.materialRequestCreate) return json({ok:false,message:"Hanya Site Manager yang dapat membuat request material."},403);
+  const body=await parseJson(request)||{}; let old=null;
+  if(id){ old=await getRecord(env,"material_requests",id); if(!old) return json({ok:false,message:"Request tidak ditemukan."},404);
+    if(!["DRAFT","RETURNED"].includes(String(old.data.status).toUpperCase())) return json({ok:false,message:"Request yang sudah diproses tidak dapat diubah."},409);
+    if(old.data.requesterUserId!==user.id && !isManagementRole(user)) return json({ok:false,message:"Hanya pengaju yang dapat mengubah request ini."},403); }
+  const projectId=String(body.projectId||old?.data?.projectId||""); if(!projectId) return json({ok:false,message:"Pilih proyek."},400);
+  const denied=await requireProjectAccess(env,user,projectId); if(denied) return denied;
+  try{
+    const items=mrNormalizeItems(body.items);
+    const rid=id||`MR-${new Date().toISOString().slice(0,7).replace("-","")}-${crypto.randomUUID().slice(0,6).toUpperCase()}`;
+    let d={...(old?.data||{}),projectId,number:old?.data?.number||rid,items,neededDate:reportDay(body.neededDate)||"",deliveryAddress:String(body.deliveryAddress||"").slice(0,300),contact:String(body.contact||"").slice(0,60),notes:String(body.notes||"").slice(0,1000),
+      requesterUserId:old?.data?.requesterUserId||user.id,requesterName:old?.data?.requesterName||user.name||user.username||"",status:old?String(old.data.status).toUpperCase():"DRAFT",updatedAt:new Date().toISOString()};
+    if(!old){ d.createdAt=d.updatedAt; d.history=mrHistory(d,user,"BUAT"); }
+    if(truthy(body.submit)){ d.status="SUBMITTED"; d.submittedAt=new Date().toISOString(); d.returnNote=""; d.history=mrHistory(d,user,"AJUKAN"); }
+    const rec=await upsertRecord(env,"material_requests",rid,d,user);
+    await syncWorkflowTask(env,"material_requests",rid,d,user);
+    await audit(env,user,id?"MATERIAL_REQUEST_UPDATE":"MATERIAL_REQUEST_CREATE","material_requests",rid,projectId,{status:d.status,items:items.length});
+    return json({ok:true,row:rec});
+  }catch(e){ return json({ok:false,message:e.message||String(e)},400); }
+}
+async function materialRequestActionHandler(request,env,user,id){
+  const rec=await getRecord(env,"material_requests",id); if(!rec) return json({ok:false,message:"Request tidak ditemukan."},404);
+  const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
+  const body=await parseJson(request)||{}; const action=String(body.action||"").toLowerCase(); const note=String(body.note||"").trim();
+  const cap=buildAccess(user).capabilities; let d={...rec.data}; const st=String(d.status||"DRAFT").toUpperCase();
+  try{
+    if(action==="submit"){ if(!["DRAFT","RETURNED"].includes(st)) throw new Error("Request sudah diajukan."); if(d.requesterUserId!==user.id && !isManagementRole(user)) throw new Error("Hanya pengaju yang dapat mengajukan.");
+      d.status="SUBMITTED"; d.submittedAt=new Date().toISOString(); d.returnNote=""; d.history=mrHistory(d,user,"AJUKAN",note); }
+    else if(action==="ops-approve"){ if(!cap.materialRequestApprove) throw new Error("Hanya Head of Operational yang dapat ACC."); if(st!=="SUBMITTED") throw new Error("Request tidak menunggu ACC.");
+      Object.assign(d,{status:"OPS_APPROVED",opsApprovedAt:new Date().toISOString(),opsApprovedBy:user.id,opsApprovedByName:user.name||user.username||""}); d.history=mrHistory(d,user,"ACC_HEAD_OPERATIONAL",note); }
+    else if(action==="return"||action==="reject"){
+      const can=(st==="SUBMITTED"&&cap.materialRequestApprove)||(st==="OPS_APPROVED"&&cap.materialRequestForward);
+      if(!can) throw new Error("Anda tidak berwenang pada tahap ini."); if(!note) throw new Error("Tuliskan alasannya.");
+      d.status=action==="return"?"RETURNED":"REJECTED"; d.returnNote=note; d.history=mrHistory(d,user,action==="return"?"KEMBALIKAN":"TOLAK",note); }
+    else if(action==="forward"){
+      if(!cap.materialRequestForward) throw new Error("Hanya Admin Logistik yang dapat meneruskan ke Bangun Nusa."); if(st!=="OPS_APPROVED") throw new Error("Request belum di-ACC Head of Operational.");
+      const mode=["per_order","rekap_bulanan"].includes(String(body.paymentMode))?String(body.paymentMode):"per_order";
+      const proj=await getRecord(env,"projects",d.projectId);
+      const res=await bnCall(env,"/api/unit/order",{ref:d.number,proyek:proj?.data?.name||proj?.data?.projectName||d.projectId,alamat_kirim:d.deliveryAddress||proj?.data?.location||proj?.data?.address||"",tgl_dibutuhkan:d.neededDate||"",
+        pemesan:{nama:d.requesterName||"",kontak:d.contact||""},catatan:[d.notes,note].filter(Boolean).join(" · "),cara_bayar:mode,items:d.items.map(i=>i.kode?{kode:i.kode,nama:i.nama,satuan:i.satuan,qty:i.qty}:{nama:i.nama,satuan:i.satuan,qty:i.qty})});
+      d=mrApplyBn({...d,status:"SENT_BN",paymentMode:mode,forwardedAt:new Date().toISOString(),forwardedBy:user.id,forwardedByName:user.name||user.username||""},res);
+      d.history=mrHistory(d,user,"TERUSKAN_KE_BANGUN_NUSA",`${mode==="rekap_bulanan"?"Rekap bulanan":"Per order"}${res.nomor?` · ${res.nomor}`:""}`); }
+    else if(action==="refresh"){
+      if(!d.forwardedAt) throw new Error("Request belum diteruskan ke Bangun Nusa.");
+      d=mrApplyBn(d,await bnCall(env,"/api/unit/order/status",{ref:d.number})); }
+    else throw new Error("Aksi tidak dikenal.");
+  }catch(e){ return json({ok:false,message:e.message},400); }
+  d.updatedAt=new Date().toISOString();
+  const out=await upsertRecord(env,"material_requests",id,d,user); await syncWorkflowTask(env,"material_requests",id,d,user);
+  if(action!=="refresh") await audit(env,user,"MATERIAL_REQUEST_ACTION","material_requests",id,d.projectId,{action,from:st,to:d.status});
+  return json({ok:true,row:out});
+}
+async function materialRequestReceiveHandler(request,env,user,id){
+  const rec=await getRecord(env,"material_requests",id); if(!rec) return json({ok:false,message:"Request tidak ditemukan."},404);
+  const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
+  let d={...rec.data};
+  const sm=await projectRoleUser(env,d.projectId,"site_manager");
+  if(!(d.requesterUserId===user.id||String(sm)===String(user.id)||isManagementRole(user))) return json({ok:false,message:"Konfirmasi barang diterima dilakukan Site Manager proyek."},403);
+  let fd; try{ fd=await request.formData(); }catch{ return json({ok:false,message:"Form tidak valid."},400); }
+  const sj=String(fd.get("suratJalan")||""); const kirim=(d.bn?.pengiriman||[]).find(k=>k.surat_jalan===sj);
+  if(!kirim) return json({ok:false,message:"Surat jalan tidak ditemukan."},404);
+  const photos=fd.getAll("files").filter(f=>f instanceof File&&f.size>0);
+  if(!photos.length) return json({ok:false,message:"Foto barang diterima wajib diunggah."},400);
+  const qtys=safeJsonParse(String(fd.get("items")||"[]"),[]); const catatan=String(fd.get("note")||"").slice(0,500);
+  try{
+    const docIds=[]; for(const f of photos){ const doc=await storeEvidenceDocument(env,user,f,{projectId:d.projectId,category:"DELIVERY_RECEIPT",title:`Penerimaan material ${sj}`,relatedCollection:"material_requests",relatedId:id}); docIds.push(doc.id); }
+    const res=await bnCall(env,"/api/unit/order/terima",{ref:d.number,surat_jalan:sj,penerima:user.name||user.username||"",catatan,items:(Array.isArray(qtys)?qtys:[]).map(x=>({item_id:Number(x.item_id),qty_diterima:num(x.qty_diterima)}))});
+    d=mrApplyBn(d,res);
+    const rc=Array.isArray(d.receipts)?d.receipts:[]; rc.push({suratJalan:sj,at:new Date().toISOString(),by:user.id,byName:user.name||user.username||"",note:catatan,photoDocIds:docIds,items:qtys}); d.receipts=rc.slice(-30);
+    d.history=mrHistory(d,user,"DITERIMA",`${sj}${catatan?` · ${catatan}`:""}`); d.updatedAt=new Date().toISOString();
+  }catch(e){ return json({ok:false,message:e.message},400); }
+  const out=await upsertRecord(env,"material_requests",id,d,user); await syncWorkflowTask(env,"material_requests",id,d,user);
+  await audit(env,user,"MATERIAL_REQUEST_RECEIVED","material_requests",id,d.projectId,{suratJalan:sj,status:d.status});
+  return json({ok:true,row:out});
+}
+// Kabar status dari Bangun Nusa (ditandatangani x-bn-unit: BN). Selalu dijawab 2xx bila tanda tangan sah agar tidak dikirim ulang terus.
+async function bangunNusaStatusHandler(request,env){
+  const secret=String(env.BANGUN_NUSA_KEY||""); if(!secret) return json({ok:false,message:"Belum tersambung."},401);
+  const unit=String(request.headers.get("x-bn-unit")||""); const ts=Number(request.headers.get("x-bn-ts")||0); const sig=String(request.headers.get("x-bn-sig")||"");
+  const raw=await request.text(); if(raw.length>200000) return json({ok:false},413);
+  if(unit!=="BN"||!ts||Math.abs(Math.floor(Date.now()/1000)-ts)>BN_SIG_WINDOW||!bnSafeEq(await bnHmac(secret,`${ts}.${raw}`),sig)) return json({ok:false,message:"Tanda tangan tidak sah."},401);
+  const s=safeJsonParse(raw,null); if(!s||!s.ref) return json({ok:false,message:"Isi tidak valid."},400);
+  const rows=await rowsWhere(env,"material_requests","json_extract(data_json,'$.number')=?",[String(s.ref)]);
+  if(!rows.length) return json({ok:true,ignored:true});
+  const r=rows[0]; const actor={id:"bangun-nusa",name:"Bangun Nusa",username:"bangun-nusa"};
+  let d=mrApplyBn({...r.data},s);
+  if(s.pesan) d.history=mrHistory(d,actor,`BN_${String(s.jenis||"STATUS").toUpperCase()}`,String(s.pesan));
+  d.updatedAt=new Date().toISOString();
+  await upsertRecord(env,"material_requests",r.id,d,actor); await syncWorkflowTask(env,"material_requests",r.id,d,actor);
+  return json({ok:true});
+}
 async function payrollPreviewHandler(env,user,url) {
   const projectId=String(url.searchParams.get("projectId")||""); const a=reportDay(url.searchParams.get("start")), b=reportDay(url.searchParams.get("end"));
   if(!projectId||!a||!b) return json({ok:false,message:"Pilih proyek dan periode."},400);
@@ -3514,7 +3665,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.40-sipatuo-sso"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.41-request-material-bn"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3527,6 +3678,7 @@ async function handleRequest(request, env) {
     if (path === "/sso" && request.method === "GET") return sipatuoSsoHandler(request,env);
     if (path === "/api/sipatuo/verify-login" && request.method === "POST") return sipatuoVerifyLoginHandler(request,env);
     if (path === "/api/sipatuo/ringkasan" && request.method === "POST") return sipatuoRingkasanHandler(request,env);
+    if (path === "/api/bangun-nusa/status" && request.method === "POST") return bangunNusaStatusHandler(request,env);
 
     const auth = await authenticate(request,env);
     if (path === "/api/auth/me" || path === "/api/access/session") {
@@ -3566,6 +3718,10 @@ async function handleRequest(request, env) {
     const finContractMatch = path.match(/^\/api\/finance\/contracts\/([^/]+)$/);
     if (finContractMatch && request.method === "POST") return contractSaveHandler(request,env,auth.user,decodeURIComponent(finContractMatch[1]));
     if (path === "/api/finance/payroll-preview" && request.method === "GET") return payrollPreviewHandler(env,auth.user,url);
+    if (path === "/api/bangun-nusa/katalog" && request.method === "GET") return bnKatalogHandler(env,auth.user);
+    if (path === "/api/material-requests" && request.method === "POST") return materialRequestSaveHandler(request,env,auth.user,"");
+    const mrMatch = path.match(/^\/api\/material-requests\/([^/]+)(?:\/(action|receive))?$/);
+    if (mrMatch && request.method === "POST") { const mid=decodeURIComponent(mrMatch[1]); if(mrMatch[2]==="action") return materialRequestActionHandler(request,env,auth.user,mid); if(mrMatch[2]==="receive") return materialRequestReceiveHandler(request,env,auth.user,mid); return materialRequestSaveHandler(request,env,auth.user,mid); }
     if (path === "/api/finance/payments" && request.method === "POST") return partnerPaymentSaveHandler(request,env,auth.user,"");
     const finPayMatch = path.match(/^\/api\/finance\/payments\/([^/]+)(?:\/(action|pay))?$/);
     if (finPayMatch && request.method === "POST") { const pid=decodeURIComponent(finPayMatch[1]); if(finPayMatch[2]==="action") return partnerPaymentActionHandler(request,env,auth.user,pid); if(finPayMatch[2]==="pay") return partnerPaymentPayHandler(request,env,auth.user,pid); return partnerPaymentSaveHandler(request,env,auth.user,pid); }
