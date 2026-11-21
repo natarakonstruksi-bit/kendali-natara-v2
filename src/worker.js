@@ -1,5 +1,5 @@
 /**
- * Nara System V3.4.42 — Request Material ke Bangun Nusa + negosiasi harga
+ * Nara System V3.4.43 — Pekerjaan TAJAMA (Peluang, Penawaran, SPK, QC, komplain)
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
@@ -29,7 +29,7 @@ async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik 
 }
 // ---- SIPATUO-SSO-VERIFY:END ----
 
-const APP_VERSION = "APP-V3.4.42";
+const APP_VERSION = "APP-V3.4.43";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -42,9 +42,9 @@ const STORAGE_BUCKET = "kendali-natara-files-v2";
 const LOGIN_MAX_FAILS = 8;
 const LOGIN_WINDOW_SEC = 15 * 60;
 
-const COLLECTIONS = new Set(["partners","project_terms","partner_payments","projects","users","rabs","surat","tukang","pelatihan","aset","proyeksi","vendor","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","qc_inspection_sessions","qc_inspection_items","qc_work_groups","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","public_site_settings","public_portfolio","qc_reports","ati_reports","workflow_tasks","as_built_progress","qc_visit_routes","material_requests"]);
+const COLLECTIONS = new Set(["partners","project_terms","partner_payments","projects","users","rabs","surat","tukang","pelatihan","aset","proyeksi","vendor","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","qc_inspection_sessions","qc_inspection_items","qc_work_groups","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","public_site_settings","public_portfolio","qc_reports","ati_reports","workflow_tasks","as_built_progress","qc_visit_routes","material_requests","tajama_jobs"]);
 
-const PROJECT_SCOPED_COLLECTIONS = new Set(["project_terms","partner_payments","projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","as_built_progress","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks","qc_visit_routes","material_requests"]);
+const PROJECT_SCOPED_COLLECTIONS = new Set(["project_terms","partner_payments","projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","as_built_progress","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks","qc_visit_routes","material_requests","tajama_jobs"]);
 
 const DOC_CORE = ["CONTRACT", "RAB_BASELINE", "DED_FINAL", "TIME_SCHEDULE"];
 const DOC_PRECON = ["PCM", "MC0"];
@@ -75,22 +75,22 @@ const ROLE_LABELS = {
   viewer: "Viewer"
 };
 
-const ALL_VIEWS = ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","ati","documents","flow","closeout","public_info","employees","master","audit"];
+const ALL_VIEWS = ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","tajama","ati","documents","flow","closeout","public_info","employees","master","audit"];
 const ROLE_VIEWS = {
   administrator: ALL_VIEWS,
   direktur: ALL_VIEWS,
   head_unit_bisnis: ALL_VIEWS,
-  manager_operasional: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","ati","documents","flow","closeout","public_info","master","audit"],
-  koordinator_engineering: ["dashboard","tasks","projects","progress","opname","asbuilt","qc","cco","procurement","documents","flow","closeout"],
+  manager_operasional: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","tajama","ati","documents","flow","closeout","public_info","master","audit"],
+  koordinator_engineering: ["dashboard","tasks","projects","progress","opname","asbuilt","qc","cco","procurement","tajama","documents","flow","closeout"],
   koordinator_supporting: ["dashboard","tasks","projects","progress","qc","qc_archive","documents","flow","closeout"],
-  admin_teknik: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","ati","documents","flow","closeout","public_info","master"],
-  site_manager: ["dashboard","tasks","projects","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","material","ati","documents","flow","closeout"],
+  admin_teknik: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","tajama","ati","documents","flow","closeout","public_info","master"],
+  site_manager: ["dashboard","tasks","projects","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","material","tajama","ati","documents","flow","closeout"],
   estimator: ["dashboard","tasks","projects","cco","documents","flow"],
   qs: ["dashboard","tasks","projects","fund_requests","progress","opname","cco","documents","flow"],
   drafter: ["dashboard","tasks","projects","asbuilt","documents","flow"],
-  qc: ["dashboard","tasks","projects","fund_requests","progress","qc","qc_archive","documents","flow"],
+  qc: ["dashboard","tasks","projects","fund_requests","progress","qc","tajama","qc_archive","documents","flow"],
   mep_engineer: ["dashboard","tasks","projects","progress","qc","documents","flow"],
-  finance: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","procurement","material","documents","flow","closeout"],
+  finance: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","procurement","material","tajama","documents","flow","closeout"],
   procurement: ["dashboard","tasks","projects","payments","directory","fund_requests","procurement","material","documents","flow"],
   kepala_ati: ["dashboard","tasks","ati","progress","master"],
   instruktur_ati: ["dashboard","tasks","ati","master"],
@@ -265,6 +265,7 @@ function collectionPermission(user, collection) {
   // V3.4.24 — Keuangan proyek
   if (collection === "partners") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance","koordinator_engineering"],["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","finance"]);
   if (collection === "project_terms") return allow(["manager_operasional","admin_teknik","finance","site_manager"],["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
+  if (collection === "tajama_jobs") return allow(["manager_operasional","admin_teknik","site_manager","qc","finance","koordinator_engineering"],[],[]);
   if (collection === "material_requests") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],[],[]);
   if (collection === "partner_payments") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],[],[]);
   if (collection === "po") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","admin_teknik","procurement","finance"],["manager_operasional","admin_teknik"]);
@@ -303,6 +304,9 @@ function buildAccess(user) {
       ccoEscalation: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       financeApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       financePay: roleIn(user,["administrator","direktur","head_unit_bisnis","finance"]),
+      tajamaCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","site_manager"]),
+      tajamaApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
+      tajamaInspect: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","site_manager","qc"]),
       materialRequestCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","site_manager"]),
       materialRequestApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       materialRequestForward: roleIn(user,["administrator","direktur","head_unit_bisnis","procurement"]),
@@ -1361,14 +1365,14 @@ async function getProjectBudgetValue(env, projectId) {
 }
 
 
-const WORKFLOW_SOURCE_COLLECTIONS = new Set(["daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items","partner_payments","project_terms","material_requests"]);
+const WORKFLOW_SOURCE_COLLECTIONS = new Set(["daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items","partner_payments","project_terms","material_requests","tajama_jobs"]);
 
 function workflowRoleLabel(role) { return String(role||"").split(",").filter(Boolean).map(r=>ROLE_LABELS[r]||r).join(" / "); }
 // V3.4.30: antrean tugas bisa untuk beberapa jabatan sekaligus, ditulis "qc,koordinator_supporting".
 function roleQueueHas(assigneeRole,role){ return String(assigneeRole||"").split(",").map(x=>x.trim()).filter(Boolean).includes(String(role||"")); }
 function workflowActiveStatus(status) { return ["OPEN","IN_PROGRESS"].includes(String(status||"").toUpperCase()); }
 function workflowSourceView(collection) {
-  return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc",partner_payments:"payments",project_terms:"finance",material_requests:"material"})[collection] || "dashboard";
+  return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc",partner_payments:"payments",project_terms:"finance",material_requests:"material",tajama_jobs:"tajama"})[collection] || "dashboard";
 }
 async function projectRoleUser(env, projectId, roleKey, ctx=null) {
   if (!projectId) return "";
@@ -1457,6 +1461,19 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
   if(collection==="ati_field_issues"){
     if(["OPEN","IN PROGRESS"].includes(status)) return mk("ATI_ISSUE_ACTION","Masalah Lapangan ATI", "PIC menangani masalah tenaga/operasional ATI","Tangani Masalah",d.picUserId,"kepala_ati",{priority:"HIGH"});
     if(status==="WAITING EVALUATION") return mk("ATI_ISSUE_EVAL","Evaluasi Masalah ATI", "Kepala ATI melakukan evaluasi dan menutup masalah","Evaluasi Masalah","","kepala_ati");
+    return null;
+  }
+  if(collection==="tajama_jobs"){
+    const ttl=`TAJAMA ${d.number||""} — ${d.title||""}`;
+    if(status==="PELUANG") return mk("TJ_OFFER",ttl,"Lengkapi peluang & penawaran pekerjaan TAJAMA lalu ajukan ke Head of Operational.","Lengkapi & Ajukan",d.createdBy||sm,"");
+    if(status==="RETURNED") return mk("TJ_FIX",ttl,`Dikembalikan: ${d.returnNote||"perlu perbaikan"}.`,"Perbaiki & Ajukan Ulang",d.createdBy||sm,"",{priority:"HIGH"});
+    if(status==="WAIT_OPS") return mk("TJ_OPS_APPROVE",ttl,`Head of Operational memeriksa penawaran TAJAMA ${rp(d.offerTotal)}.`,"ACC / Kembalikan","","manager_operasional",{priority:"HIGH"});
+    if(status==="APPROVED") return mk("TJ_SPK",ttl,"Admin Teknik membuat SPK TAJAMA; SPK otomatis terkirim ke website TAJAMA.","Buat SPK TAJAMA","","admin_teknik",{priority:"HIGH"});
+    if(status==="SPK_CREATED") return mk("TJ_SEND",ttl,"SPK sudah dibuat tetapi belum terkirim ke website TAJAMA.","Kirim ulang ke TAJAMA","","admin_teknik",{priority:"HIGH"});
+    if(status==="READY_INSPECTION") return mk("TJ_INSPECT",ttl,"QC TAJAMA sudah memeriksa. QC Natara melakukan inspeksi lalu menyatakan lulus / tidak lulus.","Inspeksi QC Natara","","qc",{priority:"HIGH"});
+    const cs=(d.complaints||[]).filter(c=>c.status!=="CLOSED");
+    if(cs.some(c=>c.status==="RESPONDED")) return mk("TJ_COMPLAINT_CLOSE",ttl,"TAJAMA sudah menanggapi komplain. Periksa di lapangan lalu tutup komplain.","Periksa & Tutup Komplain","","qc");
+    if(cs.some(c=>c.escalatedAt)) return mk("TJ_ESCALATION",ttl,`Komplain ke TAJAMA lebih dari ${TJ_ESCALATE_DAYS} hari belum ditanggapi.`,"Tindak Lanjut Eskalasi","","manager_operasional",{priority:"HIGH"});
     return null;
   }
   if(collection==="material_requests"){
@@ -3303,6 +3320,172 @@ async function bangunNusaStatusHandler(request,env){
   await upsertRecord(env,"material_requests",r.id,d,actor); await syncWorkflowTask(env,"material_requests",r.id,d,actor);
   return json({ok:true});
 }
+// ===================== V3.4.43 — Pekerjaan TAJAMA (Peluang → Penawaran → ACC → SPK → TAJAMA → QC → Selesai) =====================
+// Alur vendor biasa (PR) tetap. Pekerjaan yang dikerjakan TAJAMA dicatat di sini: Natara mengisi Peluang & Penawaran,
+// Head of Operational ACC, Admin Teknik membuat SPK lalu dikirim ke website TAJAMA (API bertanda tangan x-maw-*),
+// TAJAMA mengirim update mingguan & hasil QC TAJAMA (callback /api/tajama/status), QC Natara inspeksi, komplain → TAJAMA (+eskalasi).
+const TJ_LABEL = {PELUANG:"Peluang / penawaran disusun",WAIT_OPS:"Menunggu ACC Head of Operational",RETURNED:"Dikembalikan",REJECTED:"Ditolak",APPROVED:"Menunggu SPK Admin Teknik",SPK_CREATED:"SPK dibuat — belum terkirim ke TAJAMA",SENT_TAJAMA:"Terkirim ke TAJAMA",TAJAMA_REJECTED:"Ditolak TAJAMA",IN_PROGRESS:"Dikerjakan TAJAMA",READY_INSPECTION:"Siap inspeksi QC Natara",DONE:"Selesai",CANCELLED:"Dibatalkan"};
+const TJ_ESCALATE_DAYS = 3;
+function tjBaseUrl(env){ return String(env.TAJAMA_URL||"").replace(/\/+$/,""); }
+async function tjCall(env,path,bodyObj){
+  const secret=String(env.TAJAMA_KEY||""); const base=tjBaseUrl(env);
+  if(!secret||!base) throw new Error("KENDALI belum tersambung ke website TAJAMA (TAJAMA_URL / TAJAMA_KEY belum diisi).");
+  const body=JSON.stringify(bodyObj||{}); const ts=String(Math.floor(Date.now()/1000));
+  const headers={"content-type":"application/json","x-maw-unit":"NK","x-maw-ts":ts,"x-maw-sig":await bnHmac(secret,`${ts}.${body}`)};
+  let r; try{ r=await fetch(`${base}${path}`,{method:"POST",headers,body,signal:AbortSignal.timeout(10000)}); }catch(e){ throw new Error(`Website TAJAMA tidak dapat dihubungi: ${e?.message||e}`); }
+  let data={}; try{ data=await r.json(); }catch(_){}
+  if(!r.ok||data.ok===false) throw new Error(data.message||data.pesan||`TAJAMA menjawab HTTP ${r.status}.`);
+  return data;
+}
+function tjItems(items){
+  const out=[]; for(const it of (Array.isArray(items)?items:[])){ const uraian=String(it.uraian||"").trim().slice(0,200); const vol=num(it.volume);
+    if(!uraian) continue; out.push({uraian,volume:Math.round(vol*10000)/10000,satuan:String(it.satuan||"").trim().slice(0,30),harga:Math.max(0,Math.round(num(it.harga)))}); }
+  if(out.length>100) throw new Error("Maksimal 100 baris penawaran.");
+  return out;
+}
+const tjTotal=d=>(d.items||[]).reduce((s,i)=>s+num(i.volume)*num(i.harga),0);
+async function tjPayload(env,d){
+  const proj=await getRecord(env,"projects",d.projectId); const smId=await projectRoleUser(env,d.projectId,"site_manager"); const sm=smId?await getRecord(env,"users",String(smId)):null;
+  return {ref:d.number,proyek:proj?.data?.name||d.projectId,lokasi:d.location||proj?.data?.location||"",pekerjaan:d.title,lingkup:d.scope||"",items:d.items||[],nilai:Math.round(num(d.spk?.value)||tjTotal(d)),
+    spk:{nomor:d.spk?.number||"",tanggal:d.spk?.date||"",mulai:d.spk?.start||d.targetStart||"",selesai:d.spk?.end||d.targetEnd||""},kontak:{nama:sm?.data?.name||"",hp:sm?.data?.phone||""},catatan:d.notes||""};
+}
+async function tjSendAll(env,d){
+  // Kirim SPK (idempoten di sisi TAJAMA, kunci = ref) lalu komplain yang belum terkirim.
+  const errs=[];
+  if(["SPK_CREATED","SENT_TAJAMA"].includes(d.status)||(d.spk&&!d.sentAt)){
+    try{ const res=await tjCall(env,"/api/unit/pekerjaan",await tjPayload(env,d)); d.sentAt=d.sentAt||new Date().toISOString(); if(d.status==="SPK_CREATED") d.status="SENT_TAJAMA"; d=tjApply(d,res); }
+    catch(e){ errs.push(e.message); }
+  }
+  if(d.sentAt){ for(const c of (d.complaints||[])){ if(c.sent) continue; try{ await tjCall(env,"/api/unit/pekerjaan/komplain",{ref:d.number,komplain:{id:c.id,teks:c.text,tanggal:c.at,oleh:c.byName}}); c.sent=true; }catch(e){ errs.push(e.message); break; } } }
+  return {d,errs};
+}
+function tjApply(d,s){
+  if(!s||typeof s!=="object") return d;
+  const map={diterima:"IN_PROGRESS",berjalan:"IN_PROGRESS",ditolak:"TAJAMA_REJECTED",siap_inspeksi:"READY_INSPECTION",selesai:"DONE"};
+  const tj={...(d.tajama||{}),status:String(s.status||d.tajama?.status||""),label:String(s.label||""),progres:num(s.progres??d.tajama?.progres),keterangan:String(s.keterangan||""),updatedAt:new Date().toISOString()};
+  let st=d.status; const ns=map[String(s.status||"")];
+  if(ns && !["DONE","CANCELLED"].includes(st)){ if(!(ns==="IN_PROGRESS"&&st==="READY_INSPECTION"&&s.jenis!=="berjalan")) st=ns; }
+  const out={...d,tajama:tj,status:st};
+  if(s.update&&typeof s.update==="object"){ const u=s.update; const ups=Array.isArray(out.updates)?out.updates:[]; const key=String(u.id||u.minggu||u.tanggal||ups.length+1);
+    const row={id:key,minggu:String(u.minggu||""),tanggal:String(u.tanggal||"").slice(0,10),progres:num(u.progres),catatan:String(u.catatan||"").slice(0,2000),kendala:String(u.kendala||"").slice(0,1000),foto:(Array.isArray(u.foto)?u.foto:[]).slice(0,10).map(String),at:new Date().toISOString()};
+    const i=ups.findIndex(x=>x.id===key); if(i>=0) ups[i]=row; else ups.push(row); out.updates=ups.slice(-120); out.lastUpdateAt=row.at; }
+  if(s.qc_tajama) out.qcTajama={catatan:String(s.qc_tajama.catatan||""),tanggal:String(s.qc_tajama.tanggal||""),oleh:String(s.qc_tajama.oleh||""),at:new Date().toISOString()};
+  if(s.komplain&&s.komplain.id){ const c=(out.complaints||[]).find(x=>x.id===String(s.komplain.id)); if(c&&c.status!=="CLOSED"){ c.status="RESPONDED"; c.response=String(s.komplain.respon||"").slice(0,2000); c.respondedAt=new Date().toISOString(); c.responseBy=String(s.komplain.oleh||"TAJAMA"); } }
+  return out;
+}
+function tjHist(d,user,action,note=""){ return mrHistory(d,user,action,note); }
+async function tajamaSaveHandler(request,env,user,id=""){
+  const cap=buildAccess(user).capabilities; if(!cap.tajamaCreate) return json({ok:false,message:"Role ini tidak dapat menyusun peluang pekerjaan TAJAMA."},403);
+  const b=await parseJson(request)||{}; let old=null;
+  if(id){ old=await getRecord(env,"tajama_jobs",id); if(!old) return json({ok:false,message:"Pekerjaan tidak ditemukan."},404);
+    if(!["PELUANG","RETURNED"].includes(String(old.data.status))) return json({ok:false,message:"Pekerjaan yang sudah diajukan tidak dapat diubah."},409); }
+  const projectId=String(b.projectId||old?.data?.projectId||""); if(!projectId) return json({ok:false,message:"Pilih proyek."},400);
+  const denied=await requireProjectAccess(env,user,projectId); if(denied) return denied;
+  try{
+    const title=String(b.title||"").trim().slice(0,200); if(!title) throw new Error("Nama pekerjaan wajib diisi.");
+    const items=tjItems(b.items);
+    const rid=id||`TJM-${new Date().toISOString().slice(0,7).replace("-","")}-${crypto.randomUUID().slice(0,6).toUpperCase()}`;
+    let d={...(old?.data||{}),projectId,number:old?.data?.number||rid,title,scope:String(b.scope||"").slice(0,3000),location:String(b.location||"").slice(0,300),
+      targetStart:reportDay(b.targetStart)||"",targetEnd:reportDay(b.targetEnd)||"",items,offerTotal:Math.round(items.reduce((s,i)=>s+i.volume*i.harga,0)),offerNote:String(b.offerNote||"").slice(0,2000),notes:String(b.notes||"").slice(0,2000),
+      createdBy:old?.data?.createdBy||user.id,createdByName:old?.data?.createdByName||user.name||user.username||"",status:old?String(old.data.status):"PELUANG",updatedAt:new Date().toISOString()};
+    if(!old){ d.createdAt=d.updatedAt; d.history=tjHist(d,user,"BUAT_PELUANG"); }
+    if(truthy(b.submit)){ if(!items.length||!(d.offerTotal>0)) throw new Error("Isi penawaran (uraian, volume, harga) sebelum diajukan."); d.status="WAIT_OPS"; d.submittedAt=new Date().toISOString(); d.returnNote=""; d.history=tjHist(d,user,"AJUKAN_PENAWARAN"); }
+    const rec=await upsertRecord(env,"tajama_jobs",rid,d,user); await syncWorkflowTask(env,"tajama_jobs",rid,d,user);
+    await audit(env,user,id?"TAJAMA_JOB_UPDATE":"TAJAMA_JOB_CREATE","tajama_jobs",rid,projectId,{status:d.status,total:d.offerTotal});
+    return json({ok:true,row:rec});
+  }catch(e){ return json({ok:false,message:e.message},400); }
+}
+async function tajamaActionHandler(request,env,user,id,sub=""){
+  const rec=await getRecord(env,"tajama_jobs",id); if(!rec) return json({ok:false,message:"Pekerjaan tidak ditemukan."},404);
+  const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied;
+  const cap=buildAccess(user).capabilities; let d=JSON.parse(JSON.stringify(rec.data)); const st=String(d.status);
+  const isForm=sub==="spk"||sub==="inspect"||sub==="complaint";
+  let fd=null,b={}; try{ if(isForm){ fd=await request.formData(); b=safeJsonParse(String(fd.get("payload")||"{}"),{}); } else b=await parseJson(request)||{}; }catch{ return json({ok:false,message:"Form tidak valid."},400); }
+  const note=String(b.note||"").trim(); const action=sub||String(b.action||"");
+  const files=fd?fd.getAll("files").filter(f=>f instanceof File&&f.size>0).slice(0,10):[];
+  const saveDocs=async(cat,title)=>{ const ids=[]; for(const f of files){ const doc=await storeEvidenceDocument(env,user,f,{projectId:d.projectId,category:cat,title,relatedCollection:"tajama_jobs",relatedId:id}); ids.push(doc.id); } return ids; };
+  let warn="";
+  try{
+    if(action==="submit"){ if(!cap.tajamaCreate) throw new Error("Tidak berwenang."); if(!["PELUANG","RETURNED"].includes(st)) throw new Error("Sudah diajukan."); if(!(num(d.offerTotal)>0)) throw new Error("Isi penawaran dulu.");
+      d.status="WAIT_OPS"; d.submittedAt=new Date().toISOString(); d.returnNote=""; d.history=tjHist(d,user,"AJUKAN_PENAWARAN",note); }
+    else if(action==="ops-approve"){ if(!cap.tajamaApprove) throw new Error("Hanya Head of Operational yang dapat ACC."); if(st!=="WAIT_OPS") throw new Error("Tidak menunggu ACC.");
+      Object.assign(d,{status:"APPROVED",opsApprovedAt:new Date().toISOString(),opsApprovedBy:user.id,opsApprovedByName:user.name||user.username||""}); d.history=tjHist(d,user,"ACC_HEAD_OPERATIONAL",note); }
+    else if(action==="return"||action==="reject"){ if(!cap.tajamaApprove) throw new Error("Hanya Head of Operational."); if(!["WAIT_OPS","APPROVED"].includes(st)) throw new Error("Tahap ini tidak dapat dikembalikan/ditolak."); if(!note) throw new Error("Tuliskan alasannya.");
+      d.status=action==="return"?"RETURNED":"REJECTED"; d.returnNote=note; d.history=tjHist(d,user,action==="return"?"KEMBALIKAN":"TOLAK",note); }
+    else if(action==="spk"){
+      if(!cap.contractManage) throw new Error("Hanya Admin Teknik yang membuat SPK."); if(st!=="APPROVED") throw new Error("Pekerjaan belum di-ACC Head of Operational.");
+      const number=String(b.number||"").trim(); if(!number) throw new Error("Nomor SPK wajib diisi.");
+      const value=Math.round(num(b.value)||num(d.offerTotal)); if(value<=0) throw new Error("Nilai SPK wajib diisi.");
+      const partner=await findOrCreatePartner(env,user,"SUBKON",{name:"TAJAMA",specialty:"Pekerjaan TAJAMA Workspace"});
+      const poId=`SPK-${crypto.randomUUID().slice(0,10)}`;
+      const po={projectId:d.projectId,partnerType:"SUBKON",partnerId:partner.id,partnerName:partner.data.name,vendor:partner.data.name,contractValue:value,amount:value,retentionPct:num(b.retentionPct),terms:b.terms,
+        number,date:reportDay(b.date)||new Date().toISOString().slice(0,10),description:`TAJAMA — ${d.title}`,status:"ACTIVE",tajamaJobId:id};
+      normalizeContractFields(po);
+      const f=fd.get("file"); if(f instanceof File&&f.size>0){ const doc=await storeEvidenceDocument(env,user,f,{projectId:d.projectId,category:"PO_SPK",title:`SPK ${number} - TAJAMA`,relatedCollection:"po",relatedId:poId}); po.spkDocId=doc.id; }
+      await upsertRecord(env,"po",poId,po,user); await audit(env,user,"CONTRACT_CREATE","po",poId,d.projectId,{partnerType:"SUBKON",value,tajamaJobId:id});
+      d.spk={poId,number,value,date:po.date,start:reportDay(b.start)||d.targetStart||"",end:reportDay(b.end)||d.targetEnd||"",docId:po.spkDocId||"",byName:user.name||user.username||""};
+      d.status="SPK_CREATED"; d.history=tjHist(d,user,"SPK_DIBUAT",number);
+      const r=await tjSendAll(env,d); d=r.d; if(r.errs.length) warn=`SPK tersimpan, tetapi belum terkirim ke TAJAMA: ${r.errs[0]}`; else d.history=tjHist(d,user,"TERKIRIM_KE_TAJAMA");
+    }
+    else if(action==="resend"){ if(!(cap.contractManage||cap.tajamaApprove)) throw new Error("Tidak berwenang."); const r=await tjSendAll(env,d); d=r.d; if(r.errs.length) throw new Error(r.errs[0]); d.history=tjHist(d,user,"KIRIM_ULANG_KE_TAJAMA"); }
+    else if(action==="refresh"){ if(!d.sentAt) throw new Error("Belum terkirim ke TAJAMA."); d=tjApply(d,await tjCall(env,"/api/unit/pekerjaan/status",{ref:d.number})); }
+    else if(action==="inspect"){
+      if(!cap.tajamaInspect) throw new Error("Hanya QC / Site Manager Natara yang melakukan inspeksi."); if(st!=="READY_INSPECTION") throw new Error("TAJAMA belum menyatakan siap inspeksi.");
+      const result=String(b.result||""); if(!["pass","fail"].includes(result)) throw new Error("Pilih hasil inspeksi."); if(result==="fail"&&!note) throw new Error("Tuliskan temuan/ketidaksesuaian.");
+      if(!files.length) throw new Error("Foto inspeksi wajib diunggah.");
+      const docIds=await saveDocs("QC_TAJAMA",`Inspeksi QC Natara ${d.number}`);
+      const ins={at:new Date().toISOString(),by:user.id,byName:user.name||user.username||"",result,note,docIds}; d.inspections=[...(d.inspections||[]),ins].slice(-30);
+      if(result==="pass"){ d.status="DONE"; d.doneAt=ins.at; d.history=tjHist(d,user,"INSPEKSI_LULUS_SELESAI",note); }
+      else { d.status="IN_PROGRESS"; const c={id:`K${Date.now().toString(36).toUpperCase()}`,at:ins.at,by:user.id,byName:ins.byName,text:`Hasil inspeksi QC Natara tidak sesuai: ${note}`,docIds,status:"OPEN",sent:false,fromInspection:true}; d.complaints=[...(d.complaints||[]),c]; d.history=tjHist(d,user,"INSPEKSI_TIDAK_LULUS",note); }
+      if(d.sentAt){ try{ await tjCall(env,"/api/unit/pekerjaan/inspeksi",{ref:d.number,hasil:result==="pass"?"lulus":"tidak_lulus",catatan:note,oleh:ins.byName,tanggal:ins.at}); }catch(e){ warn=`Hasil tersimpan, tetapi belum terkirim ke TAJAMA: ${e.message}`; }
+        const r=await tjSendAll(env,d); d=r.d; if(r.errs.length&&!warn) warn=`Komplain belum terkirim ke TAJAMA: ${r.errs[0]}`; }
+    }
+    else if(action==="complaint"){
+      if(!cap.tajamaInspect) throw new Error("Hanya QC / Site Manager / Head of Operational yang dapat mengajukan komplain."); if(!["SENT_TAJAMA","IN_PROGRESS","READY_INSPECTION","DONE"].includes(st)) throw new Error("Pekerjaan belum berjalan di TAJAMA.");
+      const text=String(b.text||"").trim().slice(0,2000); if(!text) throw new Error("Tuliskan isi komplain.");
+      const docIds=await saveDocs("KOMPLAIN_TAJAMA",`Komplain ${d.number}`);
+      const c={id:`K${Date.now().toString(36).toUpperCase()}`,at:new Date().toISOString(),by:user.id,byName:user.name||user.username||"",text,docIds,status:"OPEN",sent:false};
+      d.complaints=[...(d.complaints||[]),c]; d.history=tjHist(d,user,"KOMPLAIN",text);
+      const r=await tjSendAll(env,d); d=r.d; if(r.errs.length) warn=`Komplain tersimpan, tetapi belum terkirim ke TAJAMA: ${r.errs[0]}`;
+    }
+    else if(action==="close-complaint"){
+      if(!cap.tajamaInspect) throw new Error("Tidak berwenang."); const c=(d.complaints||[]).find(x=>x.id===String(b.complaintId)); if(!c) throw new Error("Komplain tidak ditemukan."); if(c.status==="CLOSED") throw new Error("Komplain sudah ditutup.");
+      c.status="CLOSED"; c.closedAt=new Date().toISOString(); c.closedByName=user.name||user.username||""; c.closeNote=note; d.history=tjHist(d,user,"TUTUP_KOMPLAIN",`${c.id}${note?` · ${note}`:""}`);
+      if(d.sentAt){ try{ await tjCall(env,"/api/unit/pekerjaan/komplain",{ref:d.number,komplain:{id:c.id,status:"ditutup",catatan:note,oleh:c.closedByName}}); }catch(e){ warn=`Tersimpan, tetapi belum terkirim ke TAJAMA: ${e.message}`; } }
+    }
+    else if(action==="cancel"){ if(!cap.tajamaApprove) throw new Error("Hanya Head of Operational."); if(["DONE","CANCELLED"].includes(st)) throw new Error("Sudah selesai/dibatalkan."); if(!note) throw new Error("Tuliskan alasan.");
+      d.status="CANCELLED"; d.history=tjHist(d,user,"BATAL",note); if(d.sentAt){ try{ await tjCall(env,"/api/unit/pekerjaan/batal",{ref:d.number,alasan:note}); }catch(e){ warn=`Dibatalkan di KENDALI, tetapi belum terkirim ke TAJAMA: ${e.message}`; } } }
+    else throw new Error("Aksi tidak dikenal.");
+  }catch(e){ return json({ok:false,message:e.message},400); }
+  d.updatedAt=new Date().toISOString();
+  const out=await upsertRecord(env,"tajama_jobs",id,d,user); await syncWorkflowTask(env,"tajama_jobs",id,d,user);
+  if(action!=="refresh") await audit(env,user,"TAJAMA_JOB_ACTION","tajama_jobs",id,d.projectId,{action,from:st,to:d.status});
+  return json({ok:true,row:out,warning:warn});
+}
+// Kabar dari website TAJAMA (x-maw-unit: TJM). jenis: diterima | ditolak | update | siap_inspeksi | komplain_respon | selesai
+async function tajamaStatusHandler(request,env){
+  const secret=String(env.TAJAMA_KEY||""); if(!secret) return json({ok:false,message:"Belum tersambung."},401);
+  const unit=String(request.headers.get("x-maw-unit")||""); const ts=Number(request.headers.get("x-maw-ts")||0); const sig=String(request.headers.get("x-maw-sig")||"");
+  const raw=await request.text(); if(raw.length>300000) return json({ok:false},413);
+  if(unit!=="TJM"||!ts||Math.abs(Math.floor(Date.now()/1000)-ts)>BN_SIG_WINDOW||!bnSafeEq(await bnHmac(secret,`${ts}.${raw}`),sig)) return json({ok:false,message:"Tanda tangan tidak sah."},401);
+  const s=safeJsonParse(raw,null); if(!s||!s.ref) return json({ok:false,message:"Isi tidak valid."},400);
+  const rows=await rowsWhere(env,"tajama_jobs","json_extract(data_json,'$.number')=?",[String(s.ref)]);
+  if(!rows.length) return json({ok:true,ignored:true});
+  const r=rows[0]; const actor={id:"tajama",name:"TAJAMA",username:"tajama"};
+  let d=tjApply(JSON.parse(JSON.stringify(r.data)),s);
+  if(s.pesan) d.history=tjHist(d,actor,`TJM_${String(s.jenis||"STATUS").toUpperCase()}`,String(s.pesan));
+  d.updatedAt=new Date().toISOString();
+  await upsertRecord(env,"tajama_jobs",r.id,d,actor); await syncWorkflowTask(env,"tajama_jobs",r.id,d,actor);
+  return json({ok:true});
+}
+// Cron: komplain terbuka > 3 hari tanpa respon TAJAMA → eskalasi ke Head of Operational.
+async function escalateTajamaComplaints(env){
+  const rows=await rowsWhere(env,"tajama_jobs","json_extract(data_json,'$.status') NOT IN ('DONE','CANCELLED','REJECTED')",[]);
+  const batas=Date.now()-TJ_ESCALATE_DAYS*86400000; const actor={id:"system",name:"Sistem",username:"system"};
+  for(const r of rows){ const d=r.data; let ubah=false;
+    for(const c of (d.complaints||[])){ if(c.status==="OPEN"&&!c.escalatedAt&&Date.parse(c.at)<batas){ c.escalatedAt=new Date().toISOString(); ubah=true; } }
+    if(ubah){ d.history=tjHist(d,actor,"ESKALASI_KOMPLAIN",`Komplain > ${TJ_ESCALATE_DAYS} hari belum ditanggapi TAJAMA`); await upsertRecord(env,"tajama_jobs",r.id,d,actor); await syncWorkflowTask(env,"tajama_jobs",r.id,d,actor); } }
+}
 async function payrollPreviewHandler(env,user,url) {
   const projectId=String(url.searchParams.get("projectId")||""); const a=reportDay(url.searchParams.get("start")), b=reportDay(url.searchParams.get("end"));
   if(!projectId||!a||!b) return json({ok:false,message:"Pilih proyek dan periode."},400);
@@ -3663,6 +3846,7 @@ export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil((async()=>{
       try { await escalateOverdueQcConfirmations(env); } catch(e) { console.log("qc escalation",e?.message||e); }
+      try { await escalateTajamaComplaints(env); } catch(e) { console.log("tajama escalation",e?.message||e); }
       try { await env.DB.prepare(`DELETE FROM sso_tiket_terpakai WHERE exp < ?`).bind(Math.floor(Date.now()/1000) - 300).run(); } catch(e) { console.log("sso cleanup",e?.message||e); }
       await flushEmailOutbox(env,{retry:true,limit:100}).catch(e=>console.log("scheduled email",e?.message||e));
     })());
@@ -3675,7 +3859,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.42-nego-harga-bn"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.43-pekerjaan-tajama"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3689,6 +3873,7 @@ async function handleRequest(request, env) {
     if (path === "/api/sipatuo/verify-login" && request.method === "POST") return sipatuoVerifyLoginHandler(request,env);
     if (path === "/api/sipatuo/ringkasan" && request.method === "POST") return sipatuoRingkasanHandler(request,env);
     if (path === "/api/bangun-nusa/status" && request.method === "POST") return bangunNusaStatusHandler(request,env);
+    if (path === "/api/tajama/status" && request.method === "POST") return tajamaStatusHandler(request,env);
 
     const auth = await authenticate(request,env);
     if (path === "/api/auth/me" || path === "/api/access/session") {
@@ -3728,6 +3913,9 @@ async function handleRequest(request, env) {
     const finContractMatch = path.match(/^\/api\/finance\/contracts\/([^/]+)$/);
     if (finContractMatch && request.method === "POST") return contractSaveHandler(request,env,auth.user,decodeURIComponent(finContractMatch[1]));
     if (path === "/api/finance/payroll-preview" && request.method === "GET") return payrollPreviewHandler(env,auth.user,url);
+    if (path === "/api/tajama-jobs" && request.method === "POST") return tajamaSaveHandler(request,env,auth.user,"");
+    const tjMatch = path.match(/^\/api\/tajama-jobs\/([^/]+)(?:\/(action|spk|inspect|complaint))?$/);
+    if (tjMatch && request.method === "POST") { const tid=decodeURIComponent(tjMatch[1]); if(!tjMatch[2]) return tajamaSaveHandler(request,env,auth.user,tid); return tajamaActionHandler(request,env,auth.user,tid,tjMatch[2]==="action"?"":tjMatch[2]); }
     if (path === "/api/bangun-nusa/katalog" && request.method === "GET") return bnKatalogHandler(env,auth.user);
     if (path === "/api/material-requests" && request.method === "POST") return materialRequestSaveHandler(request,env,auth.user,"");
     const mrMatch = path.match(/^\/api\/material-requests\/([^/]+)(?:\/(action|receive))?$/);
