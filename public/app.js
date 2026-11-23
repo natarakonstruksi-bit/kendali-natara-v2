@@ -1517,7 +1517,7 @@ async function renderTajama(){
   const openC=rows.reduce((s,r)=>s+(r.data.complaints||[]).filter(x=>x.status!=='CLOSED').length,0);
   const opts=[['mine','Perlu tindakan saya'],['open','Masih berjalan'],['all','Semua'],...Object.entries(TJ_STATUS).map(([k,v])=>[k,v[0]])];
   $('#content').innerHTML=`<div class="kpis">${kpi('Menunggu ACC / SPK',c('WAIT_OPS')+c('APPROVED')+c('SPK_CREATED'),'orange')}${kpi('Dikerjakan TAJAMA',c('IN_PROGRESS')+c('SENT_TAJAMA'),'blue')}${kpi('Siap inspeksi QC Natara',c('READY_INSPECTION'),'purple')}${kpi('Komplain terbuka',openC,openC?'red':'green')}</div>
-  <div class="card"><div class="card-head"><div><h3>Pekerjaan TAJAMA</h3><p>Untuk pekerjaan vendor yang dikerjakan TAJAMA (vendor lain tetap lewat PR / Vendor). Natara menyusun Peluang & Penawaran → Head of Operational ACC → Admin Teknik membuat SPK (otomatis terkirim ke TAJAMA) → TAJAMA update mingguan & QC TAJAMA → QC Natara inspeksi → selesai. Ketidaksesuaian diajukan sebagai komplain ke TAJAMA; komplain > 3 hari tanpa tanggapan dieskalasi ke Head of Operational.</p></div><div class="card-actions">${cap('tajamaCreate')?'<button class="btn primary" id="tjNew">+ Peluang Pekerjaan TAJAMA</button>':''}</div></div>
+  <div class="card"><div class="card-head"><div><h3>Pekerjaan TAJAMA</h3><p>Pekerjaan masuk ke sini dari tombol <b>Ke TAJAMA</b> pada PR / Vendor (hanya pekerjaan tertentu; vendor lain tetap alur PR biasa). Natara melengkapi Penawaran → Head of Operational ACC → Admin Teknik membuat SPK (otomatis terkirim ke TAJAMA) → TAJAMA update mingguan & QC TAJAMA → QC Natara inspeksi → selesai. Ketidaksesuaian diajukan sebagai komplain ke TAJAMA; komplain > 3 hari tanpa tanggapan dieskalasi ke Head of Operational.</p></div><div class="card-actions"><button class="btn" id="tjGoPr">Buka PR / Vendor</button></div></div>
   <div class="fin-filter"><label>Tampilkan<select id="tjFilter">${opts.map(([k,l])=>`<option value="${k}" ${k===f?'selected':''}>${esc(l)}</option>`).join('')}</select></label></div>
   <div class="table-wrap"><table class="table"><thead><tr><th>Pekerjaan</th><th>Proyek</th><th>Nilai</th><th>Progres TAJAMA</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${list.map(r=>{const d=r.data,w=tjWho(r);const oc=(d.complaints||[]).filter(x=>x.status!=='CLOSED');let a=`<button class="btn small" data-tj-detail="${esc(r.id)}">Detail</button>`;
     if(w==='edit')a+=`<button class="btn small" data-tj-edit="${esc(r.id)}">Edit</button><button class="btn small primary" data-tj-act="submit" data-id="${esc(r.id)}">Ajukan</button>`;
@@ -1525,8 +1525,8 @@ async function renderTajama(){
     if(w==='spk')a+=d.status==='APPROVED'?`<button class="btn small primary" data-tj-spk="${esc(r.id)}">Buat SPK TAJAMA</button>`:`<button class="btn small primary" data-tj-act="resend" data-id="${esc(r.id)}">Kirim ulang ke TAJAMA</button>`;
     if(w==='inspect')a+=`<button class="btn small primary" data-tj-inspect="${esc(r.id)}">Inspeksi QC Natara</button>`;
     if(['SENT_TAJAMA','IN_PROGRESS','READY_INSPECTION','DONE'].includes(d.status)&&cap('tajamaInspect'))a+=`<button class="btn small" data-tj-complain="${esc(r.id)}">Komplain</button>`;
-    return `<tr><td><b>${esc(d.title)}</b><div class="tiny muted">${esc(d.number)}${d.spk?.number?` · SPK ${esc(d.spk.number)}`:''}</div></td><td>${esc(projectName(d.projectId))}</td><td class="num">${fmtRp(d.spk?.value||d.offerTotal||tjTot(d))}</td><td>${d.tajama?.progres!=null&&d.sentAt?`${fmtNum(d.tajama.progres,1)}%`:'-'}${d.lastUpdateAt?`<div class="tiny muted">update ${fmtDate(d.lastUpdateAt)}</div>`:''}${tjStale(d)?'<div class="tiny text-danger">Update mingguan terlambat</div>':''}</td><td>${finPill(TJ_STATUS,d.status)}${oc.length?`<div class="tiny ${oc.some(x=>x.escalatedAt)?'text-danger':'muted'}">${oc.length} komplain terbuka${oc.some(x=>x.escalatedAt)?' · eskalasi':''}</div>`:''}</td><td class="actions">${a}</td></tr>`;}).join('')||'<tr><td colspan="6" class="empty">Belum ada pekerjaan TAJAMA pada filter ini.</td></tr>'}</tbody></table></div></div>`;
-  if($('#tjNew'))$('#tjNew').onclick=()=>openTjForm();
+    return `<tr><td><b>${esc(d.title)}</b><div class="tiny muted">${esc(d.number)}${d.prNumber?` · dari PR ${esc(d.prNumber)}`:''}${d.spk?.number?` · SPK ${esc(d.spk.number)}`:''}</div></td><td>${esc(projectName(d.projectId))}</td><td class="num">${fmtRp(d.spk?.value||d.offerTotal||tjTot(d))}</td><td>${d.tajama?.progres!=null&&d.sentAt?`${fmtNum(d.tajama.progres,1)}%`:'-'}${d.lastUpdateAt?`<div class="tiny muted">update ${fmtDate(d.lastUpdateAt)}</div>`:''}${tjStale(d)?'<div class="tiny text-danger">Update mingguan terlambat</div>':''}</td><td>${finPill(TJ_STATUS,d.status)}${oc.length?`<div class="tiny ${oc.some(x=>x.escalatedAt)?'text-danger':'muted'}">${oc.length} komplain terbuka${oc.some(x=>x.escalatedAt)?' · eskalasi':''}</div>`:''}</td><td class="actions">${a}</td></tr>`;}).join('')||'<tr><td colspan="6" class="empty">Belum ada pekerjaan TAJAMA pada filter ini. Pekerjaan masuk dari tombol <b>Ke TAJAMA</b> di PR / Vendor.</td></tr>'}</tbody></table></div></div>`;
+  if($('#tjGoPr'))$('#tjGoPr').onclick=()=>setView('procurement');
   $('#tjFilter').onchange=e=>{state.tjFilter=e.target.value;renderTajama();};
   const find=id=>rows.find(x=>x.id===id);
   $$('[data-tj-detail]').forEach(b=>b.onclick=()=>openTjDetail(find(b.dataset.tjDetail)));
@@ -2830,3 +2830,32 @@ renderProjects=async function(...args){
   const fill=()=>{const t=$('#modalTitle')?.textContent||'';if(!/^(Tambah|Buat)/i.test(t.trim()))return;['date','requestDate','reportDate'].forEach(n=>{const el=$(`#modalForm input[type="date"][name="${n}"]`);if(el&&!el.value)el.value=today();});};
   try{const mb=$('#modalBackdrop'),mf=$('#modalForm');const go=()=>{if(mb&&!mb.classList.contains('hidden'))setTimeout(fill,0);};if(mb)new MutationObserver(go).observe(mb,{attributes:true,attributeFilter:['class']});if(mf)new MutationObserver(go).observe(mf,{childList:true});}catch(_){}
 })();
+
+/* ========================================================================== */
+/* V3.4.44 — PR / Vendor: tombol "Ke TAJAMA" untuk pekerjaan tertentu        */
+/* Vendor lain tetap alur PR biasa; PR yang dialihkan lanjut di Pekerjaan TAJAMA. */
+/* ========================================================================== */
+const V3444_PR_TO_TJ=['DRAFT','REJECTED','SUBMITTED','READY_FOR_APPROVAL'];
+const v3444BasePrActions=v31PrActions;
+v31PrActions=function(r){
+  const s=String(r.data.status||'DRAFT').toUpperCase();
+  if(s==='TAJAMA'||r.data.tajamaJobId)return `<button class="btn small" data-pr-detail="${esc(r.id)}">Detail</button><button class="btn small accent" data-pr-tajama-open="${esc(r.data.tajamaJobId||'')}">Lihat di TAJAMA</button>`;
+  let x=v3444BasePrActions(r);
+  if(cap('tajamaCreate')&&V3444_PR_TO_TJ.includes(s)&&!r.data.poId)x+=`<button class="btn small accent" data-pr-tajama="${esc(r.id)}" title="Pekerjaan ini dikerjakan TAJAMA">Ke TAJAMA</button>`;
+  return x;
+};
+const v3444BaseRenderProcurement=renderProcurement;
+renderProcurement=async function(...args){
+  const out=await v3444BaseRenderProcurement.apply(this,args);
+  $$('[data-pr-tajama-open]').forEach(b=>b.onclick=()=>{state.tjFilter='all';setView('tajama');});
+  $$('[data-pr-tajama]').forEach(b=>b.onclick=async()=>{
+    const rows=await loadCollection('procurement',Boolean(state.selectedProjectId));const r=rows.find(x=>x.id===b.dataset.prTajama);if(!r)return;const d=r.data;
+    const items=d.items||[];
+    openModal('Alihkan PR ke TAJAMA',d.prNumber||r.id,`<div class="notice blue">PR <b>${esc(d.prNumber||r.id)}</b> (${esc(projectName(d.projectId))}) akan dikerjakan <b>TAJAMA</b>, tidak lewat pemilihan vendor biasa. PR ditandai <b>TAJAMA</b> dan pekerjaannya lanjut di menu <b>Pekerjaan TAJAMA</b>: penawaran → ACC Head of Operational → SPK Admin Teknik → dikirim ke TAJAMA.</div>
+      <div class="table-wrap"><table class="table"><thead><tr><th>Item</th><th>Vol</th><th>HPP/Unit</th><th>Total</th></tr></thead><tbody>${items.map(i=>`<tr><td>${esc(i.description)}</td><td class="num">${fmtNum(i.qty,2)} ${esc(i.unit||'')}</td><td class="num">${fmtRp(i.hppUnit)}</td><td class="num">${fmtRp(i.totalHpp||num(i.qty)*num(i.hppUnit))}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">PR belum berisi item.</td></tr>'}</tbody></table></div>
+      <div class="form-grid"><label class="span-2">Nama pekerjaan TAJAMA<input name="title" value="${esc(items[0]?.description||'')}${items.length>1?` (+${items.length-1} item)`:''}"></label><label class="span-2">Catatan<textarea name="note" placeholder="mis. alasan dikerjakan TAJAMA"></textarea></label><label class="span-2 check"><input type="checkbox" name="submitNow"> Penawaran TAJAMA sudah sesuai HPP — langsung ajukan ke Head of Operational</label><div class="span-2 tiny muted">Bila dibiarkan tidak dicentang, penawaran awal diambil dari HPP PR dan bisa disesuaikan dulu di menu Pekerjaan TAJAMA.</div></div>`,
+      async form=>{const res=await api(`/api/procurement/${encodeURIComponent(r.id)}/to-tajama`,{method:'POST',body:{title:form.title.value,note:form.note.value,submit:form.submitNow.checked}});toast(`PR dialihkan ke TAJAMA (${res.row?.data?.number||''}).`);state.cache.clear();await renderProcurement();await refreshTaskBadge?.();});
+    $('#modalSave').textContent='Alihkan ke TAJAMA';
+  });
+  return out;
+};
