@@ -1,5 +1,5 @@
 /**
- * Nara System V3.4.43 — Pekerjaan TAJAMA (Peluang, Penawaran, SPK, QC, komplain)
+ * Nara System V3.4.44 — PR / Vendor: tombol Ke TAJAMA
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
@@ -29,7 +29,7 @@ async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik 
 }
 // ---- SIPATUO-SSO-VERIFY:END ----
 
-const APP_VERSION = "APP-V3.4.43";
+const APP_VERSION = "APP-V3.4.44";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -3478,6 +3478,32 @@ async function tajamaStatusHandler(request,env){
   await upsertRecord(env,"tajama_jobs",r.id,d,actor); await syncWorkflowTask(env,"tajama_jobs",r.id,d,actor);
   return json({ok:true});
 }
+// V3.4.44 — Dari PR / Vendor: tombol "Ke TAJAMA" mengalihkan PR tertentu menjadi Pekerjaan TAJAMA (vendor lain tetap alur PR biasa).
+const PR_TO_TAJAMA_STATUSES = ["DRAFT","REJECTED","SUBMITTED","READY_FOR_APPROVAL"];
+async function procurementToTajamaHandler(request,env,user,prId){
+  if(!buildAccess(user).capabilities.tajamaCreate) return json({ok:false,message:"Role ini tidak dapat mengalihkan pekerjaan ke TAJAMA."},403);
+  const pr=await getRecord(env,"procurement",prId); if(!pr) return json({ok:false,message:"PR tidak ditemukan."},404);
+  const denied=await requireProjectAccess(env,user,pr.data.projectId); if(denied) return denied;
+  const p=pr.data||{}; const st=String(p.status||"DRAFT").toUpperCase();
+  if(p.tajamaJobId) return json({ok:false,message:`PR ini sudah dialihkan ke TAJAMA (${p.tajamaNumber||p.tajamaJobId}).`},409);
+  if(p.poId||!PR_TO_TAJAMA_STATUSES.includes(st)) return json({ok:false,message:"PR yang vendornya sudah dipilih / sudah ada SPK tidak dapat dialihkan ke TAJAMA."},409);
+  const b=await parseJson(request)||{};
+  const items=(Array.isArray(p.items)?p.items:[]).map(x=>({uraian:String(x.description||"").slice(0,200),volume:num(x.qty),satuan:String(x.unit||""),harga:Math.round(num(x.hppUnit))})).filter(x=>x.uraian);
+  const first=items[0]?.uraian||"Pekerjaan vendor";
+  const id=`TJM-${new Date().toISOString().slice(0,7).replace("-","")}-${crypto.randomUUID().slice(0,6).toUpperCase()}`;
+  const now=new Date().toISOString();
+  let d={projectId:p.projectId,number:id,title:String(b.title||"").trim().slice(0,200)||(items.length>1?`${first} (+${items.length-1} item)`:first),
+    scope:[p.notes,items.map(i=>`• ${i.uraian} — ${i.volume} ${i.satuan}`).join("\n")].filter(Boolean).join("\n\n").slice(0,3000),location:String(p.deliveryLocation||""),
+    targetStart:p.workStartDate||"",targetEnd:p.workEndDate||"",items,offerTotal:Math.round(items.reduce((s,i)=>s+i.volume*i.harga,0)),offerNote:"Penawaran awal diambil dari HPP PR — sesuaikan dengan penawaran TAJAMA.",notes:String(b.note||"").slice(0,1000),
+    prId,prNumber:p.prNumber||prId,createdBy:user.id,createdByName:user.name||user.username||"",status:"PELUANG",createdAt:now,updatedAt:now};
+  d.history=tjHist(d,user,"DARI_PR",`${p.prNumber||prId}${b.note?` · ${b.note}`:""}`);
+  if(truthy(b.submit)&&d.offerTotal>0){ d.status="WAIT_OPS"; d.submittedAt=now; d.history=tjHist(d,user,"AJUKAN_PENAWARAN"); }
+  const job=await upsertRecord(env,"tajama_jobs",id,d,user); await syncWorkflowTask(env,"tajama_jobs",id,d,user);
+  const pd={...p,status:"TAJAMA",tajamaJobId:id,tajamaNumber:id,tajamaAt:now,tajamaByName:user.name||user.username||""};
+  await upsertRecord(env,"procurement",prId,pd,user); await syncWorkflowTask(env,"procurement",prId,pd,user);
+  await audit(env,user,"PR_TO_TAJAMA","procurement",prId,p.projectId,{tajamaJobId:id});
+  return json({ok:true,row:job,pr:{id:prId,status:"TAJAMA"}});
+}
 // Cron: komplain terbuka > 3 hari tanpa respon TAJAMA → eskalasi ke Head of Operational.
 async function escalateTajamaComplaints(env){
   const rows=await rowsWhere(env,"tajama_jobs","json_extract(data_json,'$.status') NOT IN ('DONE','CANCELLED','REJECTED')",[]);
@@ -3709,6 +3735,7 @@ async function procurementDeleteGuard(env,user,collection,id,old) {
       if(String(pm||d.projectManagerUserId||"")!==String(user.id||"")) return "Anda hanya dapat menghapus PR pada proyek yang Anda tangani.";
       if(!["DRAFT","REJECTED"].includes(st)) return "PR yang sudah dikirim ke Head hanya dapat dihapus oleh Head of Operational atau Administrator.";
     }
+    if(d.tajamaJobId) return `PR ini sudah dialihkan ke TAJAMA (${d.tajamaNumber||d.tajamaJobId}). Kelola di menu Pekerjaan TAJAMA.`;
     const pos=await rowsWhere(env,"po","json_extract(data_json,'$.prId')=?",[String(id)]);
     if(pos.length) return `PR ini sudah memiliki SPK/PO ${pos.map(p=>p.data.number||p.id).join(", ")}. Hapus SPK/PO tersebut terlebih dahulu.`;
   }
@@ -3859,7 +3886,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.43-pekerjaan-tajama"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.44-pr-ke-tajama"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3913,6 +3940,8 @@ async function handleRequest(request, env) {
     const finContractMatch = path.match(/^\/api\/finance\/contracts\/([^/]+)$/);
     if (finContractMatch && request.method === "POST") return contractSaveHandler(request,env,auth.user,decodeURIComponent(finContractMatch[1]));
     if (path === "/api/finance/payroll-preview" && request.method === "GET") return payrollPreviewHandler(env,auth.user,url);
+    const prTjMatch = path.match(/^\/api\/procurement\/([^/]+)\/to-tajama$/);
+    if (prTjMatch && request.method === "POST") return procurementToTajamaHandler(request,env,auth.user,decodeURIComponent(prTjMatch[1]));
     if (path === "/api/tajama-jobs" && request.method === "POST") return tajamaSaveHandler(request,env,auth.user,"");
     const tjMatch = path.match(/^\/api\/tajama-jobs\/([^/]+)(?:\/(action|spk|inspect|complaint))?$/);
     if (tjMatch && request.method === "POST") { const tid=decodeURIComponent(tjMatch[1]); if(!tjMatch[2]) return tajamaSaveHandler(request,env,auth.user,tid); return tajamaActionHandler(request,env,auth.user,tid,tjMatch[2]==="action"?"":tjMatch[2]); }
