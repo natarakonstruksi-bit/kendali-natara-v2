@@ -38,10 +38,11 @@
     "EMAIL_FROM_NAME": "Nara System — Natara Konstruksi",
     "APP_BASE_URL": "https://kendali-natara-v2.natarakonstruksi.workers.dev",
     "BANGUN_NUSA_URL": "https://bangun-nusa.natarakonstruksi.workers.dev",
-    "TAJAMA_URL": "https://tajama-website.tajama.workers.dev"
+    "TAJAMA_URL": "https://tajama-website.tajama.workers.dev",
+    "ATI_URL": "https://ati.natarakonstruksi.workers.dev"
   },
   // V3.4.41 — Request Material ke Bangun Nusa. Rahasia BANGUN_NUSA_KEY (= KUNCI_NK di Bangun Nusa) diisi lewat dashboard.
-  "services": [ { "binding": "UNIT_BN", "service": "bangun-nusa" } ],
+  "services": [ { "binding": "UNIT_BN", "service": "bangun-nusa" }, { "binding": "UNIT_ATI", "service": "ati" } ],
   "r2_buckets": [
     {
       "binding": "FILES",
