@@ -164,7 +164,7 @@ function dashboardWelcome(){
   return `<section class="dashboard-welcome"><div class="welcome-copy"><span class="eyebrow">NARA SYSTEM</span><h1>Halo, ${esc(full)}</h1><p>${esc(greetingDate())} • ${esc(scope)} • Data dashboard mengikuti input aktual tim.</p></div><div class="welcome-badge"><img src="/assets/natara-mark.png" alt="Natara"><div><b>${esc(role)}</b><span>${esc(full)}</span></div></div></section>`;
 }
 async function enterApp(me){
-  state.user=me.user;state.access=me.access;$('#loginScreen').classList.add('hidden');$('#app').classList.remove('hidden');
+  state.user=me.user;state.access=me.access;state.ati=me.ati||null;$('#loginScreen').classList.add('hidden');$('#app').classList.remove('hidden');
   $('#userName').textContent=currentUserName();$('#userRole').textContent=currentRoleLabel()+(assignedProjectScope()?' • Proyek ditugaskan saja':'');
   updateUserGreeting();
   state.navClicked='';applyRoleNavigation();await fullRefresh();
@@ -2859,3 +2859,41 @@ renderProcurement=async function(...args){
   });
   return out;
 };
+
+// ===================== V3.4.45 — Website ATI =====================
+// Bila KENDALI tersambung ke website ATI (state.ati), data tukang/asesmen/pelatihan/masalah dikelola di ATI.
+// KENDALI tetap: absensi & upah (laporan harian) dan Permintaan Tukang (Site Manager → ATI).
+const v345PrevAtiReqButtons=v34AtiRequestButtons, v345PrevAtiIssueButtons=v34AtiIssueButtons;
+v34AtiRequestButtons=function(r){
+  if(!state.ati) return v345PrevAtiReqButtons(r);
+  const s=String(r.data.status||'DRAFT').toUpperCase(),id=esc(r.id),b=(a,l,c='')=>`<button class="btn small ${c}" data-ati-flow="${a}" data-col="ati_work_requests" data-id="${id}">${l}</button>`;
+  if(s==='DRAFT') return b('submit','Kirim ke ATI','primary');
+  let out='';
+  if(['DIAJUKAN','DIPROSES','TERPENUHI'].includes(s)) out+=b('refresh','Perbarui');
+  if(['DIPROSES','TERPENUHI'].includes(s)) out+=b('complete','Selesaikan','success');
+  if(['DIAJUKAN','DIPROSES'].includes(s)) out+=b('cancel','Batalkan','danger');
+  return out;
+};
+v34AtiIssueButtons=function(r){ return state.ati?'':v345PrevAtiIssueButtons(r); };
+const v345PrevAtiAction=v34AtiAction;
+v34AtiAction=async function(col,id,action){
+  if(!(state.ati&&col==='ati_work_requests'&&['cancel','complete'].includes(action))) return v345PrevAtiAction(col,id,action);
+  openModal(action==='cancel'?'Batalkan permintaan tukang':'Selesaikan penempatan',action==='cancel'?'Permintaan di website ATI ikut dibatalkan.':'Tukang yang ditugaskan dilepas kembali ke ATI.',`<div class="form-grid"><label class="span-2">Catatan${action==='cancel'?' / alasan':''}<textarea name="notes" ${action==='cancel'?'required':''}></textarea></label></div>`,
+    async form=>{await api(`/api/ati/${col}/${encodeURIComponent(id)}/action`,{method:'POST',body:{action,notes:form.notes.value}});toast(action==='cancel'?'Permintaan dibatalkan.':'Penempatan diselesaikan.');state.cache.clear();await renderAti();await refreshTaskBadge();});
+};
+const v345PrevRenderAti=renderAti;
+renderAti=async function(){
+  await v345PrevRenderAti();
+  if(!state.ati) return;
+  const retired=['tukang','ati_field_issues','ati_issue_evaluations','ati_assessments','pelatihan'];
+  retired.forEach(c=>$$(`[data-add="${c}"],[data-edit="${c}"],[data-delete="${c}"]`).forEach(x=>x.remove()));
+  $('#v31AddAssessment')?.remove();
+  const req=await loadCollection('ati_work_requests',Boolean(state.selectedProjectId));
+  const aktif=req.filter(r=>r.data.ati?.tukang?.length&&!['SELESAI','DIBATALKAN','DITOLAK'].includes(String(r.data.status).toUpperCase()));
+  const tukangRows=aktif.flatMap(r=>r.data.ati.tukang.filter(t=>t.status!=='Ditarik').map(t=>`<tr><td><b>${esc(t.nama)}</b><div class="tiny muted">${esc(t.atiId)} · ${esc(t.noHp||'')}</div></td><td>${esc(t.skill||'-')}</td><td>${statusPill(t.level||'-')}</td><td>${esc(projectName(r.data.projectId))}<div class="tiny muted">${esc(r.data.workPackage||'')} · ${esc(r.data.ati.nomor||'')}</div></td><td class="num">${fmtRp(t.tarifHarian)}</td><td>${statusPill(t.status||'-')}</td></tr>`)).join('');
+  $('#content').insertAdjacentHTML('afterbegin',`<div class="card" style="border-left:4px solid var(--primary,#2f5d8a)"><div class="card-head"><div><h3>Data ATI kini di website ATI</h3><p>Tukang, level & nilai skill, asesmen, pelatihan, dan masalah lapangan dikelola tim ATI. Di KENDALI: buat <b>Permintaan Tukang</b> (tombol + Pengajuan → Kirim ke ATI), lalu tukang yang ditugaskan ATI otomatis muncul di laporan harian untuk absensi & upah.</p></div><a class="btn primary" href="${esc(state.ati.url)}/ati" target="_blank" rel="noopener">Buka website ATI ↗</a></div></div>
+  <div class="card"><div class="card-head"><div><h3>Tukang ditugaskan ATI</h3><p>Dari permintaan tukang yang sedang berjalan.</p></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Tukang</th><th>Keahlian</th><th>Level</th><th>Proyek / pekerjaan</th><th>Tarif harian</th><th>Status</th></tr></thead><tbody>${tukangRows||'<tr><td colspan="6" class="empty">Belum ada tukang yang ditugaskan.</td></tr>'}</tbody></table></div></div>`);
+  $$('[data-ati-flow]').forEach(b=>b.onclick=()=>v34AtiAction(b.dataset.col,b.dataset.id,b.dataset.atiFlow));
+};
+configs.ati_work_requests.fields=configs.ati_work_requests.fields.map(x=>x.name==='status'?{...x,options:['DRAFT','DIAJUKAN','DIPROSES','TERPENUHI','SELESAI','DITOLAK','DIBATALKAN']}:x.name==='workerCategory'?{...x,label:'Jenis Tenaga (BURUH/HELPER/TUKANG/TUKANG AHLI/KEPALA TUKANG/MANDOR)'}:x);
+configs.tukang.fields=configs.tukang.fields.map(x=>x.name==='atiLevel'?{...x,options:['Pemula','Terampil','Mahir','Mandor','L0','L1','L2','L3','L4','L5','L6']}:x);
