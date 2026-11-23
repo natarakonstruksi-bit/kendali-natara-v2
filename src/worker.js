@@ -1,5 +1,5 @@
 /**
- * Nara System V3.4.44 — PR / Vendor: tombol Ke TAJAMA
+ * Nara System V3.4.45 — Website ATI: data tukang dikelola di ATI, KENDALI menyimpan salinan untuk absensi & upah
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
@@ -29,7 +29,7 @@ async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik 
 }
 // ---- SIPATUO-SSO-VERIFY:END ----
 
-const APP_VERSION = "APP-V3.4.44";
+const APP_VERSION = "APP-V3.4.45";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -1453,6 +1453,7 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
   }
   if(collection==="ati_work_requests"){
     if(status==="DRAFT") return mk("ATI_REQUESTER","Pengajuan Tenaga ATI", "Pengaju melengkapi kebutuhan tenaga lalu kirim ke ATI","Ajukan ke ATI",d.requestedByUserId||sm,"site_manager");
+    if(d.ati?.nomor&&["DIAJUKAN","DIPROSES"].includes(status)) return null; // diproses di website ATI
     if(status==="DIAJUKAN") return mk("ATI_PROCESS","Proses Kebutuhan Tenaga ATI", "Kepala ATI menyiapkan tenaga sesuai skill/jumlah","Proses Pengajuan ATI","","kepala_ati");
     if(status==="DIPROSES") return mk("ATI_FULFILL","Pemenuhan Tenaga ATI", "Kepala ATI/Instruktur memastikan tenaga siap ditempatkan","Tandai Terpenuhi","","kepala_ati");
     if(status==="TERPENUHI") return mk("ATI_CONFIRM","Konfirmasi Penempatan ATI", "Pengaju mengonfirmasi kebutuhan tenaga telah terpenuhi","Selesaikan Pengajuan",d.requestedByUserId||sm,"site_manager");
@@ -1669,6 +1670,22 @@ async function closeoutWorkflowAction(request,env,user,collection,id){
 }
 async function atiWorkflowAction(request,env,user,collection,id){
   if(!['ati_work_requests','ati_field_issues'].includes(collection))return json({ok:false,message:'Workflow ATI tidak dikenal.'},400);const rec=await getRecord(env,collection,id);if(!rec)return json({ok:false,message:'Data ATI tidak ditemukan.'},404);if(rec.data.projectId){const denied=await requireProjectAccess(env,user,rec.data.projectId);if(denied)return denied;}const b=await parseJson(request)||{};const action=String(b.action||'').toLowerCase();const d={...rec.data};const old=String(d.status||'DRAFT').toUpperCase();const role=normalizeRole(user);
+  if(collection==='ati_field_issues'&&atiConnected(env))return json({ok:false,message:'Masalah lapangan kini dikelola di website ATI.'},409);
+  if(collection==='ati_work_requests'&&atiConnected(env)){
+    const mineOrMgmt=String(d.requestedByUserId||'')===String(user.id)||isManagementRole(user);
+    try{
+      if(action==='submit'){ if(old!=='DRAFT')return json({ok:false,message:'Pengajuan bukan DRAFT.'},409); if(!mineOrMgmt)return json({ok:false,message:'Hanya pengaju yang dapat submit.'},403);
+        if(!(num(d.requiredWorkers)>0))return json({ok:false,message:'Isi jumlah tenaga.'},400);
+        const r=await atiCall(env,'/api/unit/permintaan',await atiRequestPayload(env,id,d,user)); atiApplyStatus(d,{...r,jenis:'terkirim',pesan:`Terkirim ke website ATI (${r.nomor||''})`}); if(d.status==='DRAFT')d.status='DIAJUKAN'; }
+      else if(action==='refresh'){ if(!d.ati?.nomor)return json({ok:false,message:'Pengajuan belum terkirim ke ATI.'},409); atiApplyStatus(d,await atiCall(env,'/api/unit/permintaan/status',{ref:id})); }
+      else if(action==='complete'){ if(!['DIPROSES','TERPENUHI'].includes(old))return json({ok:false,message:'Pengajuan belum diproses ATI.'},409); if(!mineOrMgmt)return json({ok:false,message:'Hanya pengaju yang dapat menyelesaikan.'},403);
+        atiApplyStatus(d,{...(await atiCall(env,'/api/unit/permintaan/selesai',{ref:id,catatan:String(b.notes||'')})),jenis:'selesai',pesan:'Penempatan selesai, tukang dilepas kembali ke ATI'}); d.status='SELESAI'; }
+      else if(action==='cancel'){ if(!['DIAJUKAN','DIPROSES'].includes(old))return json({ok:false,message:'Status tidak dapat dibatalkan.'},409); if(!mineOrMgmt)return json({ok:false,message:'Hanya pengaju yang dapat membatalkan.'},403);
+        atiApplyStatus(d,{...(await atiCall(env,'/api/unit/permintaan/batal',{ref:id,alasan:String(b.notes||'')})),jenis:'batal',pesan:`Dibatalkan pengaju${b.notes?': '+String(b.notes):''}`}); d.status='DIBATALKAN'; }
+      else return json({ok:false,message:'Pengajuan diproses, ditolak, dan dipenuhi oleh Admin ATI di website ATI.'},409);
+    }catch(e){ return json({ok:false,message:e.message},502); }
+    const row=await upsertRecord(env,collection,id,d,user);await syncWorkflowTask(env,collection,id,d,user);return json({ok:true,row});
+  }
   if(collection==='ati_work_requests'){
     if(action==='submit'){if(old!=='DRAFT')return json({ok:false,message:'Pengajuan bukan DRAFT.'},409);if(String(d.requestedByUserId||'')!==String(user.id)&&!isManagementRole(user))return json({ok:false,message:'Hanya pengaju yang dapat submit.'},403);d.status='DIAJUKAN';}
     else if(action==='process'){if(old!=='DIAJUKAN')return json({ok:false,message:'Pengajuan belum DIAJUKAN.'},409);if(!['kepala_ati','manager_operasional','head_unit_bisnis','administrator','direktur'].includes(role))return json({ok:false,message:'Hanya Kepala ATI yang dapat memproses.'},403);d.status='DIPROSES';}
@@ -3320,6 +3337,99 @@ async function bangunNusaStatusHandler(request,env){
   await upsertRecord(env,"material_requests",r.id,d,actor); await syncWorkflowTask(env,"material_requests",r.id,d,actor);
   return json({ok:true});
 }
+// ===================== V3.4.45 — Website ATI (Akademi Tukang Indonesia) =====================
+// Data tukang, level, nilai skill, asesmen, pelatihan & masalah lapangan kini dikelola di website ATI.
+// KENDALI menyimpan salinan tukang (untuk absensi & upah) yang dikirim ATI lewat /api/ati/tukang,
+// dan tetap memiliki "Permintaan Tukang" (Site Manager → ATI). Tanda tangan: x-maw-unit/ts/sig, kunci ATI_KEY = KUNCI_NK di ATI.
+const ATI_RETIRED = new Set(["tukang","pelatihan","ati_assessments","ati_field_issues","ati_issue_evaluations"]);
+const ATI_REQ_STATUS = {"Masuk":"DIAJUKAN","Diproses":"DIPROSES","Terpenuhi sebagian":"DIPROSES","Terpenuhi":"TERPENUHI","Selesai":"SELESAI","Ditolak":"DITOLAK","Dibatalkan":"DIBATALKAN"};
+const ATI_JENIS = ["BURUH","HELPER","TUKANG","TUKANG AHLI","KEPALA TUKANG","MANDOR"];
+function atiConnected(env){ return Boolean(String(env.ATI_KEY||"")); }
+function atiBaseUrl(env){ return String(env.ATI_URL||"https://ati.natarakonstruksi.workers.dev").replace(/\/+$/,""); }
+async function atiCall(env,path,bodyObj){
+  const secret=String(env.ATI_KEY||""); if(!secret) throw new Error("KENDALI belum tersambung ke website ATI (secret ATI_KEY belum diisi).");
+  const body=JSON.stringify(bodyObj||{}); const ts=String(Math.floor(Date.now()/1000));
+  const headers={"content-type":"application/json","x-maw-unit":"NK","x-maw-ts":ts,"x-maw-sig":await bnHmac(secret,`${ts}.${body}`)};
+  const url=`${atiBaseUrl(env)}${path}`; const svc=env.UNIT_ATI; let r;
+  try{ r=svc&&typeof svc.fetch==="function"?await svc.fetch(url,{method:"POST",headers,body}):await fetch(url,{method:"POST",headers,body,signal:AbortSignal.timeout(15000)}); }
+  catch(e){ throw new Error(`Website ATI tidak dapat dihubungi: ${e?.message||e}`); }
+  let data={}; try{ data=await r.json(); }catch(_){}
+  if(!r.ok||data.ok===false) throw new Error(data.message||data.pesan||`Website ATI menjawab HTTP ${r.status}.`);
+  return data;
+}
+async function atiVerify(request,env){
+  const secret=String(env.ATI_KEY||""); if(!secret) return {res:json({ok:false,message:"Belum tersambung."},401)};
+  const unit=String(request.headers.get("x-maw-unit")||""); const ts=Number(request.headers.get("x-maw-ts")||0); const sig=String(request.headers.get("x-maw-sig")||"");
+  const raw=await request.text(); if(raw.length>2000000) return {res:json({ok:false},413)};
+  if(unit!=="ATI"||!ts||Math.abs(Math.floor(Date.now()/1000)-ts)>BN_SIG_WINDOW||!bnSafeEq(await bnHmac(secret,`${ts}.${raw}`),sig)) return {res:json({ok:false,message:"Tanda tangan tidak sah."},401)};
+  return {body:safeJsonParse(raw,{})||{}};
+}
+const ATI_ACTOR={id:"ati",name:"Website ATI",username:"ati"};
+// Salinan tukang dari ATI → master tukang KENDALI (dipakai absensi & upah). Kunci: kendaliId lalu atiId.
+async function atiUpsertWorkers(env,list){
+  const rows=await allRows(env,"tukang"); const byId=new Map(rows.map(r=>[r.id,r])); const byAti=new Map(rows.filter(r=>r.data.atiId).map(r=>[String(r.data.atiId),r]));
+  const out=[];
+  for(const t of (Array.isArray(list)?list:[]).slice(0,500)){
+    const atiId=String(t.atiId||"").slice(0,30); if(!atiId||!String(t.nama||"").trim()) continue;
+    const old=(t.kendaliId&&byId.get(String(t.kendaliId)))||byAti.get(atiId)||null;
+    const sk=(Array.isArray(t.skills)?t.skills:[]).slice(0,20).map(s=>({skill:String(s.skill||"").slice(0,60),nilai:num(s.nilai)}));
+    const rata=sk.length?Math.round(sk.reduce((a,s)=>a+s.nilai,0)/sk.length):num(old?.data?.rating);
+    const data={...(old?.data||{}),atiId,name:String(t.nama).slice(0,120),phone:String(t.noHp||"").slice(0,30),age:t.umur??"",domicile:String(t.domisili||"").slice(0,120),
+      workerType:ATI_JENIS.includes(String(t.jenisTenaga))?String(t.jenisTenaga):"TUKANG",atiLevel:String(t.level||""),skill1:sk[0]?.skill||"",skill2:sk[1]?.skill||"",skill3:sk[2]?.skill||"",atiSkills:sk,
+      availability:String(t.ketersediaan||"HARIAN"),dailyRate:num(t.tarifHarian),overtimeRate:num(t.tarifLembur),joinDate:String(t.tglMasuk||""),exitDate:String(t.tglKeluar||""),
+      status:String(t.status||"AKTIF"),rating:rata,atiManaged:true,atiSyncedAt:new Date().toISOString()};
+    const id=old?.id||crypto.randomUUID();
+    await upsertRecord(env,"tukang",id,data,ATI_ACTOR); byAti.set(atiId,{id,data}); out.push({atiId,kendaliId:id});
+  }
+  return out;
+}
+function atiApplyStatus(d,s){
+  const st=ATI_REQ_STATUS[String(s.status||"")]; if(st&&!(d.status==="SELESAI"&&st!=="SELESAI")) d.status=st;
+  d.ati={nomor:String(s.nomor||d.ati?.nomor||""),status:String(s.status||""),keterangan:String(s.keterangan||""),dibutuhkan:num(s.dibutuhkan),ditugaskan:num(s.ditugaskan),
+    tukang:(Array.isArray(s.tukang)?s.tukang:[]).slice(0,200).map(t=>({atiId:String(t.atiId||""),nama:String(t.nama||""),level:String(t.level||""),skill:String(t.skillTugas||""),status:String(t.statusTugas||""),noHp:String(t.noHp||""),tarifHarian:num(t.tarifHarian)})),updatedAt:new Date().toISOString()};
+  if(st==="DITOLAK") d.rejectReason=String(s.keterangan||"");
+  if(s.pesan){ const h=Array.isArray(d.history)?d.history:[]; h.push({at:new Date().toISOString(),by:"ati",byName:"Website ATI",action:`ATI_${String(s.jenis||"STATUS").toUpperCase()}`,note:String(s.pesan).slice(0,300)}); d.history=h.slice(-40); }
+  return d;
+}
+async function atiStatusHandler(request,env){
+  const v=await atiVerify(request,env); if(v.res) return v.res; const s=v.body;
+  if(!s.ref) return json({ok:false,message:"Isi tidak valid."},400);
+  const rec=await getRecord(env,"ati_work_requests",String(s.ref)); if(!rec) return json({ok:true,ignored:true});
+  if(Array.isArray(s.tukang)&&s.tukang.length) await atiUpsertWorkers(env,s.tukang);
+  const d=atiApplyStatus({...rec.data},s);
+  await upsertRecord(env,"ati_work_requests",rec.id,d,ATI_ACTOR); await syncWorkflowTask(env,"ati_work_requests",rec.id,d,ATI_ACTOR);
+  return json({ok:true});
+}
+async function atiWorkersHandler(request,env){
+  const v=await atiVerify(request,env); if(v.res) return v.res;
+  return json({ok:true,tukang:await atiUpsertWorkers(env,v.body.tukang)});
+}
+async function atiAttendanceHandler(request,env){
+  const v=await atiVerify(request,env); if(v.res) return v.res; const b=v.body;
+  const ati=new Set((b.atiIds||[]).map(String)); const ids=new Set((b.kendaliIds||[]).map(String));
+  for(const r of await allRows(env,"tukang")) if(r.data.atiId&&ati.has(String(r.data.atiId))) ids.add(r.id);
+  if(!ids.size) return json({ok:true,rows:[]});
+  const dari=/^\d{4}-\d{2}-\d{2}$/.test(String(b.dari||""))?String(b.dari):"0000-00-00", sampai=/^\d{4}-\d{2}-\d{2}$/.test(String(b.sampai||""))?String(b.sampai):"9999-12-31";
+  const names=await projectNameMap(env);
+  const rows=(await allRows(env,"daily_workers")).filter(r=>ids.has(String(r.data.workerId||""))&&String(r.data.date||"")>=dari&&String(r.data.date||"")<=sampai)
+    .map(r=>({date:String(r.data.date||""),project:names[String(r.data.projectId||"")]||"",status:String(r.data.attendanceStatus||""),overtimeHours:num(r.data.overtimeHours),amount:num(r.data.amount)}))
+    .sort((a,c)=>c.date.localeCompare(a.date)).slice(0,1000);
+  return json({ok:true,rows});
+}
+async function atiExportHandler(request,env){
+  const v=await atiVerify(request,env); if(v.res) return v.res;
+  const pick=async c=>(await allRows(env,c)).map(r=>({id:r.id,data:r.data}));
+  const [tukang,pelatihan,ati_assessments,ati_field_issues,ati_issue_evaluations,projects,employees]=await Promise.all([pick("tukang"),pick("pelatihan"),pick("ati_assessments"),pick("ati_field_issues"),pick("ati_issue_evaluations"),projectNameMap(env),employeeNameMap(env)]);
+  return json({ok:true,tukang,pelatihan,ati_assessments,ati_field_issues,ati_issue_evaluations,projects,employees});
+}
+async function atiRequestPayload(env,id,d,user){
+  const names=await projectNameMap(env); const p=d.projectId?await getRecord(env,"projects",d.projectId):null;
+  const jenis=ATI_JENIS.includes(String(d.workerCategory||"").trim().toUpperCase())?String(d.workerCategory).trim().toUpperCase():"";
+  const skill=String(d.requiredSkill||"").trim()||(jenis?"":String(d.workerCategory||"").trim());
+  return {ref:id,proyek:names[String(d.projectId||"")]||"",lokasi:String(p?.data?.location||p?.data?.lokasi||p?.data?.address||""),paket:String(d.workPackage||""),
+    kebutuhan:[{skill,jenis:jenis||(skill?"":"TUKANG"),level_min:"Pemula",jumlah:Math.max(1,Math.round(num(d.requiredWorkers)||1))}],mulai:String(d.startDate||""),selesai:String(d.endDate||""),
+    pemohon:String(user?.name||user?.username||""),kontak:String(user?.phone||""),catatan:String(d.notes||"")};
+}
 // ===================== V3.4.43 — Pekerjaan TAJAMA (Peluang → Penawaran → ACC → SPK → TAJAMA → QC → Selesai) =====================
 // Alur vendor biasa (PR) tetap. Pekerjaan yang dikerjakan TAJAMA dicatat di sini: Natara mengisi Peluang & Penawaran,
 // Head of Operational ACC, Admin Teknik membuat SPK lalu dikirim ke website TAJAMA (API bertanda tangan x-maw-*),
@@ -3886,7 +3996,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.44-pr-ke-tajama"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.45-website-ati"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -3901,14 +4011,23 @@ async function handleRequest(request, env) {
     if (path === "/api/sipatuo/ringkasan" && request.method === "POST") return sipatuoRingkasanHandler(request,env);
     if (path === "/api/bangun-nusa/status" && request.method === "POST") return bangunNusaStatusHandler(request,env);
     if (path === "/api/tajama/status" && request.method === "POST") return tajamaStatusHandler(request,env);
+    if (path === "/api/ati/status" && request.method === "POST") return atiStatusHandler(request,env);
+    if (path === "/api/ati/tukang" && request.method === "POST") return atiWorkersHandler(request,env);
+    if (path === "/api/ati/kehadiran" && request.method === "POST") return atiAttendanceHandler(request,env);
+    if (path === "/api/ati/ekspor" && request.method === "POST") return atiExportHandler(request,env);
 
     const auth = await authenticate(request,env);
     if (path === "/api/auth/me" || path === "/api/access/session") {
       if (!auth.ok) return authFailure(auth);
-      return json({ok:true,user:auth.user,username:auth.user.username,email:auth.user.email||"",access:buildAccess(auth.user),landing_route:"/"});
+      return json({ok:true,user:auth.user,username:auth.user.username,email:auth.user.email||"",access:buildAccess(auth.user),landing_route:"/",ati:atiConnected(env)?{url:atiBaseUrl(env)}:null});
     }
     if (path === "/api/auth/logout" && (request.method === "POST" || request.method === "GET")) return logoutHandler(request,env,auth);
     if ((path.startsWith("/api/") || path.startsWith("/rest/") || path.startsWith("/storage/")) && !auth.ok) return authFailure(auth);
+    if (atiConnected(env) && request.method !== "GET") {
+      const rm=path.match(/^\/api\/records\/([^/]+)/)||path.match(/^\/rest\/v1\/([^/]+)$/);
+      if (rm && ATI_RETIRED.has(decodeURIComponent(rm[1]))) return json({ok:false,message:"Data tukang, asesmen, pelatihan, dan masalah lapangan ATI kini dikelola di website ATI. Buka website ATI untuk menambah atau mengubah."},409);
+      if (path === "/api/finance/directory/merge") { const b=await request.clone().json().catch(()=>({})); if(b.kind==="tukang") return json({ok:false,message:"Data tukang dikelola di website ATI."},409); }
+    }
 
     if (path === "/api/auth/change-password" && request.method === "POST") return changePasswordHandler(request,env,auth);
     if (path === "/api/diagnostics") return isTopRole(auth.user) ? diagnostics(env) : json({ok:false,message:"Diagnostics hanya untuk Administrator/Direktur/Head Unit Bisnis."},403);
