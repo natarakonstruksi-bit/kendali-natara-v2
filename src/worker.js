@@ -1,5 +1,5 @@
 /**
- * Nara System V3.4.45 — Website ATI: data tukang dikelola di ATI, KENDALI menyimpan salinan untuk absensi & upah
+ * Nara System V3.4.46 — Permintaan Gambar ke DAARP Architect (serah terima gambar, terima / minta revisi)
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
@@ -29,7 +29,7 @@ async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik 
 }
 // ---- SIPATUO-SSO-VERIFY:END ----
 
-const APP_VERSION = "APP-V3.4.45";
+const APP_VERSION = "APP-V3.4.46";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -42,9 +42,9 @@ const STORAGE_BUCKET = "kendali-natara-files-v2";
 const LOGIN_MAX_FAILS = 8;
 const LOGIN_WINDOW_SEC = 15 * 60;
 
-const COLLECTIONS = new Set(["partners","project_terms","partner_payments","projects","users","rabs","surat","tukang","pelatihan","aset","proyeksi","vendor","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","qc_inspection_sessions","qc_inspection_items","qc_work_groups","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","public_site_settings","public_portfolio","qc_reports","ati_reports","workflow_tasks","as_built_progress","qc_visit_routes","material_requests","tajama_jobs"]);
+const COLLECTIONS = new Set(["drawing_requests","partners","project_terms","partner_payments","projects","users","rabs","surat","tukang","pelatihan","aset","proyeksi","vendor","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","qc_work_items","qc_inspection_sessions","qc_inspection_items","qc_work_groups","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","public_site_settings","public_portfolio","qc_reports","ati_reports","workflow_tasks","as_built_progress","qc_visit_routes","material_requests","tajama_jobs"]);
 
-const PROJECT_SCOPED_COLLECTIONS = new Set(["project_terms","partner_payments","projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","as_built_progress","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks","qc_visit_routes","material_requests","tajama_jobs"]);
+const PROJECT_SCOPED_COLLECTIONS = new Set(["drawing_requests","project_terms","partner_payments","projects","rabs","po","project_budget","cash_in","cash_out","receivables","payables","payment_requests","daily_progress","weekly_progress","opname","qc_inspections","defects","cco","approvals","milestones","retention","closeout","project_documents","issues","schedule","procurement","as_built_progress","qc_work_items","qc_inspection_sessions","qc_inspection_items","daily_workers","qc_actions","qc_verifications","ati_assessments","ati_work_requests","ati_field_issues","ati_issue_evaluations","public_project_settings","public_updates","workflow_tasks","qc_visit_routes","material_requests","tajama_jobs"]);
 
 const DOC_CORE = ["CONTRACT", "RAB_BASELINE", "DED_FINAL", "TIME_SCHEDULE"];
 const DOC_PRECON = ["PCM", "MC0"];
@@ -75,21 +75,21 @@ const ROLE_LABELS = {
   viewer: "Viewer"
 };
 
-const ALL_VIEWS = ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","tajama","ati","documents","flow","closeout","public_info","employees","master","audit"];
+const ALL_VIEWS = ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","tajama","daarp","ati","documents","flow","closeout","public_info","employees","master","audit"];
 const ROLE_VIEWS = {
   administrator: ALL_VIEWS,
   direktur: ALL_VIEWS,
   head_unit_bisnis: ALL_VIEWS,
-  manager_operasional: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","tajama","ati","documents","flow","closeout","public_info","master","audit"],
-  koordinator_engineering: ["dashboard","tasks","projects","progress","opname","asbuilt","qc","cco","procurement","tajama","documents","flow","closeout"],
+  manager_operasional: ["dashboard","tasks","projects","daarp","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","tajama","ati","documents","flow","closeout","public_info","master","audit"],
+  koordinator_engineering: ["dashboard","tasks","projects","daarp","progress","opname","asbuilt","qc","cco","procurement","tajama","documents","flow","closeout"],
   koordinator_supporting: ["dashboard","tasks","projects","progress","qc","qc_archive","documents","flow","closeout"],
-  admin_teknik: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","tajama","ati","documents","flow","closeout","public_info","master"],
-  site_manager: ["dashboard","tasks","projects","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","material","tajama","ati","documents","flow","closeout"],
-  estimator: ["dashboard","tasks","projects","cco","documents","flow"],
-  qs: ["dashboard","tasks","projects","fund_requests","progress","opname","cco","documents","flow"],
-  drafter: ["dashboard","tasks","projects","asbuilt","documents","flow"],
-  qc: ["dashboard","tasks","projects","fund_requests","progress","qc","tajama","qc_archive","documents","flow"],
-  mep_engineer: ["dashboard","tasks","projects","progress","qc","documents","flow"],
+  admin_teknik: ["dashboard","tasks","projects","daarp","finance","payments","directory","fund_requests","progress","opname","asbuilt","qc","qc_archive","cco","procurement","material","tajama","ati","documents","flow","closeout","public_info","master"],
+  site_manager: ["dashboard","tasks","projects","daarp","payments","directory","fund_requests","progress","opname","asbuilt","qc","cco","procurement","material","tajama","ati","documents","flow","closeout"],
+  estimator: ["dashboard","tasks","projects","daarp","cco","documents","flow"],
+  qs: ["dashboard","tasks","projects","daarp","fund_requests","progress","opname","cco","documents","flow"],
+  drafter: ["dashboard","tasks","projects","daarp","asbuilt","documents","flow"],
+  qc: ["dashboard","tasks","projects","daarp","fund_requests","progress","qc","tajama","qc_archive","documents","flow"],
+  mep_engineer: ["dashboard","tasks","projects","daarp","progress","qc","documents","flow"],
   finance: ["dashboard","tasks","projects","finance","payments","directory","fund_requests","procurement","material","tajama","documents","flow","closeout"],
   procurement: ["dashboard","tasks","projects","payments","directory","fund_requests","procurement","material","documents","flow"],
   kepala_ati: ["dashboard","tasks","ati","progress","master"],
@@ -266,6 +266,7 @@ function collectionPermission(user, collection) {
   if (collection === "partners") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance","koordinator_engineering"],["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","finance"]);
   if (collection === "project_terms") return allow(["manager_operasional","admin_teknik","finance","site_manager"],["manager_operasional","admin_teknik"],["manager_operasional","admin_teknik"]);
   if (collection === "tajama_jobs") return allow(["manager_operasional","admin_teknik","site_manager","qc","finance","koordinator_engineering"],[],[]);
+  if (collection === "drawing_requests") return allow(["manager_operasional","admin_teknik","site_manager","qc","koordinator_engineering","drafter","estimator","qs","mep_engineer"],[],[]);
   if (collection === "material_requests") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],[],[]);
   if (collection === "partner_payments") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],[],[]);
   if (collection === "po") return allow(["manager_operasional","admin_teknik","site_manager","procurement","finance"],["manager_operasional","admin_teknik","procurement","finance"],["manager_operasional","admin_teknik"]);
@@ -307,6 +308,8 @@ function buildAccess(user) {
       tajamaCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","site_manager"]),
       tajamaApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       tajamaInspect: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","site_manager","qc"]),
+      drawingCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","site_manager","koordinator_engineering"]),
+      drawingReview: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","site_manager","koordinator_engineering","qc"]),
       materialRequestCreate: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","site_manager"]),
       materialRequestApprove: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional"]),
       materialRequestForward: roleIn(user,["administrator","direktur","head_unit_bisnis","procurement"]),
@@ -1365,14 +1368,14 @@ async function getProjectBudgetValue(env, projectId) {
 }
 
 
-const WORKFLOW_SOURCE_COLLECTIONS = new Set(["daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items","partner_payments","project_terms","material_requests","tajama_jobs"]);
+const WORKFLOW_SOURCE_COLLECTIONS = new Set(["drawing_requests","daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items","partner_payments","project_terms","material_requests","tajama_jobs"]);
 
 function workflowRoleLabel(role) { return String(role||"").split(",").filter(Boolean).map(r=>ROLE_LABELS[r]||r).join(" / "); }
 // V3.4.30: antrean tugas bisa untuk beberapa jabatan sekaligus, ditulis "qc,koordinator_supporting".
 function roleQueueHas(assigneeRole,role){ return String(assigneeRole||"").split(",").map(x=>x.trim()).filter(Boolean).includes(String(role||"")); }
 function workflowActiveStatus(status) { return ["OPEN","IN_PROGRESS"].includes(String(status||"").toUpperCase()); }
 function workflowSourceView(collection) {
-  return ({daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc",partner_payments:"payments",project_terms:"finance",material_requests:"material",tajama_jobs:"tajama"})[collection] || "dashboard";
+  return ({drawing_requests:"daarp",daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc",partner_payments:"payments",project_terms:"finance",material_requests:"material",tajama_jobs:"tajama"})[collection] || "dashboard";
 }
 async function projectRoleUser(env, projectId, roleKey, ctx=null) {
   if (!projectId) return "";
@@ -1462,6 +1465,12 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
   if(collection==="ati_field_issues"){
     if(["OPEN","IN PROGRESS"].includes(status)) return mk("ATI_ISSUE_ACTION","Masalah Lapangan ATI", "PIC menangani masalah tenaga/operasional ATI","Tangani Masalah",d.picUserId,"kepala_ati",{priority:"HIGH"});
     if(status==="WAITING EVALUATION") return mk("ATI_ISSUE_EVAL","Evaluasi Masalah ATI", "Kepala ATI melakukan evaluasi dan menutup masalah","Evaluasi Masalah","","kepala_ati");
+    return null;
+  }
+  if(collection==="drawing_requests"){
+    const ttl=`Gambar DAARP — ${d.title||""}`;
+    if(status==="DRAFT") return mk("DA_SUBMIT",ttl,"Lengkapi permintaan gambar lalu kirim ke DAARP Architect.","Kirim ke DAARP",d.createdBy||sm,"");
+    if(status==="DIKIRIM") return mk("DA_REVIEW",ttl,"DAARP mengirim gambar. Periksa lalu tekan Diterima atau Minta revisi.","Periksa Gambar",d.createdBy||sm,"",{priority:"HIGH"});
     return null;
   }
   if(collection==="tajama_jobs"){
@@ -3430,6 +3439,96 @@ async function atiRequestPayload(env,id,d,user){
     kebutuhan:[{skill,jenis:jenis||(skill?"":"TUKANG"),level_min:"Pemula",jumlah:Math.max(1,Math.round(num(d.requiredWorkers)||1))}],mulai:String(d.startDate||""),selesai:String(d.endDate||""),
     pemohon:String(user?.name||user?.username||""),kontak:String(user?.phone||""),catatan:String(d.notes||"")};
 }
+// ===================== V3.4.46 — Permintaan Gambar ke DAARP Architect =====================
+// Natara meminta gambar kerja/detail ke DAARP; DAARP mengirim paket serah terima; Natara menekan Diterima atau Minta revisi.
+// Tanda tangan x-maw-*, kunci DAARP_KEY (= KUNCI_NK di website DAARP). DAARP → KENDALI: /api/daarp/status (x-maw-unit: DAARP).
+const DA_STATUS = {"Masuk":"DIAJUKAN","Diproses":"DIPROSES","Dikirim":"DIKIRIM","Revisi diminta":"REVISI","Selesai":"SELESAI","Ditolak":"DITOLAK","Dibatalkan":"DIBATALKAN"};
+const DA_JENIS = ["Gambar kerja / DED","Gambar konsep","Gambar perizinan (PBG)","Gambar detail tambahan","Revisi gambar","As-built","Lainnya"];
+function daarpBaseUrl(env){ return String(env.DAARP_URL||"https://daarp.natarakonstruksi.workers.dev").replace(/\/+$/,""); }
+async function daarpCall(env,path,bodyObj){
+  const secret=String(env.DAARP_KEY||""); if(!secret) throw new Error("KENDALI belum tersambung ke website DAARP (secret DAARP_KEY belum diisi).");
+  const body=JSON.stringify(bodyObj||{}); const ts=String(Math.floor(Date.now()/1000));
+  const headers={"content-type":"application/json","x-maw-unit":"NK","x-maw-ts":ts,"x-maw-sig":await bnHmac(secret,`${ts}.${body}`)};
+  const url=`${daarpBaseUrl(env)}${path}`; const svc=env.UNIT_DAARP; let r;
+  try{ r=svc&&typeof svc.fetch==="function"?await svc.fetch(url,{method:"POST",headers,body}):await fetch(url,{method:"POST",headers,body,signal:AbortSignal.timeout(15000)}); }
+  catch(e){ throw new Error(`Website DAARP tidak dapat dihubungi: ${e?.message||e}`); }
+  let data={}; try{ data=await r.json(); }catch(_){}
+  if(!r.ok||data.ok===false) throw new Error(data.message||`Website DAARP menjawab HTTP ${r.status}.`);
+  return data;
+}
+function daApply(d,s){
+  const versi=num(s.versi); if(versi&&num(d.daarp?.versi)>versi) return d; // kabar lama diabaikan
+  const st=DA_STATUS[String(s.status||"")]; if(st) d.status=st;
+  d.daarp={nomor:String(s.nomor||d.daarp?.nomor||""),status:String(s.status||""),keterangan:String(s.keterangan||""),versi:versi||Date.now(),
+    proyek:s.proyek?{kode:String(s.proyek.kode||""),nama:String(s.proyek.nama||""),target:String(s.proyek.target||""),status:String(s.proyek.status||""),progres:num(s.proyek.progres),tahap:String(s.proyek.tahap||"")}:(d.daarp?.proyek||null),
+    serahTerima:(Array.isArray(s.serahTerima)?s.serahTerima:[]).slice(0,50).map(x=>({nomor:String(x.nomor||""),status:String(x.status||""),catatan:String(x.catatan||""),dikirim:String(x.dikirim||""),tanggapan:String(x.tanggapan||""),ditanggapiOleh:String(x.ditanggapiOleh||""),ditanggapi:String(x.ditanggapi||""),
+      gambar:(Array.isArray(x.gambar)?x.gambar:[]).slice(0,300).map(g=>({nomor:String(g.nomor||""),judul:String(g.judul||""),disiplin:String(g.disiplin||""),revisi:num(g.revisi),url:/^https?:\/\//i.test(String(g.url||""))?String(g.url):""}))})),
+    updatedAt:new Date().toISOString()};
+  if(st==="DITOLAK") d.rejectReason=String(s.keterangan||"");
+  if(s.pesan){ const h=Array.isArray(d.history)?d.history:[]; h.push({at:new Date().toISOString(),by:"daarp",byName:"DAARP Architect",action:`DAARP_${String(s.jenis||"STATUS").toUpperCase()}`,note:String(s.pesan).slice(0,300)}); d.history=h.slice(-40); }
+  return d;
+}
+const DAARP_ACTOR={id:"daarp",name:"Website DAARP",username:"daarp"};
+function daHist(d,user,action,note=""){ const h=Array.isArray(d.history)?d.history:[]; h.push({at:new Date().toISOString(),by:user.id,byName:user.name||user.username,action,note:String(note||"").slice(0,500)}); return h.slice(-40); }
+async function daarpStatusHandler(request,env){
+  const secret=String(env.DAARP_KEY||""); if(!secret) return json({ok:false,message:"Belum tersambung."},401);
+  const unit=String(request.headers.get("x-maw-unit")||""), ts=Number(request.headers.get("x-maw-ts")||0), sig=String(request.headers.get("x-maw-sig")||"");
+  const raw=await request.text(); if(raw.length>2000000) return json({ok:false},413);
+  if(unit!=="DAARP"||!ts||Math.abs(Math.floor(Date.now()/1000)-ts)>BN_SIG_WINDOW||!bnSafeEq(await bnHmac(secret,`${ts}.${raw}`),sig)) return json({ok:false,message:"Tanda tangan tidak sah."},401);
+  const s=safeJsonParse(raw,{})||{}; if(!s.ref) return json({ok:false,message:"Isi tidak valid."},400);
+  const rec=await getRecord(env,"drawing_requests",String(s.ref)); if(!rec) return json({ok:true,ignored:true});
+  const d=daApply({...rec.data},s);
+  await upsertRecord(env,"drawing_requests",rec.id,d,DAARP_ACTOR); await syncWorkflowTask(env,"drawing_requests",rec.id,d,DAARP_ACTOR);
+  return json({ok:true});
+}
+async function drawingSaveHandler(request,env,user,id){
+  const cap=buildAccess(user).capabilities; if(!cap.drawingCreate) return json({ok:false,message:"Role ini tidak dapat membuat permintaan gambar."},403);
+  const b=await parseJson(request)||{};
+  let old=null; if(id){ old=await getRecord(env,"drawing_requests",id); if(!old) return json({ok:false,message:"Permintaan tidak ditemukan."},404); if(!["DRAFT"].includes(old.data.status)) return json({ok:false,message:"Permintaan yang sudah dikirim tidak dapat diubah."},409); }
+  const projectId=String(b.projectId||"").slice(0,80); if(!projectId||!(await getRecord(env,"projects",projectId))) return json({ok:false,message:"Pilih proyek."},400);
+  { const denied=await requireProjectAccess(env,user,projectId); if(denied) return denied; }
+  const title=String(b.title||"").trim().slice(0,160); if(!title) return json({ok:false,message:"Isi judul permintaan gambar."},400);
+  const link=String(b.refLink||"").trim().slice(0,500);
+  const d={...(old?.data||{}),projectId,title,jenis:DA_JENIS.includes(b.jenis)?b.jenis:"Gambar kerja / DED",uraian:String(b.uraian||"").slice(0,3000),neededDate:/^\d{4}-\d{2}-\d{2}$/.test(String(b.neededDate||""))?b.neededDate:"",refLink:/^https?:\/\//i.test(link)?link:"",
+    status:"DRAFT",createdBy:old?.data?.createdBy||user.id,createdByName:old?.data?.createdByName||user.name||user.username,history:daHist(old?.data||{},user,id?"UBAH":"BUAT")};
+  const rid=id||crypto.randomUUID();
+  if(b.submit){ try{ await daSubmit(env,user,rid,d); }catch(e){ const rec=await upsertRecord(env,"drawing_requests",rid,d,user); await syncWorkflowTask(env,"drawing_requests",rid,d,user); return json({ok:true,row:rec,warning:`Tersimpan sebagai draft, belum terkirim: ${e.message}`}); } }
+  const rec=await upsertRecord(env,"drawing_requests",rid,d,user); await syncWorkflowTask(env,"drawing_requests",rid,d,user);
+  await audit(env,user,id?"DRAWING_REQ_UPDATE":"DRAWING_REQ_CREATE","drawing_requests",rid,projectId,{status:d.status});
+  return json({ok:true,row:rec});
+}
+async function daSubmit(env,user,id,d){
+  const names=await projectNameMap(env); const p=await getRecord(env,"projects",d.projectId);
+  const r=await daarpCall(env,"/api/unit/gambar",{ref:id,judul:d.title,proyek:names[String(d.projectId)]||"",lokasi:String(p?.data?.location||p?.data?.lokasi||p?.data?.address||""),jenis:d.jenis,uraian:d.uraian,tautan:d.refLink,tgl_butuh:d.neededDate,pemohon:user.name||user.username,kontak:String(user.phone||"")});
+  daApply(d,{...r,jenis:"terkirim",pesan:`Terkirim ke DAARP (${r.nomor||""})`}); if(d.status==="DRAFT") d.status="DIAJUKAN"; d.sentAt=new Date().toISOString();
+}
+async function drawingActionHandler(request,env,user,id){
+  const rec=await getRecord(env,"drawing_requests",id); if(!rec) return json({ok:false,message:"Permintaan tidak ditemukan."},404);
+  { const denied=await requireProjectAccess(env,user,rec.data.projectId); if(denied) return denied; }
+  const cap=buildAccess(user).capabilities; const b=await parseJson(request)||{}; const action=String(b.action||""); const note=String(b.note||"").trim().slice(0,1000);
+  let d={...rec.data}; const st=d.status;
+  try{
+    if(action==="submit"){ if(!cap.drawingCreate) throw new Error("Tidak berwenang."); if(st!=="DRAFT") throw new Error("Sudah dikirim."); await daSubmit(env,user,id,d); d.history=daHist(d,user,"KIRIM_KE_DAARP"); }
+    else if(action==="refresh"){ if(!d.daarp?.nomor) throw new Error("Belum terkirim ke DAARP."); daApply(d,await daarpCall(env,"/api/unit/gambar/status",{ref:id})); }
+    else if(action==="accept"||action==="revise"){
+      if(!cap.drawingReview) throw new Error("Hanya Site Manager / Admin Teknik / Koordinator Engineering / QC / Head of Operational yang menanggapi gambar.");
+      const nomor=String(b.serahTerima||""); const stx=(d.daarp?.serahTerima||[]).find(x=>x.nomor===nomor); if(!stx) throw new Error("Paket serah terima tidak ditemukan.");
+      if(stx.status!=="Dikirim") throw new Error("Paket ini sudah ditanggapi.");
+      if(action==="revise"&&!note) throw new Error("Tuliskan bagian yang perlu direvisi.");
+      const r=await daarpCall(env,"/api/unit/gambar/tanggapan",{ref:id,serahTerima:nomor,hasil:action==="accept"?"diterima":"revisi",catatan:note,oleh:user.name||user.username});
+      daApply(d,r); d.history=daHist(d,user,action==="accept"?"GAMBAR_DITERIMA":"MINTA_REVISI",`${nomor}${note?": "+note:""}`);
+    }
+    else if(action==="cancel"){
+      if(!cap.drawingCreate) throw new Error("Tidak berwenang."); if(["SELESAI","DITOLAK","DIBATALKAN"].includes(st)) throw new Error("Sudah selesai/dibatalkan.");
+      if(st!=="DRAFT"){ if(!note) throw new Error("Tuliskan alasan pembatalan."); daApply(d,await daarpCall(env,"/api/unit/gambar/batal",{ref:id,alasan:note})); }
+      d.status="DIBATALKAN"; d.history=daHist(d,user,"BATAL",note);
+    }
+    else throw new Error("Aksi tidak dikenal.");
+  }catch(e){ return json({ok:false,message:e.message},e.message.includes("tidak dapat dihubungi")?502:409); }
+  const out=await upsertRecord(env,"drawing_requests",id,d,user); await syncWorkflowTask(env,"drawing_requests",id,d,user);
+  if(action!=="refresh") await audit(env,user,"DRAWING_REQ_ACTION","drawing_requests",id,d.projectId,{action,from:st,to:d.status});
+  return json({ok:true,row:out});
+}
 // ===================== V3.4.43 — Pekerjaan TAJAMA (Peluang → Penawaran → ACC → SPK → TAJAMA → QC → Selesai) =====================
 // Alur vendor biasa (PR) tetap. Pekerjaan yang dikerjakan TAJAMA dicatat di sini: Natara mengisi Peluang & Penawaran,
 // Head of Operational ACC, Admin Teknik membuat SPK lalu dikirim ke website TAJAMA (API bertanda tangan x-maw-*),
@@ -3996,7 +4095,7 @@ async function handleRequest(request, env) {
     const path = url.pathname;
 
     if (request.method === "OPTIONS") return new Response(null,{status:204});
-    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.45-website-ati"});
+    if (path === "/app-build.json") return json({ok:true,appVersion:APP_VERSION,service:SERVICE_NAME,architecture:"worker+d1+r2+assets",workflow:"v3.4.46-permintaan-gambar-daarp"});
     if (path === "/api/health") return diagnostics(env);
     if ((path === "/info" || path === "/public" || path === "/informasi") && request.method === "GET") return servePublicPortal(request,env);
     if (path === "/api/public/site" && request.method === "GET") return publicSiteHandler(env);
@@ -4011,6 +4110,7 @@ async function handleRequest(request, env) {
     if (path === "/api/sipatuo/ringkasan" && request.method === "POST") return sipatuoRingkasanHandler(request,env);
     if (path === "/api/bangun-nusa/status" && request.method === "POST") return bangunNusaStatusHandler(request,env);
     if (path === "/api/tajama/status" && request.method === "POST") return tajamaStatusHandler(request,env);
+    if (path === "/api/daarp/status" && request.method === "POST") return daarpStatusHandler(request,env);
     if (path === "/api/ati/status" && request.method === "POST") return atiStatusHandler(request,env);
     if (path === "/api/ati/tukang" && request.method === "POST") return atiWorkersHandler(request,env);
     if (path === "/api/ati/kehadiran" && request.method === "POST") return atiAttendanceHandler(request,env);
@@ -4062,6 +4162,9 @@ async function handleRequest(request, env) {
     const prTjMatch = path.match(/^\/api\/procurement\/([^/]+)\/to-tajama$/);
     if (prTjMatch && request.method === "POST") return procurementToTajamaHandler(request,env,auth.user,decodeURIComponent(prTjMatch[1]));
     if (path === "/api/tajama-jobs" && request.method === "POST") return tajamaSaveHandler(request,env,auth.user,"");
+    if (path === "/api/drawing-requests" && request.method === "POST") return drawingSaveHandler(request,env,auth.user,"");
+    const daMatch = path.match(/^\/api\/drawing-requests\/([^/]+)(?:\/(action))?$/);
+    if (daMatch && request.method === "POST") { const did=decodeURIComponent(daMatch[1]); return daMatch[2] ? drawingActionHandler(request,env,auth.user,did) : drawingSaveHandler(request,env,auth.user,did); }
     const tjMatch = path.match(/^\/api\/tajama-jobs\/([^/]+)(?:\/(action|spk|inspect|complaint))?$/);
     if (tjMatch && request.method === "POST") { const tid=decodeURIComponent(tjMatch[1]); if(!tjMatch[2]) return tajamaSaveHandler(request,env,auth.user,tid); return tajamaActionHandler(request,env,auth.user,tid,tjMatch[2]==="action"?"":tjMatch[2]); }
     if (path === "/api/bangun-nusa/katalog" && request.method === "GET") return bnKatalogHandler(env,auth.user);
