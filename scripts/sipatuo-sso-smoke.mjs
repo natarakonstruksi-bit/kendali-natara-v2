@@ -1,4 +1,4 @@
-// V3.4.40 — Smoke: login dari Sipatuo (portal grup).
+// V3.4.40 — Smoke: login dari MAW Group OS (portal grup).
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -7,7 +7,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const worker = fs.readFileSync(path.join(root, 'src/worker.js'), 'utf8');
 const cfg = fs.readFileSync(path.join(root, 'wrangler.jsonc'), 'utf8');
 const mig = fs.readFileSync(path.join(root, 'migrations/0024_sipatuo_sso.sql'), 'utf8');
-const must = (c, m) => { if (!c) throw new Error(`Sipatuo SSO: ${m}`); };
+const must = (c, m) => { if (!c) throw new Error(`MAW Group SSO: ${m}`); };
 const a = worker.indexOf('// ---- SIPATUO-SSO-VERIFY:START'), z = worker.indexOf('// ---- SIPATUO-SSO-VERIFY:END');
 must(a > 0 && z > a, 'blok verifikasi tiket tidak ditemukan');
 const { verifikasiTiketSipatuo } = await import('data:text/javascript,' + encodeURIComponent(worker.slice(a, z) + '\nexport { verifikasiTiketSipatuo };'));
@@ -16,7 +16,7 @@ must(worker.includes('if (path === "/sso" && request.method === "GET") return si
 must(worker.indexOf('return sipatuoSsoHandler') < worker.indexOf('const auth = await authenticate(request,env);'), 'rute /sso harus sebelum autentikasi sesi');
 must(worker.includes('INSERT INTO sso_tiket_terpakai'), 'tiket belum dicatat sekali pakai');
 must(worker.includes('"LOGIN_SSO"'), 'audit LOGIN_SSO belum ada');
-must(worker.includes('if (path === "/api/sipatuo/verify-login" && request.method === "POST") return sipatuoVerifyLoginHandler(request,env);'), 'rute verifikasi password untuk Sipatuo belum ada');
+must(worker.includes('if (path === "/api/sipatuo/verify-login" && request.method === "POST") return sipatuoVerifyLoginHandler(request,env);'), 'rute verifikasi password untuk MAW Group belum ada');
 must(worker.indexOf('return sipatuoVerifyLoginHandler') < worker.indexOf('const auth = await authenticate(request,env);'), 'verifikasi password harus sebelum autentikasi sesi');
 const vh = worker.slice(worker.indexOf('async function sipatuoVerifyLoginHandler'), worker.indexOf('async function logoutHandler'));
 for (const m of ['x-sipatuo-ts', 'x-sipatuo-sig', 'Math.abs(Math.floor(Date.now() / 1000) - ts) > 60', 'timingSafeEqual(await sipatuoHmacHex', 'loginBlocked(env, key)', 'recordLoginFail(env, key)', '"LOGIN_SIPATUO"'])
@@ -47,4 +47,4 @@ const ubah = b64(JSON.stringify({ ...JSON.parse(Buffer.from(p, 'base64url')), su
 must(!(await verifikasiTiketSipatuo(ubah, KUNCI, 'NK')).ok, 'tiket yang diubah harus ditolak');
 must(!(await verifikasiTiketSipatuo('bukan-tiket', KUNCI, 'NK')).ok, 'format salah harus ditolak');
 
-console.log('Sipatuo SSO smoke OK — /sso sebelum sesi, tiket HMAC 60 detik sekali pakai, cocok username, tanpa buat akun, cron bersih; verifikasi password Sipatuo bertanda tangan + rate limit.');
+console.log('MAW Group SSO smoke OK — /sso sebelum sesi, tiket HMAC 60 detik sekali pakai, cocok username, tanpa buat akun, cron bersih; verifikasi password MAW Group bertanda tangan + rate limit.');
