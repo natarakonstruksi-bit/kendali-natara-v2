@@ -670,9 +670,16 @@ async function sipatuoRingkasanHandler(request, env) {
   });
   const sum = k => rows.reduce((s, r) => s + num(r[k]), 0);
   const aktif = rows.filter(r => r.status !== "CLOSED");
+  // Kas masuk/keluar bulan berjalan (WITA) untuk dasbor keuangan Direksi di MAW Group OS.
+  const bulanIni = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 7);
+  const idProyek = new Set(rows.map(r => String(r.id)));
+  const kasBulan = c => all.filter(r => r.collection === c && idProyek.has(String(r.data.projectId || "")) && paidLike(r.data.status)
+    && String(r.data.date || r.data.tanggal || r.data.receivedAt || r.data.paidAt || "").slice(0, 7) === bulanIni)
+    .reduce((s, r) => s + pickNum(r.data, ["amount","nominal","value","total"]), 0);
   return json({ ok: true, unit: "NK", generatedAt: new Date().toISOString(),
     totals: { projects: rows.length, active: aktif.length, closed: rows.length - aktif.length, delayed: aktif.filter(r => r.scheduleStatus === "DELAY").length,
       contract: sum("contract"), activeContract: aktif.reduce((s, r) => s + num(r.contract), 0), income: sum("income"), expense: sum("expense"),
+      month: bulanIni, incomeMonth: kasBulan("cash_in"), expenseMonth: kasBulan("cash_out"),
       receivable: sum("receivable"), payable: sum("payable"), openQc: sum("openQc"), openDefects: sum("openDefects"), openIssues: sum("openIssues"), pendingApprovals: sum("pendingApprovals") },
     projects: rows });
 }
