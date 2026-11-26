@@ -1525,12 +1525,14 @@ async function renderTajama(){
     if(w==='spk')a+=d.status==='APPROVED'?`<button class="btn small primary" data-tj-spk="${esc(r.id)}">Buat SPK TAJAMA</button>`:`<button class="btn small primary" data-tj-act="resend" data-id="${esc(r.id)}">Kirim ulang ke TAJAMA</button>`;
     if(w==='inspect')a+=`<button class="btn small primary" data-tj-inspect="${esc(r.id)}">Inspeksi QC Natara</button>`;
     if(['SENT_TAJAMA','IN_PROGRESS','READY_INSPECTION','DONE'].includes(d.status)&&cap('tajamaInspect'))a+=`<button class="btn small" data-tj-complain="${esc(r.id)}">Komplain</button>`;
+    if(cap('tajamaCreate')&&(usOwner(d)||usMgmt())){if(w!=='edit')a+=`<button class="btn small" data-tj-edit="${esc(r.id)}">Edit</button>`;a+=`<button class="btn small danger" data-tj-del="${esc(r.id)}">Hapus</button>`;}
     return `<tr><td><b>${esc(d.title)}</b><div class="tiny muted">${esc(d.number)}${d.prNumber?` · dari PR ${esc(d.prNumber)}`:''}${d.spk?.number?` · SPK ${esc(d.spk.number)}`:''}</div></td><td>${esc(projectName(d.projectId))}</td><td class="num">${fmtRp(d.spk?.value||d.offerTotal||tjTot(d))}</td><td>${d.tajama?.progres!=null&&d.sentAt?`${fmtNum(d.tajama.progres,1)}%`:'-'}${d.lastUpdateAt?`<div class="tiny muted">update ${fmtDate(d.lastUpdateAt)}</div>`:''}${tjStale(d)?'<div class="tiny text-danger">Update mingguan terlambat</div>':''}</td><td>${finPill(TJ_STATUS,d.status)}${oc.length?`<div class="tiny ${oc.some(x=>x.escalatedAt)?'text-danger':'muted'}">${oc.length} komplain terbuka${oc.some(x=>x.escalatedAt)?' · eskalasi':''}</div>`:''}</td><td class="actions">${a}</td></tr>`;}).join('')||'<tr><td colspan="6" class="empty">Belum ada pekerjaan TAJAMA pada filter ini. Pekerjaan masuk dari tombol <b>Ke TAJAMA</b> di PR / Vendor.</td></tr>'}</tbody></table></div></div>`;
   if($('#tjGoPr'))$('#tjGoPr').onclick=()=>setView('procurement');
   $('#tjFilter').onchange=e=>{state.tjFilter=e.target.value;renderTajama();};
   const find=id=>rows.find(x=>x.id===id);
   $$('[data-tj-detail]').forEach(b=>b.onclick=()=>openTjDetail(find(b.dataset.tjDetail)));
   $$('[data-tj-edit]').forEach(b=>b.onclick=()=>openTjForm(find(b.dataset.tjEdit)));
+  $$('[data-tj-del]').forEach(b=>b.onclick=()=>usHapus('tajama_jobs',find(b.dataset.tjDel),renderTajama));
   $$('[data-tj-act]').forEach(b=>b.onclick=()=>tjAction(find(b.dataset.id),b.dataset.tjAct));
   $$('[data-tj-spk]').forEach(b=>b.onclick=()=>openTjSpk(find(b.dataset.tjSpk)));
   $$('[data-tj-inspect]').forEach(b=>b.onclick=()=>openTjInspect(find(b.dataset.tjInspect)));
@@ -1576,6 +1578,12 @@ function openTjComplaint(r){if(!r)return;
 // ===== V3.4.41 — Request Material ke Bangun Nusa =====
 const MR_STATUS={DRAFT:['Draft','gray'],SUBMITTED:['Menunggu ACC Head of Operational','orange'],RETURNED:['Dikembalikan','orange'],REJECTED:['Ditolak','red'],OPS_APPROVED:['Menunggu Admin Logistik','orange'],BN_NEGO:['Penawaran harga dari Bangun Nusa','purple'],SENT_BN:['Terkirim ke Bangun Nusa','blue'],BN_ACCEPTED:['Diterima Bangun Nusa','blue'],BN_PARTIAL:['Diterima sebagian','orange'],BN_REJECTED:['Ditolak Bangun Nusa','red'],SHIPPING:['Dalam pengiriman','blue'],ARRIVED:['Barang sampai — konfirmasi','purple'],DONE:['Selesai','green'],DONE_DIFF:['Selesai (ada selisih)','orange'],CANCELLED:['Dibatalkan','gray']};
 const MR_SJ={disiapkan:'Disiapkan',dikirim:'Dikirim',sampai:'Sampai di lokasi',diterima:'Diterima'};
+const US_UNIT={material_requests:'Bangun Nusa',drawing_requests:'DAARP',ati_work_requests:'ATI',tajama_jobs:'TAJAMA'};
+function usMgmt(){return ['administrator','direktur','head_unit_bisnis','manager_operasional'].includes(state.access?.roleKey);}
+function usOwner(d){const me=String(state.user?.id||state.me?.id||'');return [d.requesterUserId,d.createdBy,d.requestedByUserId].map(x=>String(x||'')).includes(me);}
+async function usHapus(col,r,after){if(!r)return;const d=r.data||{};const sent=d.forwardedAt||d.sentAt||d.daarp?.nomor||d.ati?.nomor;
+  if(!(await confirmAsk(`Hapus ${d.number||d.title||'data'} ini?${sent?` Data yang sama di ${US_UNIT[col]} juga ikut dihapus.`:''}`)))return;
+  try{await api(`/api/${col}/${encodeURIComponent(r.id)}/hapus`,{method:'POST',body:{}});toast('Data dihapus.');state.cache.clear();await after();}catch(e){toast(e.message,'err');}}
 function mrMe(){return String(state.user?.id||state.me?.id||'');}
 function mrWho(r){const d=r.data||{},s=String(d.status||'').toUpperCase();
   if(['DRAFT','RETURNED'].includes(s)&&(d.requesterUserId===mrMe()||cap('materialRequestApprove'))&&cap('materialRequestCreate'))return 'requester';
@@ -1600,6 +1608,7 @@ async function renderMaterial(){
     if(w==='logistik')a+=`<button class="btn small primary" data-mr-forward="${esc(r.id)}">Teruskan ke Bangun Nusa</button><button class="btn small" data-mr-act="return" data-id="${esc(r.id)}">Kembalikan</button>`;
     if(w==='nego')a+=`<button class="btn small primary" data-mr-nego="${esc(r.id)}">Tanggapi harga</button>`;
     if(w==='receive')a+=`<button class="btn small primary" data-mr-receive="${esc(r.id)}">Diterima</button>`;
+    if(usOwner(d)||usMgmt()||(d.forwardedAt&&cap('materialRequestForward'))){if(w!=='requester')a+=`<button class="btn small" data-mr-edit="${esc(r.id)}">Edit</button>`;a+=`<button class="btn small danger" data-mr-del="${esc(r.id)}">Hapus</button>`;}
     const items=(d.items||[]);
     return `<tr><td><b>${esc(d.number||r.id)}</b>${d.bn?.nomor?`<div class="tiny muted">BN: ${esc(d.bn.nomor)}</div>`:''}<div class="tiny muted">${esc(d.requesterName||'')}</div></td><td>${esc(projectName(d.projectId))}</td><td class="tiny">${items.slice(0,3).map(i=>`${esc(i.nama||i.kode)} — ${fmtNum(i.qty,2)} ${esc(i.satuan||'')}`).join('<br>')}${items.length>3?`<br>+${items.length-3} barang lain`:''}</td><td>${d.neededDate?fmtDate(d.neededDate):'-'}</td><td class="num">${fmtRp(d.bn?.nilai_diterima||mrTotal(d))}</td><td>${finPill(MR_STATUS,d.status)}${d.returnNote&&['RETURNED','REJECTED'].includes(d.status)?`<div class="tiny muted" style="max-width:220px;white-space:normal">${esc(d.returnNote)}</div>`:''}${d.bn?.keterangan&&['BN_PARTIAL','BN_REJECTED'].includes(d.status)?`<div class="tiny muted" style="max-width:220px;white-space:normal">${esc(d.bn.keterangan)}</div>`:''}</td><td class="actions">${a}</td></tr>`;}).join('')||'<tr><td colspan="7" class="empty">Belum ada request material pada filter ini.</td></tr>'}</tbody></table></div></div>`;
   if($('#mrNew'))$('#mrNew').onclick=()=>openMrForm();
@@ -1611,6 +1620,7 @@ async function renderMaterial(){
   $$('[data-mr-forward]').forEach(b=>b.onclick=()=>openMrForward(find(b.dataset.mrForward)));
   $$('[data-mr-nego]').forEach(b=>b.onclick=()=>openMrNego(find(b.dataset.mrNego)));
   $$('[data-mr-receive]').forEach(b=>b.onclick=()=>openMrReceive(find(b.dataset.mrReceive)));
+  $$('[data-mr-del]').forEach(b=>b.onclick=()=>usHapus('material_requests',find(b.dataset.mrDel),renderMaterial));
 }
 async function mrKatalog(){if(state.mrKatalog)return state.mrKatalog;try{const r=await api('/api/bangun-nusa/katalog');state.mrKatalog={ok:true,list:r.materials||[]};}catch(e){state.mrKatalog={ok:false,list:[],message:e.message};}return state.mrKatalog;}
 async function openMrForm(existing=null){
@@ -2916,6 +2926,7 @@ async function renderDaarp(){
   <div class="table-wrap"><table class="table"><thead><tr><th>Permintaan</th><th>Proyek</th><th>Dibutuhkan</th><th>Progres desain DAARP</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${list.map(r=>{const d=r.data,pr=d.daarp?.proyek;let a=`<button class="btn small" data-da-detail="${esc(r.id)}">Detail</button>`;
     if(d.status==='DRAFT'&&cap('drawingCreate'))a+=`<button class="btn small" data-da-edit="${esc(r.id)}">Edit</button><button class="btn small primary" data-da-act="submit" data-id="${esc(r.id)}">Kirim ke DAARP</button>`;
     if(d.status==='DIKIRIM'&&cap('drawingReview'))a+=`<button class="btn small primary" data-da-detail="${esc(r.id)}">Periksa gambar</button>`;
+    if(cap('drawingCreate')&&(usOwner(d)||usMgmt())){if(d.status!=='DRAFT')a+=`<button class="btn small" data-da-edit="${esc(r.id)}">Edit</button>`;a+=`<button class="btn small danger" data-da-del="${esc(r.id)}">Hapus</button>`;}
     return `<tr><td><b>${esc(d.title)}</b><div class="tiny muted">${esc(d.jenis||'')}${d.daarp?.nomor?` · ${esc(d.daarp.nomor)}`:''} · ${esc(d.createdByName||'')}</div></td><td>${esc(projectName(d.projectId))}</td><td>${fmtDate(d.neededDate)}</td>
       <td>${pr?`${fmtNum(pr.progres,0)}% <div class="tiny muted">${esc(pr.tahap)}${pr.target?` · target ${fmtDate(pr.target)}`:''}</div>`:'-'}</td><td>${finPill(DA_STATUS,d.status)}</td><td><div class="actions">${a}</div></td></tr>`;}).join('')||'<tr><td colspan="6" class="empty">Belum ada permintaan gambar.</td></tr>'}</tbody></table></div></div>`;
   if($('#daNew'))$('#daNew').onclick=()=>openDaForm();
@@ -2923,6 +2934,7 @@ async function renderDaarp(){
   const find=id=>rows.find(x=>x.id===id);
   $$('[data-da-detail]').forEach(b=>b.onclick=()=>openDaDetail(find(b.dataset.daDetail)));
   $$('[data-da-edit]').forEach(b=>b.onclick=()=>openDaForm(find(b.dataset.daEdit)));
+  $$('[data-da-del]').forEach(b=>b.onclick=()=>usHapus('drawing_requests',find(b.dataset.daDel),renderDaarp));
   $$('[data-da-act]').forEach(b=>b.onclick=async()=>{try{await daPost(b.dataset.id,{action:b.dataset.daAct});toast('Permintaan terkirim ke DAARP.');state.cache.clear();await renderDaarp();}catch(e){toast(e.message,'err');}});
 }
 function openDaForm(existing=null){const d=existing?.data||{};
