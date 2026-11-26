@@ -22,14 +22,14 @@ async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik 
   const now = Math.floor(Date.now() / 1000);
   if (d.v !== 1 || d.iss !== 'sipatuo') return { ok: false, alasan: 'Penerbit tiket tidak dikenal.' };
   if (d.aud !== kodeUnit) return { ok: false, alasan: 'Tiket ini untuk unit lain.' };
-  if (typeof d.exp !== 'number' || d.exp + toleransiDetik < now) return { ok: false, alasan: 'Tiket sudah kedaluwarsa. Masuk ulang dari Sipatuo.' };
+  if (typeof d.exp !== 'number' || d.exp + toleransiDetik < now) return { ok: false, alasan: 'Tiket sudah kedaluwarsa. Masuk ulang dari MAW Group OS.' };
   if (typeof d.iat !== 'number' || d.iat - toleransiDetik > now) return { ok: false, alasan: 'Waktu tiket tidak valid.' };
   if (!d.sub || !d.jti) return { ok: false, alasan: 'Tiket tidak lengkap.' };
   return { ok: true, username: String(d.sub), nama: String(d.name || ''), jti: String(d.jti), exp: d.exp };
 }
 // ---- SIPATUO-SSO-VERIFY:END ----
 
-const APP_VERSION = "APP-V3.4.46";
+const APP_VERSION = "APP-V3.4.47";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -600,14 +600,14 @@ async function loginHandler(request, env) {
   return json({ok:true,user:publicUser(user)},200,{"set-cookie":sessionCookie(request,token,ttl)});
 }
 
-// V3.4.40 — Login dari Sipatuo (portal grup). Tiket bertanda tangan HMAC, berlaku 60 detik, sekali pakai.
+// V3.4.40 — Login dari MAW Group OS (portal grup). Tiket bertanda tangan HMAC, berlaku 60 detik, sekali pakai.
 // Akun & jabatan tetap diatur di Nara System; dicocokkan lewat username yang sama. Tidak membuat akun baru.
 const SIPATUO_PORTAL_URL = "https://maw-group.natarakonstruksi.workers.dev/portal";
 const SIPATUO_UNIT = "NK";
 
 function ssoErrorPage(message, status = 400) {
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  const body = `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Masuk dari Sipatuo — Nara System</title>
+  const body = `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Masuk dari MAW Group OS — Nara System</title>
 <style>body{margin:0;font-family:system-ui,sans-serif;background:#f4f6f5;color:#1f2a2e;display:grid;place-items:center;min-height:100vh}.box{background:#fff;border:1px solid #d9dfdc;border-radius:12px;padding:28px;width:min(420px,92vw)}h1{font-size:20px;margin:0 0 10px}p{color:#4a5a5f}a{display:inline-block;margin:8px 12px 0 0;color:#1d6b5f}</style></head>
 <body><div class="box"><h1>Tidak bisa masuk otomatis</h1><p>${esc(message)}</p><a href="/">Login dengan username &amp; password</a><a href="${SIPATUO_PORTAL_URL}">Kembali ke MAW Group OS</a></div></body></html>`;
   return new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer", "x-frame-options": "DENY" } });
@@ -620,9 +620,9 @@ async function sipatuoSsoHandler(request, env) {
   try {
     await env.DB.prepare(`INSERT INTO sso_tiket_terpakai(jti,exp) VALUES(?,?)`).bind(hasil.jti, hasil.exp).run();
   } catch (e) {
-    if (/UNIQUE|constraint/i.test(String(e?.message || e))) return ssoErrorPage("Tiket ini sudah pernah dipakai. Klik lagi tombol masuk di Sipatuo.");
+    if (/UNIQUE|constraint/i.test(String(e?.message || e))) return ssoErrorPage("Tiket ini sudah pernah dipakai. Klik lagi tombol masuk di MAW Group OS.");
     console.log("sso tiket", e?.message || e);
-    return ssoErrorPage("Login dari Sipatuo belum siap (migration 0024 belum dijalankan). Hubungi Administrator.", 503);
+    return ssoErrorPage("Login dari MAW Group OS belum siap (migration 0024 belum dijalankan). Hubungi Administrator.", 503);
   }
   const key = hasil.username.trim().toLowerCase();
   const row = await env.DB.prepare(`
@@ -639,15 +639,15 @@ async function sipatuoSsoHandler(request, env) {
     location: "/", "set-cookie": sessionCookie(request, token, ttl), "cache-control": "no-store", "referrer-policy": "no-referrer" } });
 }
 
-// V3.4.40 — Sipatuo memeriksa username & password karyawan ke Nara System (server ke server), supaya karyawan
-// cukup memakai satu password (password Nara System) untuk masuk Sipatuo. Tidak membuat sesi di Nara System.
+// V3.4.40 — MAW Group memeriksa username & password karyawan ke Nara System (server ke server), supaya karyawan
+// cukup memakai satu password (password Nara System) untuk masuk MAW Group. Tidak membuat sesi di Nara System.
 // Permintaan ditandatangani: x-sipatuo-ts (detik) + x-sipatuo-sig = HMAC-SHA256(SSO_SECRET, ts + "." + body) dalam hex.
 async function sipatuoHmacHex(secret, data) {
   const key = await crypto.subtle.importKey("raw", SSO_ENC.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return [...new Uint8Array(await crypto.subtle.sign("HMAC", key, SSO_ENC.encode(data)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// V3.4.41 — MAW Group OS (dulu Sipatuo) membaca ringkasan proyek & keuangan untuk dashboard holding.
+// V3.4.41 — MAW Group OS (dulu MAW Group) membaca ringkasan proyek & keuangan untuk dashboard holding.
 // Baca saja, ditandatangani sama seperti verify-login. Tidak membuat sesi dan tidak mengubah data.
 async function sipatuoRingkasanHandler(request, env) {
   if (!env.SSO_SECRET) return json({ ok: false, message: "SSO belum dikonfigurasi." }, 503);
@@ -3252,12 +3252,38 @@ async function bnKatalogHandler(env,user){
   try{ const d=await bnCall(env,"/api/unit/katalog",{}); return json({ok:true,materials:d.materials||[]}); }
   catch(e){ return json({ok:false,message:e.message,materials:[]},200); }
 }
+
+// ===================== Hapus data yang tersinkron ke unit lain (kapan saja) =====================
+// Data ikut dihapus di unit penerima dulu; bila unit itu gagal dihubungi, data di KENDALI tidak dihapus.
+const UNIT_SYNC_COLLECTIONS={material_requests:"Bangun Nusa",drawing_requests:"DAARP",ati_work_requests:"ATI",tajama_jobs:"TAJAMA"};
+async function unitSyncRemoteDelete(env,collection,id,d){
+  if(collection==="material_requests"&&d.forwardedAt) await bnCall(env,"/api/unit/order/hapus",{ref:d.number||id});
+  if(collection==="drawing_requests"&&(d.sentAt||d.daarp?.nomor)) await daarpCall(env,"/api/unit/gambar/hapus",{ref:id});
+  if(collection==="ati_work_requests"&&d.ati?.nomor&&atiConnected(env)) await atiCall(env,"/api/unit/permintaan/hapus",{ref:id});
+  if(collection==="tajama_jobs"&&d.sentAt) await tjCall(env,"/api/unit/pekerjaan/hapus",{ref:d.number||id});
+}
+async function unitSyncDeleteHandler(env,user,collection,id){
+  if(!UNIT_SYNC_COLLECTIONS[collection]) return json({ok:false,message:"Data tidak dikenal."},400);
+  const rec=await getRecord(env,collection,id); if(!rec) return json({ok:true,deleted:false});
+  const d=rec.data||{};
+  if(d.projectId){ const denied=await requireProjectAccess(env,user,d.projectId); if(denied) return denied; }
+  const cap=buildAccess(user).capabilities;
+  const owner=[d.requesterUserId,d.createdBy,d.requestedByUserId].map(x=>String(x||"")).includes(String(user.id));
+  const roleOk={material_requests:cap.materialRequestForward,drawing_requests:false,tajama_jobs:false,ati_work_requests:!collectionDenied(user,"ati_work_requests","delete")}[collection];
+  if(!(owner||isManagementRole(user)||roleOk||!collectionDenied(user,collection,"delete"))) return json({ok:false,message:"Hanya pembuat data atau manajemen yang dapat menghapus."},403);
+  try{ await unitSyncRemoteDelete(env,collection,id,d); }
+  catch(e){ return json({ok:false,message:`Belum terhapus: ${UNIT_SYNC_COLLECTIONS[collection]} gagal dihubungi (${e.message}). Coba lagi.`},502); }
+  await cancelWorkflowTasks(env,collection,id,user);
+  await deleteRelatedDocuments(env,user,collection,id);
+  await deleteRecord(env,collection,id,user);
+  await audit(env,user,"UNIT_SYNC_DELETE",collection,id,d.projectId||"",{unit:UNIT_SYNC_COLLECTIONS[collection],nomor:d.number||d.ati?.nomor||d.daarp?.nomor||""});
+  return json({ok:true,deleted:true});
+}
 async function materialRequestSaveHandler(request,env,user,id=""){
   const cap=buildAccess(user).capabilities; if(!cap.materialRequestCreate) return json({ok:false,message:"Hanya Site Manager yang dapat membuat request material."},403);
   const body=await parseJson(request)||{}; let old=null;
   if(id){ old=await getRecord(env,"material_requests",id); if(!old) return json({ok:false,message:"Request tidak ditemukan."},404);
-    if(!["DRAFT","RETURNED"].includes(String(old.data.status).toUpperCase())) return json({ok:false,message:"Request yang sudah diproses tidak dapat diubah."},409);
-    if(old.data.requesterUserId!==user.id && !isManagementRole(user)) return json({ok:false,message:"Hanya pengaju yang dapat mengubah request ini."},403); }
+    if(old.data.requesterUserId!==user.id && !isManagementRole(user) && !(old.data.forwardedAt&&cap.materialRequestForward)) return json({ok:false,message:"Hanya pengaju yang dapat mengubah request ini."},403); }
   const projectId=String(body.projectId||old?.data?.projectId||""); if(!projectId) return json({ok:false,message:"Pilih proyek."},400);
   const denied=await requireProjectAccess(env,user,projectId); if(denied) return denied;
   try{
@@ -3266,7 +3292,16 @@ async function materialRequestSaveHandler(request,env,user,id=""){
     let d={...(old?.data||{}),projectId,number:old?.data?.number||rid,items,neededDate:reportDay(body.neededDate)||"",deliveryAddress:String(body.deliveryAddress||"").slice(0,300),contact:String(body.contact||"").slice(0,60),notes:String(body.notes||"").slice(0,1000),
       requesterUserId:old?.data?.requesterUserId||user.id,requesterName:old?.data?.requesterName||user.name||user.username||"",status:old?String(old.data.status).toUpperCase():"DRAFT",updatedAt:new Date().toISOString()};
     if(!old){ d.createdAt=d.updatedAt; d.history=mrHistory(d,user,"BUAT"); }
-    if(truthy(body.submit)){ d.status="SUBMITTED"; d.submittedAt=new Date().toISOString(); d.returnNote=""; d.history=mrHistory(d,user,"AJUKAN"); }
+    if(truthy(body.submit)&&["DRAFT","RETURNED"].includes(d.status)){ d.status="SUBMITTED"; d.submittedAt=new Date().toISOString(); d.returnNote=""; d.history=mrHistory(d,user,"AJUKAN"); }
+    if(old?.data?.forwardedAt){
+      // Sudah di Bangun Nusa: perubahan ikut dikirim. Daftar barang hanya dikirim bila memang berubah.
+      const proj=await getRecord(env,"projects",projectId);
+      const kirim={ref:d.number,proyek:proj?.data?.name||proj?.data?.projectName||projectId,alamat_kirim:d.deliveryAddress||proj?.data?.location||proj?.data?.address||"",tgl_dibutuhkan:d.neededDate||"",pemesan:{nama:d.requesterName||"",kontak:d.contact||""},catatan:d.notes||"",oleh:user.name||user.username||""};
+      const ib=x=>JSON.stringify((x||[]).map(i=>[i.kode||"",i.nama,i.satuan,num(i.qty),num(i.harga),i.spesifikasi||""]));
+      if(ib(old.data.items)!==ib(items)) kirim.items=items.map(i=>({...(i.kode?{kode:i.kode}:{}),nama:i.nama,satuan:i.satuan,qty:i.qty,harga:num(i.harga),spesifikasi:i.spesifikasi||""}));
+      d=mrApplyBn(d,await bnCall(env,"/api/unit/order/ubah",kirim));
+      d.history=mrHistory(d,user,"UBAH_DI_BANGUN_NUSA",kirim.items?"Daftar barang diganti":"Keterangan diubah");
+    } else if(old) d.history=mrHistory(d,user,"UBAH");
     const rec=await upsertRecord(env,"material_requests",rid,d,user);
     await syncWorkflowTask(env,"material_requests",rid,d,user);
     await audit(env,user,id?"MATERIAL_REQUEST_UPDATE":"MATERIAL_REQUEST_CREATE","material_requests",rid,projectId,{status:d.status,items:items.length});
@@ -3491,14 +3526,19 @@ async function daarpStatusHandler(request,env){
 async function drawingSaveHandler(request,env,user,id){
   const cap=buildAccess(user).capabilities; if(!cap.drawingCreate) return json({ok:false,message:"Role ini tidak dapat membuat permintaan gambar."},403);
   const b=await parseJson(request)||{};
-  let old=null; if(id){ old=await getRecord(env,"drawing_requests",id); if(!old) return json({ok:false,message:"Permintaan tidak ditemukan."},404); if(!["DRAFT"].includes(old.data.status)) return json({ok:false,message:"Permintaan yang sudah dikirim tidak dapat diubah."},409); }
+  let old=null; if(id){ old=await getRecord(env,"drawing_requests",id); if(!old) return json({ok:false,message:"Permintaan tidak ditemukan."},404); }
   const projectId=String(b.projectId||"").slice(0,80); if(!projectId||!(await getRecord(env,"projects",projectId))) return json({ok:false,message:"Pilih proyek."},400);
   { const denied=await requireProjectAccess(env,user,projectId); if(denied) return denied; }
   const title=String(b.title||"").trim().slice(0,160); if(!title) return json({ok:false,message:"Isi judul permintaan gambar."},400);
   const link=String(b.refLink||"").trim().slice(0,500);
   const d={...(old?.data||{}),projectId,title,jenis:DA_JENIS.includes(b.jenis)?b.jenis:"Gambar kerja / DED",uraian:String(b.uraian||"").slice(0,3000),neededDate:/^\d{4}-\d{2}-\d{2}$/.test(String(b.neededDate||""))?b.neededDate:"",refLink:/^https?:\/\//i.test(link)?link:"",
-    status:"DRAFT",createdBy:old?.data?.createdBy||user.id,createdByName:old?.data?.createdByName||user.name||user.username,history:daHist(old?.data||{},user,id?"UBAH":"BUAT")};
+    status:old?.data?.status||"DRAFT",createdBy:old?.data?.createdBy||user.id,createdByName:old?.data?.createdByName||user.name||user.username,history:daHist(old?.data||{},user,id?"UBAH":"BUAT")};
   const rid=id||crypto.randomUUID();
+  if(old&&d.status!=="DRAFT"){
+    try{ const names=await projectNameMap(env); const p=await getRecord(env,"projects",projectId);
+      daApply(d,{...(await daarpCall(env,"/api/unit/gambar/ubah",{ref:rid,judul:d.title,proyek:names[String(projectId)]||"",lokasi:String(p?.data?.location||p?.data?.lokasi||p?.data?.address||""),jenis:d.jenis,uraian:d.uraian,tautan:d.refLink,tgl_butuh:d.neededDate})),versi:0}); }
+    catch(e){ return json({ok:false,message:`Gagal mengubah di DAARP: ${e.message}`},502); }
+  }
   if(b.submit){ try{ await daSubmit(env,user,rid,d); }catch(e){ const rec=await upsertRecord(env,"drawing_requests",rid,d,user); await syncWorkflowTask(env,"drawing_requests",rid,d,user); return json({ok:true,row:rec,warning:`Tersimpan sebagai draft, belum terkirim: ${e.message}`}); } }
   const rec=await upsertRecord(env,"drawing_requests",rid,d,user); await syncWorkflowTask(env,"drawing_requests",rid,d,user);
   await audit(env,user,id?"DRAWING_REQ_UPDATE":"DRAWING_REQ_CREATE","drawing_requests",rid,projectId,{status:d.status});
@@ -3594,7 +3634,7 @@ async function tajamaSaveHandler(request,env,user,id=""){
   const cap=buildAccess(user).capabilities; if(!cap.tajamaCreate) return json({ok:false,message:"Role ini tidak dapat menyusun peluang pekerjaan TAJAMA."},403);
   const b=await parseJson(request)||{}; let old=null;
   if(id){ old=await getRecord(env,"tajama_jobs",id); if(!old) return json({ok:false,message:"Pekerjaan tidak ditemukan."},404);
-    if(!["PELUANG","RETURNED"].includes(String(old.data.status))) return json({ok:false,message:"Pekerjaan yang sudah diajukan tidak dapat diubah."},409); }
+}
   const projectId=String(b.projectId||old?.data?.projectId||""); if(!projectId) return json({ok:false,message:"Pilih proyek."},400);
   const denied=await requireProjectAccess(env,user,projectId); if(denied) return denied;
   try{
@@ -3605,7 +3645,8 @@ async function tajamaSaveHandler(request,env,user,id=""){
       targetStart:reportDay(b.targetStart)||"",targetEnd:reportDay(b.targetEnd)||"",items,offerTotal:Math.round(items.reduce((s,i)=>s+i.volume*i.harga,0)),offerNote:String(b.offerNote||"").slice(0,2000),notes:String(b.notes||"").slice(0,2000),
       createdBy:old?.data?.createdBy||user.id,createdByName:old?.data?.createdByName||user.name||user.username||"",status:old?String(old.data.status):"PELUANG",updatedAt:new Date().toISOString()};
     if(!old){ d.createdAt=d.updatedAt; d.history=tjHist(d,user,"BUAT_PELUANG"); }
-    if(truthy(b.submit)){ if(!items.length||!(d.offerTotal>0)) throw new Error("Isi penawaran (uraian, volume, harga) sebelum diajukan."); d.status="WAIT_OPS"; d.submittedAt=new Date().toISOString(); d.returnNote=""; d.history=tjHist(d,user,"AJUKAN_PENAWARAN"); }
+    if(truthy(b.submit)&&["PELUANG","RETURNED"].includes(d.status)){ if(!items.length||!(d.offerTotal>0)) throw new Error("Isi penawaran (uraian, volume, harga) sebelum diajukan."); d.status="WAIT_OPS"; d.submittedAt=new Date().toISOString(); d.returnNote=""; d.history=tjHist(d,user,"AJUKAN_PENAWARAN"); }
+    if(old?.data?.sentAt){ try{ d=tjApply(d,await tjCall(env,"/api/unit/pekerjaan/ubah",await tjPayload(env,d))); }catch(e){ throw new Error(`Gagal mengubah di TAJAMA: ${e.message}`); } d.history=tjHist(d,user,"UBAH_DI_TAJAMA"); }
     const rec=await upsertRecord(env,"tajama_jobs",rid,d,user); await syncWorkflowTask(env,"tajama_jobs",rid,d,user);
     await audit(env,user,id?"TAJAMA_JOB_UPDATE":"TAJAMA_JOB_CREATE","tajama_jobs",rid,projectId,{status:d.status,total:d.offerTotal});
     return json({ok:true,row:rec});
@@ -4174,6 +4215,8 @@ async function handleRequest(request, env) {
     if (daMatch && request.method === "POST") { const did=decodeURIComponent(daMatch[1]); return daMatch[2] ? drawingActionHandler(request,env,auth.user,did) : drawingSaveHandler(request,env,auth.user,did); }
     const tjMatch = path.match(/^\/api\/tajama-jobs\/([^/]+)(?:\/(action|spk|inspect|complaint))?$/);
     if (tjMatch && request.method === "POST") { const tid=decodeURIComponent(tjMatch[1]); if(!tjMatch[2]) return tajamaSaveHandler(request,env,auth.user,tid); return tajamaActionHandler(request,env,auth.user,tid,tjMatch[2]==="action"?"":tjMatch[2]); }
+    const usDel = path.match(/^\/api\/(material_requests|drawing_requests|ati_work_requests|tajama_jobs)\/([^/]+)\/hapus$/);
+    if (usDel && request.method === "POST") return unitSyncDeleteHandler(env,auth.user,usDel[1],decodeURIComponent(usDel[2]));
     if (path === "/api/bangun-nusa/katalog" && request.method === "GET") return bnKatalogHandler(env,auth.user);
     if (path === "/api/material-requests" && request.method === "POST") return materialRequestSaveHandler(request,env,auth.user,"");
     const mrMatch = path.match(/^\/api\/material-requests\/([^/]+)(?:\/(action|receive))?$/);
@@ -4402,11 +4445,17 @@ async function handleRequest(request, env) {
         }
         // Critical workflow statuses cannot be edited manually; use the action endpoints above.
         if (["cco","payment_requests","procurement","daily_progress","weekly_progress","opname","issues","retention","closeout","ati_work_requests","ati_field_issues"].includes(collection)) data.status=old.data.status || data.status || (["issues","retention","closeout","ati_field_issues"].includes(collection)?"OPEN":"DRAFT");
-        const rec = await upsertRecord(env,collection,id,{...old.data,...data},auth.user);
+        let merged={...old.data,...data};
+        if (collection==="ati_work_requests" && old.data.ati?.nomor && atiConnected(env)) {
+          try { const pl=await atiRequestPayload(env,id,merged,auth.user); delete pl.pemohon; delete pl.kontak; atiApplyStatus(merged,{...(await atiCall(env,"/api/unit/permintaan/ubah",pl)),jenis:"diubah",pesan:"Permintaan diubah Natara"}); }
+          catch(e) { return json({ok:false,message:`Gagal mengubah di website ATI: ${e.message}`},502); }
+        }
+        const rec = await upsertRecord(env,collection,id,merged,auth.user);
         await afterRecordUpsert(env,collection,rec,auth.user);
         return json({ok:true,row:rec});
       }
       if (request.method === "DELETE") {
+        if (UNIT_SYNC_COLLECTIONS[collection]) return unitSyncDeleteHandler(env,auth.user,collection,id);
         if (collectionDenied(auth.user,collection,"delete")) return json({ok:false,message:`Role ${auth.user.role || ""} tidak dapat menghapus ${collection}.`},403);
         const old = await getRecord(env,collection,id);
         if (old && !(await recordAllowedByProjectScope(env,auth.user,collection,id,old.data))) return json({ok:false,message:"Anda tidak ditugaskan pada proyek data ini."},403);
