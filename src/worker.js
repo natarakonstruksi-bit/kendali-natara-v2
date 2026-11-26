@@ -29,7 +29,7 @@ async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik 
 }
 // ---- SIPATUO-SSO-VERIFY:END ----
 
-const APP_VERSION = "APP-V3.4.47";
+const APP_VERSION = "APP-V3.4.48";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -680,6 +680,7 @@ async function sipatuoRingkasanHandler(request, env) {
     totals: { projects: rows.length, active: aktif.length, closed: rows.length - aktif.length, delayed: aktif.filter(r => r.scheduleStatus === "DELAY").length,
       contract: sum("contract"), activeContract: aktif.reduce((s, r) => s + num(r.contract), 0), income: sum("income"), expense: sum("expense"),
       month: bulanIni, incomeMonth: kasBulan("cash_in"), expenseMonth: kasBulan("cash_out"),
+      utangAntarUnit: (await rowsWhere(env, "unit_bills", "json_extract(data_json,'$.status') IN ('DITAGIHKAN','BUKTI_DITOLAK')")).reduce((s2, r) => s2 + num(r.data.amount), 0),
       receivable: sum("receivable"), payable: sum("payable"), openQc: sum("openQc"), openDefects: sum("openDefects"), openIssues: sum("openIssues"), pendingApprovals: sum("pendingApprovals") },
     projects: rows });
 }
@@ -3373,6 +3374,90 @@ async function materialRequestReceiveHandler(request,env,user,id){
   return json({ok:true,row:out});
 }
 // Kabar status dari Bangun Nusa (ditandatangani x-bn-unit: BN). Selalu dijawab 2xx bila tanda tangan sah agar tidak dikirim ulang terus.
+
+// ===================== V3.4.48 — Tagihan antar unit MAW Group =====================
+// Unit penyedia (Bangun Nusa, DAARP, ATI, TAJAMA) menekan "Tagihkan" → tagihan masuk ke KENDALI.
+// Finance membayar di menu Keuangan dengan bukti transfer → Cash Out proyek langsung tercatat
+// (bukti tersimpan sebagai dokumen) dan unit penagih mencatat pemasukannya. Penagih bisa menolak bukti
+// (Cash Out dibatalkan) atau membatalkan tagihan yang belum dibayar.
+const TU_UNITS={BN:{name:"Bangun Nusa",key:"BANGUN_NUSA_KEY",call:(env,b)=>bnCall(env,"/api/tagihan-unit",b)},TJM:{name:"TAJAMA",key:"TAJAMA_KEY",call:(env,b)=>tjCall(env,"/api/tagihan-unit",b)},DAARP:{name:"DAARP Architect",key:"DAARP_KEY",call:(env,b)=>daarpCall(env,"/api/tagihan-unit",b)},ATI:{name:"ATI",key:"ATI_KEY",call:(env,b)=>atiCall(env,"/api/tagihan-unit",b)}};
+const TU_MAX_PROOF=1200000;
+function tuB64(buf){const b=new Uint8Array(buf);let s="";for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s);}
+async function tuResolveRef(env,refType,ref){
+  ref=String(ref||""); if(!ref) return {};
+  const byId=async c=>{const r=await getRecord(env,c,ref); return r?{collection:c,id:r.id,projectId:r.data.projectId||"",label:r.data.number||r.data.title||r.id}:null;};
+  const byNo=async c=>{const rows=await rowsWhere(env,c,"json_extract(data_json,'$.number')=?",[ref]); return rows[0]?{collection:c,id:rows[0].id,projectId:rows[0].data.projectId||"",label:rows[0].data.number||rows[0].id}:null;};
+  const order={gambar:[()=>byId("drawing_requests")],tukang:[()=>byId("ati_work_requests")],invoice:[()=>byNo("material_requests")],material:[()=>byNo("material_requests")],pekerjaan:[()=>byNo("tajama_jobs")]}[refType]||[];
+  for(const f of [...order,()=>byNo("material_requests"),()=>byNo("tajama_jobs"),()=>byId("drawing_requests"),()=>byId("ati_work_requests")]){ const x=await f(); if(x) return x; }
+  return {};
+}
+async function unitBillInbound(request,env){
+  const h=n=>request.headers.get(`x-maw-${n}`)??request.headers.get(`x-bn-${n}`)??"";
+  const unit=String(h("unit")).toUpperCase(); const u=TU_UNITS[unit]; const secret=u?String(env[u.key]||""):"";
+  if(!secret) return json({ok:false,message:"Unit belum tersambung ke KENDALI."},401);
+  const ts=Number(h("ts")||0), sig=String(h("sig")); const raw=await request.text();
+  if(raw.length>2500000) return json({ok:false,message:"Terlalu besar."},413);
+  if(!ts||Math.abs(Math.floor(Date.now()/1000)-ts)>BN_SIG_WINDOW||!bnSafeEq(await bnHmac(secret,`${ts}.${raw}`),sig)) return json({ok:false,message:"Tanda tangan tidak sah."},401);
+  const b=safeJsonParse(raw,null); if(!b||!b.nomor) return json({ok:false,message:"Isi tidak valid."},400);
+  const actor={id:`unit-${unit.toLowerCase()}`,name:u.name,username:unit.toLowerCase()};
+  const id=`TU-${unit}-${String(b.nomor).replace(/[^\w.-]/g,"_")}`; const old=await getRecord(env,"unit_bills",id); const now=new Date().toISOString();
+  if(b.aksi==="baru"){
+    const amount=Math.round(num(b.nominal)); if(!(amount>0)) return json({ok:false,message:"Nominal tidak valid."},400);
+    if(old&&old.data.status==="DIBAYAR") return json({ok:true,status:"DIBAYAR"});
+    const ref=await tuResolveRef(env,String(b.ref_jenis||""),b.ref);
+    const d={...(old?.data||{}),unit,unitName:u.name,number:String(b.nomor),refType:String(b.ref_jenis||""),ref:String(b.ref||""),refCollection:ref.collection||"",refId:ref.id||"",refLabel:ref.label||String(b.ref||""),projectId:ref.projectId||old?.data?.projectId||"",title:String(b.judul||"Tagihan").slice(0,200),amount,notes:String(b.keterangan||"").slice(0,1000),dueDate:String(b.jatuh_tempo||""),bankAccount:String(b.rekening||"").slice(0,300),status:"DITAGIHKAN",receivedAt:old?.data?.receivedAt||now,updatedAt:now};
+    await upsertRecord(env,"unit_bills",id,d,actor); await audit(env,actor,"UNIT_BILL_IN","unit_bills",id,d.projectId,{unit,number:d.number,amount});
+    return json({ok:true,status:"DITAGIHKAN"});
+  }
+  if(b.aksi==="batal"||b.aksi==="tolak"){
+    if(!old) return json({ok:true,ignored:true});
+    const d={...old.data};
+    if(d.cashOutId){ const c=await getRecord(env,"cash_out",d.cashOutId); if(c) await upsertRecord(env,"cash_out",c.id,{...c.data,status:"CANCELLED",notes:`${c.data.notes||""} [Dibatalkan: ${b.aksi==="tolak"?"bukti ditolak":"tagihan dibatalkan"} ${u.name}]`},actor); }
+    d.status=b.aksi==="batal"?"DIBATALKAN":"BUKTI_DITOLAK"; d.rejectReason=String(b.alasan||"").slice(0,500); d.cashOutId=""; d.updatedAt=now;
+    await upsertRecord(env,"unit_bills",id,d,actor); await audit(env,actor,b.aksi==="batal"?"UNIT_BILL_CANCELLED":"UNIT_BILL_PROOF_REJECTED","unit_bills",id,d.projectId||"",{unit,number:d.number});
+    return json({ok:true,status:d.status});
+  }
+  return json({ok:false,message:"Aksi tidak dikenal."},400);
+}
+async function unitBillsListHandler(env,user){
+  const acc=buildAccess(user); if(!acc.views.includes("finance")&&!acc.capabilities.financePay) return json({ok:false,message:"Tidak ada akses."},403);
+  const rows=await rowsWhere(env,"unit_bills"); return json({ok:true,rows:rows.sort((a,b)=>String(b.data.receivedAt||"").localeCompare(String(a.data.receivedAt||""))),canPay:!!acc.capabilities.financePay});
+}
+async function unitBillSend(env,d,proof){
+  const payload={aksi:"bayar",nomor:d.number,tanggal:d.paidDate,nominal:d.paidAmount,rekening_asal:d.fromAccount||"",catatan:d.payNotes||"",bukti:proof};
+  await TU_UNITS[d.unit].call(env,payload);
+}
+async function unitBillPayHandler(request,env,user,id){
+  if(!buildAccess(user).capabilities.financePay) return json({ok:false,message:"Hanya Finance/Manajemen yang dapat membayar tagihan."},403);
+  const rec=await getRecord(env,"unit_bills",id); if(!rec) return json({ok:false,message:"Tagihan tidak ditemukan."},404);
+  const d={...rec.data}; if(!["DITAGIHKAN","BUKTI_DITOLAK"].includes(d.status)) return json({ok:false,message:"Tagihan ini tidak menunggu pembayaran."},409);
+  let fd; try{fd=await request.formData();}catch{return json({ok:false,message:"Form tidak valid."},400);}
+  const file=fd.get("file"); if(!(file instanceof File)||!file.size) return json({ok:false,message:"Lampirkan bukti transfer."},400);
+  if(file.size>TU_MAX_PROOF) return json({ok:false,message:"Bukti transfer maksimal 1,2 MB (foto diperkecil otomatis bila memungkinkan)."},413);
+  if(!/^(image\/(jpeg|png|webp|heic|heif)|application\/pdf)$/i.test(file.type||"")) return json({ok:false,message:"Bukti harus foto atau PDF."},400);
+  const projectId=String(fd.get("projectId")||d.projectId||""); if(!projectId) return json({ok:false,message:"Pilih proyek untuk pencatatan pengeluaran."},400);
+  const denied=await requireProjectAccess(env,user,projectId); if(denied) return denied;
+  const buf=await file.arrayBuffer(); const now=new Date().toISOString();
+  d.projectId=projectId; d.paidDate=String(fd.get("date")||now.slice(0,10)).slice(0,10); d.paidAmount=Math.round(num(fd.get("amount"))||d.amount); d.fromAccount=String(fd.get("account")||"").slice(0,200); d.payNotes=String(fd.get("notes")||"").slice(0,500);
+  const cashId=`TUPAY-${id}-${Date.now().toString(36)}`;
+  await upsertRecord(env,"cash_out",cashId,{projectId,date:d.paidDate,category:"Antar Unit",vendor:d.unitName,amount:d.paidAmount,status:"PAID",reference:d.number,account:d.fromAccount,notes:`Bayar tagihan ${d.number} ${d.unitName}: ${d.title}${d.payNotes?` — ${d.payNotes}`:""}`,unitBillId:id,systemGenerated:true},user);
+  const doc=await storeEvidenceDocument(env,user,new File([buf],file.name||"bukti-transfer",{type:file.type}),{projectId,category:"PAYMENT_PROOF_OUT",title:`Bukti transfer ${d.number}`,relatedCollection:"cash_out",relatedId:cashId});
+  d.status="DIBAYAR"; d.cashOutId=cashId; d.proofDocumentId=doc?.id||""; d.paidByUserId=user.id; d.paidByName=user.name||user.username; d.paidAt=now; d.rejectReason=""; d.updatedAt=now;
+  let sent=true, msg="";
+  try{ await unitBillSend(env,d,{nama:file.name||"bukti",tipe:file.type,data:tuB64(buf)}); d.sendPending=false; }
+  catch(e){ sent=false; msg=e.message; d.sendPending=true; d.sendError=String(e.message||e).slice(0,300); }
+  const out=await upsertRecord(env,"unit_bills",id,d,user);
+  await audit(env,user,"UNIT_BILL_PAID","unit_bills",id,projectId,{unit:d.unit,number:d.number,amount:d.paidAmount,sent});
+  return json({ok:true,row:out,sent,message:sent?`Pembayaran tercatat dan diterima ${d.unitName}.`:`Pembayaran tercatat, tetapi ${d.unitName} belum menerima (${msg}). Gunakan "Kirim ulang".`});
+}
+async function unitBillResendHandler(env,user,id){
+  if(!buildAccess(user).capabilities.financePay) return json({ok:false,message:"Tidak ada akses."},403);
+  const rec=await getRecord(env,"unit_bills",id); if(!rec||rec.data.status!=="DIBAYAR") return json({ok:false,message:"Tagihan belum dibayar."},409);
+  const d={...rec.data}; let proof=null;
+  if(d.proofDocumentId&&env.FILES){ const doc=await getRecord(env,"project_documents",d.proofDocumentId); const obj=doc?await env.FILES.get(doc.data.objectKey):null; if(obj) proof={nama:doc.data.originalName,tipe:doc.data.mimeType,data:tuB64(await obj.arrayBuffer())}; }
+  try{ await unitBillSend(env,d,proof); }catch(e){ return json({ok:false,message:e.message},502); }
+  d.sendPending=false; d.sendError=""; const out=await upsertRecord(env,"unit_bills",id,d,user); return json({ok:true,row:out});
+}
 async function bangunNusaStatusHandler(request,env){
   const secret=String(env.BANGUN_NUSA_KEY||""); if(!secret) return json({ok:false,message:"Belum tersambung."},401);
   const unit=String(request.headers.get("x-bn-unit")||""); const ts=Number(request.headers.get("x-bn-ts")||0); const sig=String(request.headers.get("x-bn-sig")||"");
@@ -4157,6 +4242,7 @@ async function handleRequest(request, env) {
     if (path === "/api/sipatuo/verify-login" && request.method === "POST") return sipatuoVerifyLoginHandler(request,env);
     if (path === "/api/sipatuo/ringkasan" && request.method === "POST") return sipatuoRingkasanHandler(request,env);
     if (path === "/api/bangun-nusa/status" && request.method === "POST") return bangunNusaStatusHandler(request,env);
+    if (path === "/api/tagihan-unit" && request.method === "POST") return unitBillInbound(request,env);
     if (path === "/api/tajama/status" && request.method === "POST") return tajamaStatusHandler(request,env);
     if (path === "/api/daarp/status" && request.method === "POST") return daarpStatusHandler(request,env);
     if (path === "/api/ati/status" && request.method === "POST") return atiStatusHandler(request,env);
@@ -4215,6 +4301,9 @@ async function handleRequest(request, env) {
     if (daMatch && request.method === "POST") { const did=decodeURIComponent(daMatch[1]); return daMatch[2] ? drawingActionHandler(request,env,auth.user,did) : drawingSaveHandler(request,env,auth.user,did); }
     const tjMatch = path.match(/^\/api\/tajama-jobs\/([^/]+)(?:\/(action|spk|inspect|complaint))?$/);
     if (tjMatch && request.method === "POST") { const tid=decodeURIComponent(tjMatch[1]); if(!tjMatch[2]) return tajamaSaveHandler(request,env,auth.user,tid); return tajamaActionHandler(request,env,auth.user,tid,tjMatch[2]==="action"?"":tjMatch[2]); }
+    if (path === "/api/unit-bills" && request.method === "GET") return unitBillsListHandler(env,auth.user);
+    const ubAct = path.match(/^\/api\/unit-bills\/([^/]+)\/(pay|resend)$/);
+    if (ubAct && request.method === "POST") return ubAct[2]==="pay" ? unitBillPayHandler(request,env,auth.user,decodeURIComponent(ubAct[1])) : unitBillResendHandler(env,auth.user,decodeURIComponent(ubAct[1]));
     const usDel = path.match(/^\/api\/(material_requests|drawing_requests|ati_work_requests|tajama_jobs)\/([^/]+)\/hapus$/);
     if (usDel && request.method === "POST") return unitSyncDeleteHandler(env,auth.user,usDel[1],decodeURIComponent(usDel[2]));
     if (path === "/api/bangun-nusa/katalog" && request.method === "GET") return bnKatalogHandler(env,auth.user);
