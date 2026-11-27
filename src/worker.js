@@ -29,7 +29,7 @@ async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik 
 }
 // ---- SIPATUO-SSO-VERIFY:END ----
 
-const APP_VERSION = "APP-V3.4.49";
+const APP_VERSION = "APP-V3.4.50";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -319,6 +319,7 @@ function buildAccess(user) {
       termBill: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
       contractManage: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik"]),
       financeSettings: roleIn(user,["administrator","direktur","head_unit_bisnis"]),
+      unitBillApprove: roleIn(user,["administrator","direktur"]),
       financeImport: roleIn(user,["administrator","direktur","head_unit_bisnis","finance"]),
       directoryMerge: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","finance"]),
       directoryEdit: roleIn(user,["administrator","direktur","head_unit_bisnis","manager_operasional","admin_teknik","site_manager","procurement","finance"]),
@@ -683,6 +684,8 @@ async function sipatuoRingkasanHandler(request, env) {
       ...(() => { const au = all.filter(r => r.collection === "cash_out" && r.data.unitBillId && idProyek.has(String(r.data.projectId || "")) && paidLike(r.data.status));
         const v = r => pickNum(r.data, ["amount","nominal","value","total"]);
         return { antarDibayar: au.reduce((s2, r) => s2 + v(r), 0), antarDibayarBulan: au.filter(r => String(r.data.date || "").slice(0, 7) === bulanIni).reduce((s2, r) => s2 + v(r), 0) }; })(),
+      logTagihan: await (async () => { try { const q = await env.DB.prepare("SELECT action, actor_name, detail_json, created_at FROM kendali_audit_log WHERE action IN ('UNIT_BILL_PAID','UNIT_BILL_APPROVED') ORDER BY created_at DESC LIMIT 150").all();
+        return (q.results || []).map(r => { const x = safeJsonParse(r.detail_json, {}); return { waktu: String(r.created_at || "").replace("T", " ").slice(0, 19), aksi: r.action === "UNIT_BILL_PAID" ? "Membayar" : "Menyetujui pembayaran", nomor: x.number || "", mitra: x.unit || "", nominal: num(x.amount), oleh: r.actor_name || "", ket: "" }; }); } catch { return []; } })(),
       utangAntarUnit: (await rowsWhere(env, "unit_bills", "json_extract(data_json,'$.status') IN ('DITAGIHKAN','BUKTI_DITOLAK')")).reduce((s2, r) => s2 + num(r.data.amount), 0),
       receivable: sum("receivable"), payable: sum("payable"), openQc: sum("openQc"), openDefects: sum("openDefects"), openIssues: sum("openIssues"), pendingApprovals: sum("pendingApprovals") },
     projects: rows });
@@ -1500,6 +1503,8 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
   if(collection==="unit_bills"){
     const ttl=`Tagihan ${d.unitName||d.unit||"unit"} ${d.number||""}`; const rp=`Rp${Math.round(num(d.amount)).toLocaleString("id-ID")}`;
     const telat=d.dueDate&&String(d.dueDate)<new Date(Date.now()+8*3600e3).toISOString().slice(0,10);
+    const perluAcc=status!=="DIBAYAR"&&!d.approvedAt&&num(d.amount)>=num((await financeSettings(env)).unitBillApproval)&&num((await financeSettings(env)).unitBillApproval)>0;
+    if(["DITAGIHKAN","BUKTI_DITOLAK"].includes(status)&&perluAcc) return mk("UB_APPROVE",ttl,`Setujui pembayaran ${rp} ke ${d.unitName||d.unit} (${d.title||""}). Di atas batas, Finance baru bisa membayar setelah disetujui Direksi.`,"Setujui Pembayaran","","direktur",{priority:"HIGH"});
     if(status==="DITAGIHKAN") return mk("UB_PAY",ttl,`Bayar ${rp} ke ${d.unitName||d.unit} (${d.title||""}) dan lampirkan bukti transfer di menu Keuangan.${telat?" Sudah lewat jatuh tempo.":""}`,"Bayar Tagihan","","finance",{priority:telat?"HIGH":"NORMAL"});
     if(status==="BUKTI_DITOLAK") return mk("UB_REPAY",ttl,`Bukti pembayaran ditolak ${d.unitName||d.unit}: ${d.rejectReason||"-"}. Bayar ulang dengan bukti yang benar.`,"Bayar Ulang","","finance",{priority:"HIGH"});
     return null;
@@ -3041,6 +3046,7 @@ const PAYMENT_CATEGORY_LABEL = {VENDOR:"Vendor",SUBKON:"Subkon",TUKANG:"Tukang",
 const PARTNER_TYPES = {VENDOR:"Vendor",SUBKON:"Subkon",SUPPLIER:"Toko Material",REIMBURSE:"Reimburse / Perorangan"};
 const FINANCE_SETTINGS_ID = "finance";
 const DEFAULT_MATERIAL_HUB_THRESHOLD = 5000000;
+const DEFAULT_UNIT_BILL_APPROVAL = 10000000; // V3.4.50 — bayar tagihan antar unit di atas batas ini perlu ACC Direksi
 const rp = v => `Rp ${Math.round(num(v)).toLocaleString("id-ID")}`;
 const nameKey = v => String(v||"").toLowerCase().replace(/\b(pt|cv|ud|tb|toko)\.?\s+/g,"").replace(/[^a-z0-9]+/g," ").trim();
 
@@ -3080,7 +3086,8 @@ async function normalizeProjectTerm(env,d) {
 }
 async function financeSettings(env) {
   const r=await getRecord(env,"app_settings",FINANCE_SETTINGS_ID);
-  return {materialHubThreshold:num(r?.data?.materialHubThreshold)||DEFAULT_MATERIAL_HUB_THRESHOLD};
+  const ub=r?.data?.unitBillApproval;
+  return {materialHubThreshold:num(r?.data?.materialHubThreshold)||DEFAULT_MATERIAL_HUB_THRESHOLD,unitBillApproval:ub===undefined||ub===null||ub===""?DEFAULT_UNIT_BILL_APPROVAL:Math.max(0,num(ub))};
 }
 async function contractPaymentsTotals(env,contractId,excludeId="") {
   const q=await env.DB.prepare(`SELECT id,data_json FROM app_records WHERE collection='partner_payments' AND json_extract(data_json,'$.contractId')=?`).bind(String(contractId)).all();
@@ -3385,7 +3392,7 @@ async function materialRequestReceiveHandler(request,env,user,id){
 }
 // Kabar status dari Bangun Nusa (ditandatangani x-bn-unit: BN). Selalu dijawab 2xx bila tanda tangan sah agar tidak dikirim ulang terus.
 
-// ===================== V3.4.49 — Tagihan antar unit MAW Group =====================
+// ===================== V3.4.50 — Tagihan antar unit MAW Group =====================
 // Unit penyedia (Bangun Nusa, Ruaka Studio, ATI, TAJAMA) menekan "Tagihkan" → tagihan masuk ke KENDALI.
 // Finance membayar di menu Keuangan dengan bukti transfer → Cash Out proyek langsung tercatat
 // (bukti tersimpan sebagai dokumen) dan unit penagih mencatat pemasukannya. Penagih bisa menolak bukti
@@ -3416,6 +3423,7 @@ async function unitBillInbound(request,env){
     if(old&&old.data.status==="DIBAYAR") return json({ok:true,status:"DIBAYAR"});
     const ref=await tuResolveRef(env,String(b.ref_jenis||""),b.ref);
     const d={...(old?.data||{}),unit,unitName:u.name,number:String(b.nomor),refType:String(b.ref_jenis||""),ref:String(b.ref||""),refCollection:ref.collection||"",refId:ref.id||"",refLabel:ref.label||String(b.ref||""),projectId:ref.projectId||old?.data?.projectId||"",title:String(b.judul||"Tagihan").slice(0,200),amount,notes:String(b.keterangan||"").slice(0,1000),dueDate:String(b.jatuh_tempo||""),bankAccount:String(b.rekening||"").slice(0,300),status:"DITAGIHKAN",receivedAt:old?.data?.receivedAt||now,updatedAt:now};
+    if(old&&num(old.data.amount)!==amount){ delete d.approvedAt; delete d.approvedById; delete d.approvedByName; delete d.approvalNote; }
     await upsertRecord(env,"unit_bills",id,d,actor); await audit(env,actor,"UNIT_BILL_IN","unit_bills",id,d.projectId,{unit,number:d.number,amount});
     try{ await syncWorkflowTask(env,"unit_bills",id,d,null); }catch(e){ console.log("ub task",e?.message); }
     return json({ok:true,status:"DITAGIHKAN"});
@@ -3432,7 +3440,7 @@ async function unitBillInbound(request,env){
 }
 async function unitBillsListHandler(env,user){
   const acc=buildAccess(user); if(!acc.views.includes("finance")&&!acc.capabilities.financePay) return json({ok:false,message:"Tidak ada akses."},403);
-  const rows=await rowsWhere(env,"unit_bills"); return json({ok:true,rows:rows.sort((a,b)=>String(b.data.receivedAt||"").localeCompare(String(a.data.receivedAt||""))),canPay:!!acc.capabilities.financePay});
+  const rows=await rowsWhere(env,"unit_bills"); return json({ok:true,rows:rows.sort((a,b)=>String(b.data.receivedAt||"").localeCompare(String(a.data.receivedAt||""))),canPay:!!acc.capabilities.financePay,canApprove:!!acc.capabilities.unitBillApprove,approvalThreshold:(await financeSettings(env)).unitBillApproval});
 }
 async function unitBillSend(env,d,proof){
   const payload={aksi:"bayar",nomor:d.number,tanggal:d.paidDate,nominal:d.paidAmount,rekening_asal:d.fromAccount||"",catatan:d.payNotes||"",bukti:proof};
@@ -3443,6 +3451,8 @@ async function unitBillPayHandler(request,env,user,id){
   const rec=await getRecord(env,"unit_bills",id); if(!rec) return json({ok:false,message:"Tagihan tidak ditemukan."},404);
   const d={...rec.data}; if(!["DITAGIHKAN","BUKTI_DITOLAK"].includes(d.status)) return json({ok:false,message:"Tagihan ini tidak menunggu pembayaran."},409);
   let fd; try{fd=await request.formData();}catch{return json({ok:false,message:"Form tidak valid."},400);}
+  { const batas=num((await financeSettings(env)).unitBillApproval); const nilai=Math.max(num(d.amount),Math.round(num(fd.get("amount"))));
+    if(batas>0&&nilai>=batas&&!d.approvedAt) return json({ok:false,message:`Pembayaran ${fmtRpServer(nilai)} di atas batas ${fmtRpServer(batas)} — tunggu persetujuan Direksi dulu.`},409); }
   const file=fd.get("file"); if(!(file instanceof File)||!file.size) return json({ok:false,message:"Lampirkan bukti transfer."},400);
   if(file.size>TU_MAX_PROOF) return json({ok:false,message:"Bukti transfer maksimal 1,2 MB (foto diperkecil otomatis bila memungkinkan)."},413);
   if(!/^(image\/(jpeg|png|webp|heic|heif)|application\/pdf)$/i.test(file.type||"")) return json({ok:false,message:"Bukti harus foto atau PDF."},400);
@@ -3461,6 +3471,87 @@ async function unitBillPayHandler(request,env,user,id){
   try{ await syncWorkflowTask(env,"unit_bills",id,d,user); }catch(e){ console.log("ub task",e?.message); }
   await audit(env,user,"UNIT_BILL_PAID","unit_bills",id,projectId,{unit:d.unit,number:d.number,amount:d.paidAmount,sent});
   return json({ok:true,row:out,sent,message:sent?`Pembayaran tercatat dan diterima ${d.unitName}.`:`Pembayaran tercatat, tetapi ${d.unitName} belum menerima (${msg}). Gunakan "Kirim ulang".`});
+}
+const fmtRpServer=n=>`Rp${Math.round(num(n)).toLocaleString("id-ID")}`;
+async function unitBillApproveHandler(request,env,user,id){
+  if(!buildAccess(user).capabilities.unitBillApprove) return json({ok:false,message:"Hanya Direksi yang dapat menyetujui pembayaran ini."},403);
+  const rec=await getRecord(env,"unit_bills",id); if(!rec) return json({ok:false,message:"Tagihan tidak ditemukan."},404);
+  const d={...rec.data}; if(!["DITAGIHKAN","BUKTI_DITOLAK"].includes(d.status)) return json({ok:false,message:"Tagihan ini tidak menunggu pembayaran."},409);
+  const b=await parseJson(request)||{}; const now=new Date().toISOString();
+  d.approvedAt=now; d.approvedById=user.id; d.approvedByName=user.name||user.username; d.approvalNote=String(b.note||"").slice(0,300); d.updatedAt=now;
+  const out=await upsertRecord(env,"unit_bills",id,d,user);
+  try{ await syncWorkflowTask(env,"unit_bills",id,d,user); }catch(e){ console.log("ub task",e?.message); }
+  await audit(env,user,"UNIT_BILL_APPROVED","unit_bills",id,d.projectId||"",{unit:d.unit,number:d.number,amount:d.amount});
+  return json({ok:true,row:out,message:"Pembayaran disetujui. Finance sudah bisa membayar."});
+}
+// ===== V3.4.50 — Invoice & kwitansi tagihan antar unit (template sama dengan website unit) =====
+// Invoice & kwitansi tagihan antar unit MAW Group — halaman siap cetak / simpan PDF.
+// File ini identik di Bangun Nusa, ATI, Ruaka Studio, dan TAJAMA (dan disalin ke KENDALI).
+const escC = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const rpC = (n) => 'Rp ' + Math.round(Number(n) || 0).toLocaleString('id-ID');
+const BLN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const tglC = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? `${Number(m[3])} ${BLN[Number(m[2]) - 1]} ${m[1]}` : '-'; };
+const SATUAN = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
+function terbilang(n) {
+  n = Math.floor(Math.abs(Number(n) || 0));
+  if (n < 12) return SATUAN[n];
+  if (n < 20) return terbilang(n - 10) + ' belas';
+  if (n < 100) return terbilang(Math.floor(n / 10)) + ' puluh' + (n % 10 ? ' ' + terbilang(n % 10) : '');
+  if (n < 200) return 'seratus' + (n - 100 ? ' ' + terbilang(n - 100) : '');
+  if (n < 1000) return terbilang(Math.floor(n / 100)) + ' ratus' + (n % 100 ? ' ' + terbilang(n % 100) : '');
+  if (n < 2000) return 'seribu' + (n - 1000 ? ' ' + terbilang(n - 1000) : '');
+  if (n < 1e6) return terbilang(Math.floor(n / 1000)) + ' ribu' + (n % 1000 ? ' ' + terbilang(n % 1000) : '');
+  if (n < 1e9) return terbilang(Math.floor(n / 1e6)) + ' juta' + (n % 1e6 ? ' ' + terbilang(n % 1e6) : '');
+  if (n < 1e12) return terbilang(Math.floor(n / 1e9)) + ' miliar' + (n % 1e9 ? ' ' + terbilang(n % 1e9) : '');
+  return terbilang(Math.floor(n / 1e12)) + ' triliun' + (n % 1e12 ? ' ' + terbilang(n % 1e12) : '');
+}
+const kapital = (s) => s.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+
+// t: { nomor, dari, ke, tanggal, judul, ref, keterangan, nominal, jatuhTempo, rekening, status,
+//      bayarTanggal, bayarNominal, rekeningAsal, logo }  — kwitansi bila status Dibayar.
+function htmlCetakTagihan(t) {
+  const lunas = /^dibayar$/i.test(String(t.status || ''));
+  const judulDok = lunas ? 'KWITANSI' : 'INVOICE';
+  const nominal = lunas ? (t.bayarNominal || t.nominal) : t.nominal;
+  const batal = /batal/i.test(String(t.status || ''));
+  const isi = lunas
+    ? `<p class="lead">Telah diterima dari <b>${escC(t.ke)}</b> uang sejumlah</p>
+       <div class="besar">${rpC(nominal)}</div><p class="tb"><i>${escC(kapital(terbilang(nominal)))} rupiah</i></p>
+       <p>Untuk pembayaran <b>${escC(t.judul)}</b>${t.ref ? ` (ref. ${escC(t.ref)})` : ''} sesuai tagihan ${escC(t.nomor)}.</p>
+       <table class="kv"><tr><td>Tanggal bayar</td><td>${tglC(t.bayarTanggal)}</td></tr>${t.rekeningAsal ? `<tr><td>Dari rekening</td><td>${escC(t.rekeningAsal)}</td></tr>` : ''}${t.rekening ? `<tr><td>Ke rekening</td><td>${escC(t.rekening)}</td></tr>` : ''}</table>`
+    : `<table class="kv"><tr><td>Kepada</td><td><b>${escC(t.ke)}</b></td></tr><tr><td>Tanggal</td><td>${tglC(t.tanggal)}</td></tr><tr><td>Jatuh tempo</td><td>${t.jatuhTempo ? tglC(t.jatuhTempo) : '-'}</td></tr>${t.ref ? `<tr><td>Referensi</td><td>${escC(t.ref)}</td></tr>` : ''}</table>
+       <table class="it"><tr><th>Uraian</th><th class="r">Jumlah</th></tr><tr><td><b>${escC(t.judul)}</b>${t.keterangan ? `<div class="m">${escC(t.keterangan)}</div>` : ''}</td><td class="r">${rpC(nominal)}</td></tr>
+       <tr class="tot"><td>Total</td><td class="r">${rpC(nominal)}</td></tr></table>
+       <p class="tb">Terbilang: <i>${escC(kapital(terbilang(nominal)))} rupiah</i></p>
+       <div class="rek"><b>Pembayaran ditransfer ke:</b><br>${t.rekening ? escC(t.rekening) : '<span class="m">Rekening belum diisi unit penagih — hubungi unit penagih.</span>'}<br><span class="m">Bayar lewat menu Keuangan dengan melampirkan bukti transfer.</span></div>`;
+  return `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${judulDok} ${escC(t.nomor)}</title>
+<style>*{box-sizing:border-box}body{font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1a1a1a;background:#f2f2ef;margin:0;padding:24px}
+.doc{background:#fff;max-width:780px;margin:auto;padding:44px 48px;border-radius:10px;box-shadow:0 2px 14px #0001;position:relative}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #17323C;padding-bottom:16px;margin-bottom:22px;gap:16px}
+.hd h1{margin:0;font-size:26px;letter-spacing:.12em;color:#17323C}.hd .no{color:#555;font-size:13px;margin-top:4px}.hd .dari{text-align:right}.hd .dari b{font-size:16px;display:block}.hd img{max-height:54px;max-width:160px;display:block;margin-left:auto;margin-bottom:6px}
+.kv{border-collapse:collapse;margin:8px 0 18px}.kv td{padding:4px 14px 4px 0;vertical-align:top}.kv td:first-child{color:#666;width:140px}
+.it{width:100%;border-collapse:collapse;margin:10px 0}.it th,.it td{border-bottom:1px solid #ddd;padding:10px 8px;text-align:left}.it th{background:#f4f5f3;font-size:12px;text-transform:uppercase;letter-spacing:.05em}.r{text-align:right!important;white-space:nowrap}.tot td{font-weight:700;border-bottom:2px solid #17323C}
+.m{color:#666;font-size:12.5px}.tb{color:#333}.rek{background:#f4f6f5;border-left:3px solid #2F6B5E;padding:12px 14px;border-radius:6px;margin-top:16px}
+.lead{margin:4px 0}.besar{font-size:30px;font-weight:800;color:#17323C;margin:6px 0}
+.ttd{display:flex;justify-content:flex-end;margin-top:46px}.ttd div{text-align:center;min-width:200px}.ttd .g{height:70px}
+.st{position:absolute;top:270px;right:56px;transform:rotate(-12deg);border:3px solid;border-radius:8px;padding:4px 14px;font-weight:800;letter-spacing:.1em;font-size:20px;opacity:.75}
+.st.ok{color:#2F6B5E}.st.x{color:#A4372A}.bar{max-width:780px;margin:0 auto 14px;display:flex;justify-content:flex-end;gap:8px}
+.bar button{font:inherit;background:#17323C;color:#fff;border:0;border-radius:8px;padding:9px 16px;cursor:pointer}
+@media print{body{background:#fff;padding:0}.doc{box-shadow:none;border-radius:0;padding:24px}.bar{display:none}}</style></head><body>
+<div class="bar"><button onclick="window.print()">Cetak / Simpan PDF</button></div>
+<div class="doc">${lunas ? '<div class="st ok">LUNAS</div>' : batal ? '<div class="st x">DIBATALKAN</div>' : ''}
+<div class="hd"><div><h1>${judulDok}</h1><div class="no">No. ${escC(t.nomor)}</div></div><div class="dari">${t.logo ? `<img src="${escC(t.logo)}" alt="">` : ''}<b>${escC(t.dari)}</b><span class="m">MAW Group</span></div></div>
+${isi}
+<div class="ttd"><div>${escC(t.dari)}<div class="g"></div><span class="m">( ................................ )</span></div></div>
+<p class="m" style="margin-top:26px">Dokumen dibuat otomatis oleh sistem MAW Group${t.dicetak ? ' · ' + escC(t.dicetak) : ''}.</p></div></body></html>`;
+}
+
+async function unitBillPrintHandler(env,user,id){
+  const acc=buildAccess(user); if(!acc.views.includes("finance")&&!acc.capabilities.financePay) return new Response("Tidak ada akses.",{status:403});
+  const rec=await getRecord(env,"unit_bills",id); if(!rec) return new Response("Tidak ditemukan.",{status:404}); const d=rec.data||{};
+  const st={DIBAYAR:"Dibayar",DIBATALKAN:"Dibatalkan",BUKTI_DITOLAK:"Bukti ditolak"}[d.status]||"Ditagihkan";
+  const html=htmlCetakTagihan({nomor:d.number,dari:d.unitName||d.unit,ke:"Natara Konstruksi",tanggal:String(d.receivedAt||"").slice(0,10),judul:d.title,ref:d.refLabel||d.ref||"",keterangan:d.notes,nominal:d.amount,jatuhTempo:d.dueDate,rekening:d.bankAccount,status:st,bayarTanggal:d.paidDate,bayarNominal:d.paidAmount,rekeningAsal:d.fromAccount});
+  return new Response(html,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"private, no-store"}});
 }
 async function unitBillResendHandler(env,user,id){
   if(!buildAccess(user).capabilities.financePay) return json({ok:false,message:"Tidak ada akses."},403);
@@ -3940,9 +4031,13 @@ async function contractSaveHandler(request,env,user,poId="") {
 async function financeSettingsHandler(request,env,user) {
   if(request.method==="GET") return json({ok:true,settings:await financeSettings(env)});
   if(!buildAccess(user).capabilities.financeSettings) return json({ok:false,message:"Hanya pimpinan yang dapat mengubah pengaturan keuangan."},403);
-  const b=await parseJson(request)||{}; const t=Math.round(num(b.materialHubThreshold)); if(t<0) return json({ok:false,message:"Batas tidak valid."},400);
-  await upsertRecord(env,"app_settings",FINANCE_SETTINGS_ID,{materialHubThreshold:t},user); await audit(env,user,"FINANCE_SETTINGS","app_settings",FINANCE_SETTINGS_ID,"",{materialHubThreshold:t});
-  return json({ok:true,settings:{materialHubThreshold:t}});
+  const b=await parseJson(request)||{}; const cur=await financeSettings(env);
+  const t=b.materialHubThreshold===undefined?cur.materialHubThreshold:Math.round(num(b.materialHubThreshold));
+  const u=b.unitBillApproval===undefined?cur.unitBillApproval:Math.round(num(b.unitBillApproval));
+  if(t<0||u<0) return json({ok:false,message:"Batas tidak valid."},400);
+  const settings={materialHubThreshold:t,unitBillApproval:u};
+  await upsertRecord(env,"app_settings",FINANCE_SETTINGS_ID,settings,user); await audit(env,user,"FINANCE_SETTINGS","app_settings",FINANCE_SETTINGS_ID,"",settings);
+  return json({ok:true,settings});
 }
 async function financeSummaryHandler(env,user,url) {
   const projectFilter=String(url.searchParams.get("projectId")||"");
@@ -4314,8 +4409,9 @@ async function handleRequest(request, env) {
     const tjMatch = path.match(/^\/api\/tajama-jobs\/([^/]+)(?:\/(action|spk|inspect|complaint))?$/);
     if (tjMatch && request.method === "POST") { const tid=decodeURIComponent(tjMatch[1]); if(!tjMatch[2]) return tajamaSaveHandler(request,env,auth.user,tid); return tajamaActionHandler(request,env,auth.user,tid,tjMatch[2]==="action"?"":tjMatch[2]); }
     if (path === "/api/unit-bills" && request.method === "GET") return unitBillsListHandler(env,auth.user);
-    const ubAct = path.match(/^\/api\/unit-bills\/([^/]+)\/(pay|resend)$/);
-    if (ubAct && request.method === "POST") return ubAct[2]==="pay" ? unitBillPayHandler(request,env,auth.user,decodeURIComponent(ubAct[1])) : unitBillResendHandler(env,auth.user,decodeURIComponent(ubAct[1]));
+    { const ubc = path.match(/^\/api\/unit-bills\/([^/]+)\/cetak$/); if (ubc && request.method === "GET") return unitBillPrintHandler(env,auth.user,decodeURIComponent(ubc[1])); }
+    const ubAct = path.match(/^\/api\/unit-bills\/([^/]+)\/(pay|resend|approve)$/);
+    if (ubAct && request.method === "POST") return ubAct[2]==="pay" ? unitBillPayHandler(request,env,auth.user,decodeURIComponent(ubAct[1])) : ubAct[2]==="approve" ? unitBillApproveHandler(request,env,auth.user,decodeURIComponent(ubAct[1])) : unitBillResendHandler(env,auth.user,decodeURIComponent(ubAct[1]));
     const usDel = path.match(/^\/api\/(material_requests|drawing_requests|ati_work_requests|tajama_jobs)\/([^/]+)\/hapus$/);
     if (usDel && request.method === "POST") return unitSyncDeleteHandler(env,auth.user,usDel[1],decodeURIComponent(usDel[2]));
     if (path === "/api/bangun-nusa/katalog" && request.method === "GET") return bnKatalogHandler(env,auth.user);
