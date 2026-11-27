@@ -222,7 +222,7 @@ async function renderProjects(){
 }
 
 
-// V3.4.51 — Tagihan antar unit (Bangun Nusa, Ruaka Studio, ATI, TAJAMA → Natara). Finance membayar dengan bukti transfer;
+// V3.4.52 — Tagihan antar unit (Bangun Nusa, Ruaka Studio, ATI, TAJAMA → Natara). Finance membayar dengan bukti transfer;
 // pengeluaran (Cash Out) proyek langsung tercatat dan unit penagih mencatat pemasukannya.
 const UB_LABEL={DITAGIHKAN:'Ditagihkan',DIBAYAR:'Dibayar',BUKTI_DITOLAK:'Bukti ditolak',DIBATALKAN:'Dibatalkan'};
 async function ubCompress(file){if(!file||!/^image\//.test(file.type)||file.size<900000||!window.createImageBitmap)return file;try{const b=await createImageBitmap(file);const s=Math.min(1,1600/Math.max(b.width,b.height));const c=document.createElement('canvas');c.width=Math.round(b.width*s);c.height=Math.round(b.height*s);c.getContext('2d').drawImage(b,0,0,c.width,c.height);const bl=await new Promise(r=>c.toBlob(r,'image/jpeg',.82));return bl?new File([bl],file.name.replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}):file;}catch(_){return file;}}
@@ -233,7 +233,8 @@ async function unitBillsCard(){
   const perluAcc=d=>batas>0&&num(d.amount)>=batas&&!d.approvedAt&&['DITAGIHKAN','BUKTI_DITOLAK'].includes(d.status);
   const open=rows.filter(r=>['DITAGIHKAN','BUKTI_DITOLAK'].includes(r.data.status));const tot=open.reduce((a,r)=>a+num(r.data.amount),0);
   const pname=id=>{const p=(state.projects||[]).find(x=>x.id===id);return p?esc(p.name||p.projectName||id):esc(id||'— pilih saat bayar —');};
-  const body=rows.length?`<div class="table-wrap"><table><thead><tr><th>Tagihan</th><th>Dari unit</th><th>Proyek / ref.</th><th>Nominal</th><th>Jatuh tempo</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(r=>{const d=r.data;const st=UB_LABEL[d.status]||d.status;
+  {const rk=st=>({DITAGIHKAN:0,BUKTI_DITOLAK:0,DIBAYAR:1,DIBATALKAN:2}[st]??1);rows=rows.slice().sort((a,b)=>rk(a.data.status)-rk(b.data.status));}
+  const body=rows.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Tagihan</th><th>Dari unit</th><th>Proyek / ref.</th><th>Nominal</th><th>Jatuh tempo</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(r=>{const d=r.data;const st=UB_LABEL[d.status]||d.status;
     let a='';if(perluAcc(d)){if(res.canApprove)a+=`<button class="btn small primary" data-ub-approve="${esc(r.id)}">Setujui</button>`;else a+=`<span class="tiny muted">Menunggu ACC Direksi</span> `;}
     else if(res.canPay&&['DITAGIHKAN','BUKTI_DITOLAK'].includes(d.status))a+=`<button class="btn small primary" data-ub-pay="${esc(r.id)}">Bayar</button>`;
     a+=`<a class="btn small" href="/api/unit-bills/${encodeURIComponent(r.id)}/cetak" target="_blank" rel="noopener">${d.status==='DIBAYAR'?'Kwitansi':'Invoice'}</a>`;
@@ -265,7 +266,7 @@ function openUnitBillPay(r){if(!r)return;const d=r.data;
 async function renderFinance(){
   const scope=Boolean(state.selectedProjectId);const [budget,ar,cin,ap,cout]=await Promise.all(['project_budget','receivables','cash_in','payables','cash_out'].map(c=>loadCollection(c,scope)));
   const explanation=`<div class="info-grid"><div class="info-card"><span class="tag auto">Otomatis dari Proyek</span><h4>Nilai Kontrak & HPP</h4><p>Nilai kontrak dan HPP di master proyek langsung dipakai dashboard. HPP proyek juga membuat/update baseline Budget Proyek otomatis. Ini bukan transaksi kas.</p></div><div class="info-card"><span class="tag manual">Finance</span><h4>Piutang & Cash In</h4><p>Kontrak tidak otomatis dianggap uang masuk. Finance membuat tagihan/piutang sesuai termin. Saat uang benar-benar diterima, input Cash In. Jika Cash In dikaitkan ke ID piutang, paid amount ikut diperbarui.</p></div><div class="info-card"><span class="tag auto">Dari Karyawan</span><h4>Payment Request → Cash Out</h4><p>Karyawan mengajukan kebutuhan di menu Pengajuan Dana. Setelah approved dan Finance menekan Bayar, sistem otomatis membuat Cash Out.</p></div><div class="info-card"><span class="tag auto">Dari Procurement</span><h4>PO/SPK → Hutang</h4><p>PO/SPK yang berstatus Approved/Ordered/Partial otomatis membentuk Hutang/Outstanding proyek. Cash Out tetap hanya muncul saat pembayaran benar-benar dicatat.</p></div></div>`;
-  const ubCard=await unitBillsCard();
+  const ubCard=state.ubOnTop?'':await unitBillsCard();
   $('#content').innerHTML=ubCard+explanation+genericTable('project_budget',budget,'Budget / HPP Proyek','Baseline biaya dan cost code.')+genericTable('receivables',ar,'Piutang Client','Tagihan yang belum seluruhnya diterima.')+genericTable('cash_in',cin,'Pemasukan / Cash In','Hanya uang yang benar-benar diterima/terverifikasi.')+genericTable('payables',ap,'Hutang / Outstanding','Komitmen yang masih harus dibayar.')+genericTable('cash_out',cout,'Pengeluaran / Cash Out','Pengeluaran yang benar-benar sudah dibayar.');bindCrudActions();bindUnitBills();
 }
 
@@ -1870,6 +1871,8 @@ renderFinance=async function(){
   ${pid?'':`<div class="card"><div class="card-head"><div><h3>Ringkasan per proyek</h3></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Proyek</th><th>Nilai kontrak</th><th>Termin diterima</th><th>Ditagih belum masuk</th><th>Pengeluaran</th><th>Saldo</th><th>Hutang disetujui</th></tr></thead><tbody>${v3418Visible(projRows,r=>String(r.cashOut).padStart(15,'0')).map(p=>`<tr><td><b>${esc(p.name)}</b></td><td class="num">${fmtRp(p.contractValue)}</td><td class="num">${fmtRp(p.cashIn)}</td><td class="num">${fmtRp(p.termsBilledOpen)}</td><td class="num">${fmtRp(p.cashOut)}</td><td class="num ${p.balance<0?'text-danger':''}">${fmtRp(p.balance)}</td><td class="num">${fmtRp(p.payablesApproved)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Belum ada transaksi.</td></tr>'}${v3418MoreNote(projRows,7)}</tbody></table></div></div>`}
   <details class="card fin-ledger"><summary><b>Buku kas & data rinci</b> <span class="muted tiny">Budget, piutang, cash in, hutang, cash out</span></summary><div id="finLedger"></div></details>`;
   $('#finGoPayments').onclick=()=>setView('payments');
+  // V3.4.52 — Tagihan Antar Unit tampil paling atas (sebelumnya tersembunyi di "Buku kas & data rinci").
+  state.ubOnTop=true;{const ubTop=await unitBillsCard();if(ubTop){$('#content').insertAdjacentHTML('afterbegin',ubTop);bindUnitBills();}}
   if($('#finSettingsBtn'))$('#finSettingsBtn').onclick=openFinSettings;
   if($('#termAdd'))$('#termAdd').onclick=()=>openTermForm(null);
   const find=id=>terms.find(x=>x.id===id);
