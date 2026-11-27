@@ -222,7 +222,7 @@ async function renderProjects(){
 }
 
 
-// V3.4.50 — Tagihan antar unit (Bangun Nusa, Ruaka Studio, ATI, TAJAMA → Natara). Finance membayar dengan bukti transfer;
+// V3.4.51 — Tagihan antar unit (Bangun Nusa, Ruaka Studio, ATI, TAJAMA → Natara). Finance membayar dengan bukti transfer;
 // pengeluaran (Cash Out) proyek langsung tercatat dan unit penagih mencatat pemasukannya.
 const UB_LABEL={DITAGIHKAN:'Ditagihkan',DIBAYAR:'Dibayar',BUKTI_DITOLAK:'Bukti ditolak',DIBATALKAN:'Dibatalkan'};
 async function ubCompress(file){if(!file||!/^image\//.test(file.type)||file.size<900000||!window.createImageBitmap)return file;try{const b=await createImageBitmap(file);const s=Math.min(1,1600/Math.max(b.width,b.height));const c=document.createElement('canvas');c.width=Math.round(b.width*s);c.height=Math.round(b.height*s);c.getContext('2d').drawImage(b,0,0,c.width,c.height);const bl=await new Promise(r=>c.toBlob(r,'image/jpeg',.82));return bl?new File([bl],file.name.replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}):file;}catch(_){return file;}}
@@ -237,6 +237,9 @@ async function unitBillsCard(){
     let a='';if(perluAcc(d)){if(res.canApprove)a+=`<button class="btn small primary" data-ub-approve="${esc(r.id)}">Setujui</button>`;else a+=`<span class="tiny muted">Menunggu ACC Direksi</span> `;}
     else if(res.canPay&&['DITAGIHKAN','BUKTI_DITOLAK'].includes(d.status))a+=`<button class="btn small primary" data-ub-pay="${esc(r.id)}">Bayar</button>`;
     a+=`<a class="btn small" href="/api/unit-bills/${encodeURIComponent(r.id)}/cetak" target="_blank" rel="noopener">${d.status==='DIBAYAR'?'Kwitansi':'Invoice'}</a>`;
+    {const wa=t=>`<a class="btn small" href="https://wa.me/?text=${encodeURIComponent(t)}" target="_blank" rel="noopener" title="Pilih kontak WhatsApp lalu kirim">WA</a>`;
+     if(perluAcc(d))a+=wa(`Yth. Direksi,\nMohon persetujuan pembayaran tagihan antar unit *${d.number}* dari ${d.unitName||d.unit} — ${d.title||''}\nNominal: ${fmtRp(d.amount)}${d.dueDate?`\nJatuh tempo: ${d.dueDate}`:''}\nSetujui di KENDALI → Keuangan → Tagihan Antar Unit: ${location.origin}/\nTerima kasih.`);
+     else if(d.status==='DIBAYAR')a+=wa(`Yth. ${d.unitName||d.unit},\nNatara sudah membayar *${d.number}* — ${d.title||''}\nNominal: ${fmtRp(d.paidAmount||d.amount)} pada ${d.paidDate||'-'}.\nBukti transfer sudah terlampir; mohon dicek. Terima kasih.`);}
     if(d.proofDocumentId)a+=`<a class="btn small" href="/api/documents/${encodeURIComponent(d.proofDocumentId)}/file" target="_blank" rel="noopener">Bukti</a>`;
     if(res.canPay&&d.status==='DIBAYAR'&&d.sendPending)a+=`<button class="btn small" data-ub-resend="${esc(r.id)}">Kirim ulang</button>`;
     return `<tr><td><b>${esc(d.number)}</b><div class="tiny muted">${esc(d.title||'')}${d.notes?' — '+esc(d.notes):''}</div>${d.approvedAt?`<div class="tiny muted">Disetujui ${esc(d.approvedByName||'Direksi')}</div>`:perluAcc(d)?`<div class="tiny" style="color:#b45309">Perlu ACC Direksi</div>`:''}</td><td>${esc(d.unitName||d.unit)}</td><td>${pname(d.projectId)}<div class="tiny muted">${esc(d.refLabel||'')}</div></td><td>${fmtRp(d.amount)}</td><td>${d.dueDate?fmtDate(d.dueDate):'-'}</td><td>${statusPill(st)}${d.rejectReason?`<div class="tiny muted">${esc(d.rejectReason)}</div>`:''}${d.status==='DIBAYAR'?`<div class="tiny muted">${fmtDate(d.paidDate)} · ${fmtRp(d.paidAmount)}${d.sendPending?' · belum terkirim':''}</div>`:''}</td><td><div class="actions">${a}</div></td></tr>`;}).join('')}</tbody></table></div>`:'<div class="card-body empty">Belum ada tagihan dari unit lain.</div>';
