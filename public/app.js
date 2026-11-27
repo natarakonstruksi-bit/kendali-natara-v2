@@ -222,7 +222,7 @@ async function renderProjects(){
 }
 
 
-// V3.4.48 — Tagihan antar unit (Bangun Nusa, DAARP, ATI, TAJAMA → Natara). Finance membayar dengan bukti transfer;
+// V3.4.49 — Tagihan antar unit (Bangun Nusa, Ruaka Studio, ATI, TAJAMA → Natara). Finance membayar dengan bukti transfer;
 // pengeluaran (Cash Out) proyek langsung tercatat dan unit penagih mencatat pemasukannya.
 const UB_LABEL={DITAGIHKAN:'Ditagihkan',DIBAYAR:'Dibayar',BUKTI_DITOLAK:'Bukti ditolak',DIBATALKAN:'Dibatalkan'};
 async function ubCompress(file){if(!file||!/^image\//.test(file.type)||file.size<900000||!window.createImageBitmap)return file;try{const b=await createImageBitmap(file);const s=Math.min(1,1600/Math.max(b.width,b.height));const c=document.createElement('canvas');c.width=Math.round(b.width*s);c.height=Math.round(b.height*s);c.getContext('2d').drawImage(b,0,0,c.width,c.height);const bl=await new Promise(r=>c.toBlob(r,'image/jpeg',.82));return bl?new File([bl],file.name.replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}):file;}catch(_){return file;}}
@@ -237,7 +237,7 @@ async function unitBillsCard(){
     if(d.proofDocumentId)a+=`<a class="btn small" href="/api/documents/${encodeURIComponent(d.proofDocumentId)}/file" target="_blank" rel="noopener">Bukti</a>`;
     if(res.canPay&&d.status==='DIBAYAR'&&d.sendPending)a+=`<button class="btn small" data-ub-resend="${esc(r.id)}">Kirim ulang</button>`;
     return `<tr><td><b>${esc(d.number)}</b><div class="tiny muted">${esc(d.title||'')}${d.notes?' — '+esc(d.notes):''}</div></td><td>${esc(d.unitName||d.unit)}</td><td>${pname(d.projectId)}<div class="tiny muted">${esc(d.refLabel||'')}</div></td><td>${fmtRp(d.amount)}</td><td>${d.dueDate?fmtDate(d.dueDate):'-'}</td><td>${statusPill(st)}${d.rejectReason?`<div class="tiny muted">${esc(d.rejectReason)}</div>`:''}${d.status==='DIBAYAR'?`<div class="tiny muted">${fmtDate(d.paidDate)} · ${fmtRp(d.paidAmount)}${d.sendPending?' · belum terkirim':''}</div>`:''}</td><td><div class="actions">${a}</div></td></tr>`;}).join('')}</tbody></table></div>`:'<div class="card-body empty">Belum ada tagihan dari unit lain.</div>';
-  return `<div class="card"><div class="card-head"><div><h3>Tagihan Antar Unit</h3><p>Tagihan dari Bangun Nusa, DAARP, ATI, dan TAJAMA. Bayar dengan bukti transfer — pengeluaran proyek otomatis tercatat.${open.length?` <b>${open.length} belum dibayar · ${fmtRp(tot)}</b>`:''}</p></div></div>${body}</div>`;
+  return `<div class="card"><div class="card-head"><div><h3>Tagihan Antar Unit</h3><p>Tagihan dari Bangun Nusa, Ruaka Studio, ATI, dan TAJAMA. Bayar dengan bukti transfer — pengeluaran proyek otomatis tercatat.${open.length?` <b>${open.length} belum dibayar · ${fmtRp(tot)}</b>`:''}</p></div></div>${body}</div>`;
 }
 function bindUnitBills(){
   $$('[data-ub-pay]').forEach(b=>b.onclick=()=>openUnitBillPay(state.unitBills.find(x=>x.id===b.dataset.ubPay)));
@@ -1612,7 +1612,7 @@ function openTjComplaint(r){if(!r)return;
 // ===== V3.4.41 — Request Material ke Bangun Nusa =====
 const MR_STATUS={DRAFT:['Draft','gray'],SUBMITTED:['Menunggu ACC Head of Operational','orange'],RETURNED:['Dikembalikan','orange'],REJECTED:['Ditolak','red'],OPS_APPROVED:['Menunggu Admin Logistik','orange'],BN_NEGO:['Penawaran harga dari Bangun Nusa','purple'],SENT_BN:['Terkirim ke Bangun Nusa','blue'],BN_ACCEPTED:['Diterima Bangun Nusa','blue'],BN_PARTIAL:['Diterima sebagian','orange'],BN_REJECTED:['Ditolak Bangun Nusa','red'],SHIPPING:['Dalam pengiriman','blue'],ARRIVED:['Barang sampai — konfirmasi','purple'],DONE:['Selesai','green'],DONE_DIFF:['Selesai (ada selisih)','orange'],CANCELLED:['Dibatalkan','gray']};
 const MR_SJ={disiapkan:'Disiapkan',dikirim:'Dikirim',sampai:'Sampai di lokasi',diterima:'Diterima'};
-const US_UNIT={material_requests:'Bangun Nusa',drawing_requests:'DAARP',ati_work_requests:'ATI',tajama_jobs:'TAJAMA'};
+const US_UNIT={material_requests:'Bangun Nusa',drawing_requests:'Ruaka Studio',ati_work_requests:'ATI',tajama_jobs:'TAJAMA'};
 function usMgmt(){return ['administrator','direktur','head_unit_bisnis','manager_operasional'].includes(state.access?.roleKey);}
 function usOwner(d){const me=String(state.user?.id||state.me?.id||'');return [d.requesterUserId,d.createdBy,d.requestedByUserId].map(x=>String(x||'')).includes(me);}
 async function usHapus(col,r,after){if(!r)return;const d=r.data||{};const sent=d.forwardedAt||d.sentAt||d.daarp?.nomor||d.ati?.nomor;
@@ -2942,9 +2942,9 @@ renderAti=async function(){
 configs.ati_work_requests.fields=configs.ati_work_requests.fields.map(x=>x.name==='status'?{...x,options:['DRAFT','DIAJUKAN','DIPROSES','TERPENUHI','SELESAI','DITOLAK','DIBATALKAN']}:x.name==='workerCategory'?{...x,label:'Jenis Tenaga (BURUH/HELPER/TUKANG/TUKANG AHLI/KEPALA TUKANG/MANDOR)'}:x);
 configs.tukang.fields=configs.tukang.fields.map(x=>x.name==='atiLevel'?{...x,options:['Pemula','Terampil','Mahir','Mandor','L0','L1','L2','L3','L4','L5','L6']}:x);
 
-// ===================== V3.4.46 — Permintaan Gambar ke DAARP Architect =====================
-TITLES.daarp=['Permintaan Gambar','Minta gambar kerja / detail ke DAARP Architect, pantau progres desain, terima atau minta revisi gambar.'];
-const DA_STATUS={DRAFT:['Draft','gray'],DIAJUKAN:['Terkirim ke DAARP','orange'],DIPROSES:['Dikerjakan DAARP','blue'],DIKIRIM:['Gambar dikirim — periksa','purple'],REVISI:['Revisi diminta','orange'],SELESAI:['Selesai','green'],DITOLAK:['Ditolak DAARP','red'],DIBATALKAN:['Dibatalkan','gray']};
+// ===================== V3.4.46 — Permintaan Gambar ke Ruaka Studio =====================
+TITLES.daarp=['Permintaan Gambar','Minta gambar kerja / detail ke Ruaka Studio, pantau progres desain, terima atau minta revisi gambar.'];
+const DA_STATUS={DRAFT:['Draft','gray'],DIAJUKAN:['Terkirim ke Ruaka Studio','orange'],DIPROSES:['Dikerjakan Ruaka Studio','blue'],DIKIRIM:['Gambar dikirim — periksa','purple'],REVISI:['Revisi diminta','orange'],SELESAI:['Selesai','green'],DITOLAK:['Ditolak DAARP','red'],DIBATALKAN:['Dibatalkan','gray']};
 const DA_JENIS=['Gambar kerja / DED','Gambar konsep','Gambar perizinan (PBG)','Gambar detail tambahan','Revisi gambar','As-built','Lainnya'];
 const daOpenSt=d=>(d.daarp?.serahTerima||[]).filter(x=>x.status==='Dikirim');
 async function daPost(id,body){const r=await api(`/api/drawing-requests/${encodeURIComponent(id)}/action`,{method:'POST',body});if(r.warning)toast(r.warning,'err');return r;}
@@ -2954,11 +2954,11 @@ async function renderDaarp(){
   const f=state.daFilter||'open';
   const list=rows.filter(r=>f==='all'?true:f==='open'?!['SELESAI','DITOLAK','DIBATALKAN'].includes(r.data.status):r.data.status===f).sort((a,b)=>String(b.data.updatedAt||b.updated_at||'').localeCompare(String(a.data.updatedAt||a.updated_at||'')));
   const opts=[['open','Masih berjalan'],['all','Semua'],...Object.entries(DA_STATUS).map(([k,v])=>[k,v[0]])];
-  $('#content').innerHTML=`<div class="kpis">${kpi('Dikerjakan DAARP',c('DIAJUKAN')+c('DIPROSES')+c('REVISI'),'blue')}${kpi('Gambar perlu diperiksa',c('DIKIRIM'),c('DIKIRIM')?'purple':'green')}${kpi('Selesai',c('SELESAI'),'green')}</div>
-  <div class="card"><div class="card-head"><div><h3>Permintaan Gambar ke DAARP</h3><p>Buat permintaan gambar kerja / detail → otomatis terkirim ke <b>DAARP Architect</b> → DAARP mengerjakan (progres tahapan desain terlihat di sini) → DAARP mengirim paket gambar → periksa lalu tekan <b>Diterima</b> atau <b>Minta revisi</b>.</p></div><div class="card-actions">${cap('drawingCreate')?'<button class="btn primary" id="daNew">+ Permintaan gambar</button>':''}</div></div>
+  $('#content').innerHTML=`<div class="kpis">${kpi('Dikerjakan Ruaka Studio',c('DIAJUKAN')+c('DIPROSES')+c('REVISI'),'blue')}${kpi('Gambar perlu diperiksa',c('DIKIRIM'),c('DIKIRIM')?'purple':'green')}${kpi('Selesai',c('SELESAI'),'green')}</div>
+  <div class="card"><div class="card-head"><div><h3>Permintaan Gambar ke Ruaka Studio</h3><p>Buat permintaan gambar kerja / detail → otomatis terkirim ke <b>Ruaka Studio</b> → Ruaka Studio mengerjakan (progres tahapan desain terlihat di sini) → Ruaka Studio mengirim paket gambar → periksa lalu tekan <b>Diterima</b> atau <b>Minta revisi</b>.</p></div><div class="card-actions">${cap('drawingCreate')?'<button class="btn primary" id="daNew">+ Permintaan gambar</button>':''}</div></div>
   <div class="fin-filter"><label>Tampilkan<select id="daFilter">${opts.map(([k,l])=>`<option value="${k}" ${k===f?'selected':''}>${esc(l)}</option>`).join('')}</select></label></div>
-  <div class="table-wrap"><table class="table"><thead><tr><th>Permintaan</th><th>Proyek</th><th>Dibutuhkan</th><th>Progres desain DAARP</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${list.map(r=>{const d=r.data,pr=d.daarp?.proyek;let a=`<button class="btn small" data-da-detail="${esc(r.id)}">Detail</button>`;
-    if(d.status==='DRAFT'&&cap('drawingCreate'))a+=`<button class="btn small" data-da-edit="${esc(r.id)}">Edit</button><button class="btn small primary" data-da-act="submit" data-id="${esc(r.id)}">Kirim ke DAARP</button>`;
+  <div class="table-wrap"><table class="table"><thead><tr><th>Permintaan</th><th>Proyek</th><th>Dibutuhkan</th><th>Progres desain Ruaka Studio</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${list.map(r=>{const d=r.data,pr=d.daarp?.proyek;let a=`<button class="btn small" data-da-detail="${esc(r.id)}">Detail</button>`;
+    if(d.status==='DRAFT'&&cap('drawingCreate'))a+=`<button class="btn small" data-da-edit="${esc(r.id)}">Edit</button><button class="btn small primary" data-da-act="submit" data-id="${esc(r.id)}">Kirim ke Ruaka Studio</button>`;
     if(d.status==='DIKIRIM'&&cap('drawingReview'))a+=`<button class="btn small primary" data-da-detail="${esc(r.id)}">Periksa gambar</button>`;
     if(cap('drawingCreate')&&(usOwner(d)||usMgmt())){if(d.status!=='DRAFT')a+=`<button class="btn small" data-da-edit="${esc(r.id)}">Edit</button>`;a+=`<button class="btn small danger" data-da-del="${esc(r.id)}">Hapus</button>`;}
     return `<tr><td><b>${esc(d.title)}</b><div class="tiny muted">${esc(d.jenis||'')}${d.daarp?.nomor?` · ${esc(d.daarp.nomor)}`:''} · ${esc(d.createdByName||'')}</div></td><td>${esc(projectName(d.projectId))}</td><td>${fmtDate(d.neededDate)}</td>
@@ -2969,24 +2969,24 @@ async function renderDaarp(){
   $$('[data-da-detail]').forEach(b=>b.onclick=()=>openDaDetail(find(b.dataset.daDetail)));
   $$('[data-da-edit]').forEach(b=>b.onclick=()=>openDaForm(find(b.dataset.daEdit)));
   $$('[data-da-del]').forEach(b=>b.onclick=()=>usHapus('drawing_requests',find(b.dataset.daDel),renderDaarp));
-  $$('[data-da-act]').forEach(b=>b.onclick=async()=>{try{await daPost(b.dataset.id,{action:b.dataset.daAct});toast('Permintaan terkirim ke DAARP.');state.cache.clear();await renderDaarp();}catch(e){toast(e.message,'err');}});
+  $$('[data-da-act]').forEach(b=>b.onclick=async()=>{try{await daPost(b.dataset.id,{action:b.dataset.daAct});toast('Permintaan terkirim ke Ruaka Studio.');state.cache.clear();await renderDaarp();}catch(e){toast(e.message,'err');}});
 }
 function openDaForm(existing=null){const d=existing?.data||{};
-  openModal(existing?'Edit Permintaan Gambar':'Permintaan Gambar ke DAARP','Permintaan langsung terkirim ke website DAARP Architect bila dicentang.',`<div class="form-grid"><label class="span-2">Proyek<select name="projectId" required>${finProjectOptions(d.projectId||state.selectedProjectId||'')}</select></label>
+  openModal(existing?'Edit Permintaan Gambar':'Permintaan Gambar ke Ruaka Studio','Permintaan langsung terkirim ke website Ruaka Studio bila dicentang.',`<div class="form-grid"><label class="span-2">Proyek<select name="projectId" required>${finProjectOptions(d.projectId||state.selectedProjectId||'')}</select></label>
     <label class="span-2">Judul<input name="title" required maxlength="160" value="${esc(d.title||'')}" placeholder="mis. Detail tangga & railing lantai 2"></label>
     <label>Jenis gambar<select name="jenis">${DA_JENIS.map(j=>`<option ${j===(d.jenis||DA_JENIS[0])?'selected':''}>${esc(j)}</option>`).join('')}</select></label><label>Dibutuhkan tanggal<input type="date" name="neededDate" value="${esc(d.neededDate||'')}"></label>
     <label class="span-2">Uraian kebutuhan<textarea name="uraian" placeholder="Bagian yang perlu digambar, skala, acuan, catatan lapangan">${esc(d.uraian||'')}</textarea></label>
     <label class="span-2">Tautan referensi (opsional)<input name="refLink" value="${esc(d.refLink||'')}" placeholder="https://drive.google.com/..."></label>
-    <label class="span-2 check"><input type="checkbox" name="submitNow" checked> Langsung kirim ke DAARP</label></div>`,
+    <label class="span-2 check"><input type="checkbox" name="submitNow" checked> Langsung kirim ke Ruaka Studio</label></div>`,
     async form=>{const body={projectId:form.projectId.value,title:form.title.value,jenis:form.jenis.value,neededDate:form.neededDate.value,uraian:form.uraian.value,refLink:form.refLink.value,submit:form.submitNow.checked};
-      const r=await api(existing?`/api/drawing-requests/${encodeURIComponent(existing.id)}`:'/api/drawing-requests',{method:'POST',body});if(r.warning)toast(r.warning,'err');else toast(body.submit?'Permintaan terkirim ke DAARP.':'Draft tersimpan.');state.cache.clear();await renderDaarp();});
+      const r=await api(existing?`/api/drawing-requests/${encodeURIComponent(existing.id)}`:'/api/drawing-requests',{method:'POST',body});if(r.warning)toast(r.warning,'err');else toast(body.submit?'Permintaan terkirim ke Ruaka Studio.':'Draft tersimpan.');state.cache.clear();await renderDaarp();});
 }
 function daDetailHtml(r){const d=r.data,pr=d.daarp?.proyek;
   const sts=(d.daarp?.serahTerima||[]).slice().reverse();
-  return `<div class="notice blue"><b>${esc(d.title)}</b> · ${esc(projectName(d.projectId))}<br>${esc(d.jenis||'')} · dibutuhkan ${fmtDate(d.neededDate)} · ${finPill(DA_STATUS,d.status)}${d.daarp?.nomor?` · DAARP ${esc(d.daarp.nomor)}`:''}</div>
+  return `<div class="notice blue"><b>${esc(d.title)}</b> · ${esc(projectName(d.projectId))}<br>${esc(d.jenis||'')} · dibutuhkan ${fmtDate(d.neededDate)} · ${finPill(DA_STATUS,d.status)}${d.daarp?.nomor?` · Ruaka Studio ${esc(d.daarp.nomor)}`:''}</div>
   ${d.uraian?`<p class="tiny">${esc(d.uraian).replace(/\n/g,'<br>')}</p>`:''}${d.refLink?`<p class="tiny"><a href="${esc(d.refLink)}" target="_blank" rel="noopener">Referensi ↗</a></p>`:''}
-  ${pr?`<p><b>Proyek desain DAARP:</b> ${esc(pr.kode)} — ${esc(pr.nama)} · progres <b>${fmtNum(pr.progres,0)}%</b> (${esc(pr.tahap)})${pr.target?` · target ${fmtDate(pr.target)}`:''}</p>`:''}
-  ${d.daarp?.keterangan?`<p class="tiny"><b>Keterangan DAARP:</b> ${esc(d.daarp.keterangan)}</p>`:''}
+  ${pr?`<p><b>Proyek desain Ruaka Studio:</b> ${esc(pr.kode)} — ${esc(pr.nama)} · progres <b>${fmtNum(pr.progres,0)}%</b> (${esc(pr.tahap)})${pr.target?` · target ${fmtDate(pr.target)}`:''}</p>`:''}
+  ${d.daarp?.keterangan?`<p class="tiny"><b>Keterangan Ruaka Studio:</b> ${esc(d.daarp.keterangan)}</p>`:''}
   ${sts.map(s=>`<div class="card" style="margin:10px 0;padding:12px"><b>${esc(s.nomor)}</b> · ${esc(s.status)} <span class="tiny muted">dikirim ${fmtDate(s.dikirim)}</span>${s.catatan?`<div class="tiny">${esc(s.catatan)}</div>`:''}
     <div class="table-wrap"><table class="table"><thead><tr><th>No.</th><th>Judul</th><th>Disiplin</th><th>Rev.</th><th></th></tr></thead><tbody>${(s.gambar||[]).map(g=>`<tr><td>${esc(g.nomor)}</td><td>${esc(g.judul)}</td><td>${esc(g.disiplin)}</td><td>${esc(g.revisi)}</td><td>${g.url?`<a class="btn small" href="${esc(g.url)}" target="_blank" rel="noopener">Unduh</a>`:''}</td></tr>`).join('')}</tbody></table></div>
     ${s.status==='Dikirim'&&cap('drawingReview')?`<div class="actions" style="margin-top:8px"><button type="button" class="btn small success" data-da-accept="${esc(s.nomor)}">Diterima</button><button type="button" class="btn small" data-da-revise="${esc(s.nomor)}">Minta revisi</button></div>`:''}
@@ -2994,11 +2994,11 @@ function daDetailHtml(r){const d=r.data,pr=d.daarp?.proyek;
   ${(d.history||[]).length?`<details><summary class="tiny">Riwayat</summary>${(d.history||[]).slice().reverse().map(h=>`<div class="tiny">${fmtDate(h.at)} · ${esc(h.byName||'')} · ${esc(h.action)}${h.note?` — ${esc(h.note)}`:''}</div>`).join('')}</details>`:''}
   ${!['SELESAI','DITOLAK','DIBATALKAN'].includes(d.status)&&cap('drawingCreate')?`<div class="actions" style="margin-top:10px"><button type="button" class="btn small danger" data-da-cancel="1">Batalkan permintaan</button></div>`:''}`;}
 function openDaDetail(r){if(!r)return;
-  openModal(`Permintaan Gambar — ${r.data.title||''}`,r.data.createdByName||'',daDetailHtml(r),async()=>{if(r.data.daarp?.nomor){await daPost(r.id,{action:'refresh'});toast('Status diperbarui dari DAARP.');state.cache.clear();await renderDaarp();}});
-  $('#modalSave').textContent=r.data.daarp?.nomor?'Perbarui dari DAARP':'Tutup';
+  openModal(`Permintaan Gambar — ${r.data.title||''}`,r.data.createdByName||'',daDetailHtml(r),async()=>{if(r.data.daarp?.nomor){await daPost(r.id,{action:'refresh'});toast('Status diperbarui dari Ruaka Studio.');state.cache.clear();await renderDaarp();}});
+  $('#modalSave').textContent=r.data.daarp?.nomor?'Perbarui dari Ruaka Studio':'Tutup';
   const done=async(msg)=>{toast(msg);closeModal();state.cache.clear();await renderDaarp();};
   $$('[data-da-accept]').forEach(b=>b.onclick=async()=>{try{await daPost(r.id,{action:'accept',serahTerima:b.dataset.daAccept});await done('Gambar diterima.');}catch(e){toast(e.message,'err');}});
-  $$('[data-da-revise]').forEach(b=>b.onclick=()=>{const nomor=b.dataset.daRevise;openModal('Minta revisi gambar',nomor,`<div class="form-grid"><label class="span-2">Bagian yang perlu direvisi<textarea name="note" required></textarea></label></div>`,async form=>{await daPost(r.id,{action:'revise',serahTerima:nomor,note:form.note.value});toast('Permintaan revisi terkirim ke DAARP.');state.cache.clear();await renderDaarp();});});
+  $$('[data-da-revise]').forEach(b=>b.onclick=()=>{const nomor=b.dataset.daRevise;openModal('Minta revisi gambar',nomor,`<div class="form-grid"><label class="span-2">Bagian yang perlu direvisi<textarea name="note" required></textarea></label></div>`,async form=>{await daPost(r.id,{action:'revise',serahTerima:nomor,note:form.note.value});toast('Permintaan revisi terkirim ke Ruaka Studio.');state.cache.clear();await renderDaarp();});});
   $$('[data-da-cancel]').forEach(b=>b.onclick=()=>{openModal('Batalkan permintaan gambar',r.data.title,`<div class="form-grid"><label class="span-2">Alasan<textarea name="note" ${r.data.status==='DRAFT'?'':'required'}></textarea></label></div>`,async form=>{await daPost(r.id,{action:'cancel',note:form.note.value});toast('Permintaan dibatalkan.');state.cache.clear();await renderDaarp();});});
 }
 const v346PrevRenderView=renderView;
