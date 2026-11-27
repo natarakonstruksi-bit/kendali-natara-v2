@@ -1,5 +1,5 @@
 /**
- * Nara System V3.4.46 — Permintaan Gambar ke DAARP Architect (serah terima gambar, terima / minta revisi)
+ * Nara System V3.4.46 — Permintaan Gambar ke Ruaka Studio (serah terima gambar, terima / minta revisi)
  * Cloudflare Worker + D1 + R2 + Static Assets
  */
 
@@ -29,7 +29,7 @@ async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik 
 }
 // ---- SIPATUO-SSO-VERIFY:END ----
 
-const APP_VERSION = "APP-V3.4.48";
+const APP_VERSION = "APP-V3.4.49";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -680,6 +680,9 @@ async function sipatuoRingkasanHandler(request, env) {
     totals: { projects: rows.length, active: aktif.length, closed: rows.length - aktif.length, delayed: aktif.filter(r => r.scheduleStatus === "DELAY").length,
       contract: sum("contract"), activeContract: aktif.reduce((s, r) => s + num(r.contract), 0), income: sum("income"), expense: sum("expense"),
       month: bulanIni, incomeMonth: kasBulan("cash_in"), expenseMonth: kasBulan("cash_out"),
+      ...(() => { const au = all.filter(r => r.collection === "cash_out" && r.data.unitBillId && idProyek.has(String(r.data.projectId || "")) && paidLike(r.data.status));
+        const v = r => pickNum(r.data, ["amount","nominal","value","total"]);
+        return { antarDibayar: au.reduce((s2, r) => s2 + v(r), 0), antarDibayarBulan: au.filter(r => String(r.data.date || "").slice(0, 7) === bulanIni).reduce((s2, r) => s2 + v(r), 0) }; })(),
       utangAntarUnit: (await rowsWhere(env, "unit_bills", "json_extract(data_json,'$.status') IN ('DITAGIHKAN','BUKTI_DITOLAK')")).reduce((s2, r) => s2 + num(r.data.amount), 0),
       receivable: sum("receivable"), payable: sum("payable"), openQc: sum("openQc"), openDefects: sum("openDefects"), openIssues: sum("openIssues"), pendingApprovals: sum("pendingApprovals") },
     projects: rows });
@@ -1376,14 +1379,14 @@ async function getProjectBudgetValue(env, projectId) {
 }
 
 
-const WORKFLOW_SOURCE_COLLECTIONS = new Set(["drawing_requests","daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items","partner_payments","project_terms","material_requests","tajama_jobs"]);
+const WORKFLOW_SOURCE_COLLECTIONS = new Set(["unit_bills","drawing_requests","daily_progress","weekly_progress","opname","defects","cco","payment_requests","procurement","issues","retention","closeout","ati_work_requests","ati_field_issues","qc_reports","ati_reports","as_built_progress","qc_inspection_items","partner_payments","project_terms","material_requests","tajama_jobs"]);
 
 function workflowRoleLabel(role) { return String(role||"").split(",").filter(Boolean).map(r=>ROLE_LABELS[r]||r).join(" / "); }
 // V3.4.30: antrean tugas bisa untuk beberapa jabatan sekaligus, ditulis "qc,koordinator_supporting".
 function roleQueueHas(assigneeRole,role){ return String(assigneeRole||"").split(",").map(x=>x.trim()).filter(Boolean).includes(String(role||"")); }
 function workflowActiveStatus(status) { return ["OPEN","IN_PROGRESS"].includes(String(status||"").toUpperCase()); }
 function workflowSourceView(collection) {
-  return ({drawing_requests:"daarp",daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc",partner_payments:"payments",project_terms:"finance",material_requests:"material",tajama_jobs:"tajama"})[collection] || "dashboard";
+  return ({unit_bills:"finance",drawing_requests:"daarp",daily_progress:"progress",weekly_progress:"progress",opname:"opname",defects:"qc",cco:"cco",payment_requests:"fund_requests",procurement:"procurement",issues:"progress",retention:"closeout",closeout:"closeout",ati_work_requests:"ati",ati_field_issues:"ati",qc_reports:"qc",ati_reports:"ati",as_built_progress:"asbuilt",qc_inspection_items:"qc",partner_payments:"payments",project_terms:"finance",material_requests:"material",tajama_jobs:"tajama"})[collection] || "dashboard";
 }
 async function projectRoleUser(env, projectId, roleKey, ctx=null) {
   if (!projectId) return "";
@@ -1476,8 +1479,8 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
     return null;
   }
   if(collection==="drawing_requests"){
-    const ttl=`Gambar DAARP — ${d.title||""}`;
-    if(status==="DRAFT") return mk("DA_SUBMIT",ttl,"Lengkapi permintaan gambar lalu kirim ke DAARP Architect.","Kirim ke DAARP",d.createdBy||sm,"");
+    const ttl=`Gambar Ruaka Studio — ${d.title||""}`;
+    if(status==="DRAFT") return mk("DA_SUBMIT",ttl,"Lengkapi permintaan gambar lalu kirim ke Ruaka Studio.","Kirim ke DAARP",d.createdBy||sm,"");
     if(status==="DIKIRIM") return mk("DA_REVIEW",ttl,"DAARP mengirim gambar. Periksa lalu tekan Diterima atau Minta revisi.","Periksa Gambar",d.createdBy||sm,"",{priority:"HIGH"});
     return null;
   }
@@ -1492,6 +1495,13 @@ async function workflowTaskSpec(env, collection, id, d={}, ctx=null) {
     const cs=(d.complaints||[]).filter(c=>c.status!=="CLOSED");
     if(cs.some(c=>c.status==="RESPONDED")) return mk("TJ_COMPLAINT_CLOSE",ttl,"TAJAMA sudah menanggapi komplain. Periksa di lapangan lalu tutup komplain.","Periksa & Tutup Komplain","","qc");
     if(cs.some(c=>c.escalatedAt)) return mk("TJ_ESCALATION",ttl,`Komplain ke TAJAMA lebih dari ${TJ_ESCALATE_DAYS} hari belum ditanggapi.`,"Tindak Lanjut Eskalasi","","manager_operasional",{priority:"HIGH"});
+    return null;
+  }
+  if(collection==="unit_bills"){
+    const ttl=`Tagihan ${d.unitName||d.unit||"unit"} ${d.number||""}`; const rp=`Rp${Math.round(num(d.amount)).toLocaleString("id-ID")}`;
+    const telat=d.dueDate&&String(d.dueDate)<new Date(Date.now()+8*3600e3).toISOString().slice(0,10);
+    if(status==="DITAGIHKAN") return mk("UB_PAY",ttl,`Bayar ${rp} ke ${d.unitName||d.unit} (${d.title||""}) dan lampirkan bukti transfer di menu Keuangan.${telat?" Sudah lewat jatuh tempo.":""}`,"Bayar Tagihan","","finance",{priority:telat?"HIGH":"NORMAL"});
+    if(status==="BUKTI_DITOLAK") return mk("UB_REPAY",ttl,`Bukti pembayaran ditolak ${d.unitName||d.unit}: ${d.rejectReason||"-"}. Bayar ulang dengan bukti yang benar.`,"Bayar Ulang","","finance",{priority:"HIGH"});
     return null;
   }
   if(collection==="material_requests"){
@@ -3256,7 +3266,7 @@ async function bnKatalogHandler(env,user){
 
 // ===================== Hapus data yang tersinkron ke unit lain (kapan saja) =====================
 // Data ikut dihapus di unit penerima dulu; bila unit itu gagal dihubungi, data di KENDALI tidak dihapus.
-const UNIT_SYNC_COLLECTIONS={material_requests:"Bangun Nusa",drawing_requests:"DAARP",ati_work_requests:"ATI",tajama_jobs:"TAJAMA"};
+const UNIT_SYNC_COLLECTIONS={material_requests:"Bangun Nusa",drawing_requests:"Ruaka Studio",ati_work_requests:"ATI",tajama_jobs:"TAJAMA"};
 async function unitSyncRemoteDelete(env,collection,id,d){
   if(collection==="material_requests"&&d.forwardedAt) await bnCall(env,"/api/unit/order/hapus",{ref:d.number||id});
   if(collection==="drawing_requests"&&(d.sentAt||d.daarp?.nomor)) await daarpCall(env,"/api/unit/gambar/hapus",{ref:id});
@@ -3273,7 +3283,7 @@ async function unitSyncDeleteHandler(env,user,collection,id){
   const roleOk={material_requests:cap.materialRequestForward,drawing_requests:false,tajama_jobs:false,ati_work_requests:!collectionDenied(user,"ati_work_requests","delete")}[collection];
   if(!(owner||isManagementRole(user)||roleOk||!collectionDenied(user,collection,"delete"))) return json({ok:false,message:"Hanya pembuat data atau manajemen yang dapat menghapus."},403);
   try{ await unitSyncRemoteDelete(env,collection,id,d); }
-  catch(e){ return json({ok:false,message:`Belum terhapus: ${UNIT_SYNC_COLLECTIONS[collection]} gagal dihubungi (${e.message}). Coba lagi.`},502); }
+  catch(e){ const blok=/pembayaran/i.test(String(e.message)); return json({ok:false,message:blok?`Belum terhapus — ${UNIT_SYNC_COLLECTIONS[collection]}: ${e.message}`:`Belum terhapus: ${UNIT_SYNC_COLLECTIONS[collection]} gagal dihubungi (${e.message}). Coba lagi.`},blok?409:502); }
   await cancelWorkflowTasks(env,collection,id,user);
   await deleteRelatedDocuments(env,user,collection,id);
   await deleteRecord(env,collection,id,user);
@@ -3375,12 +3385,12 @@ async function materialRequestReceiveHandler(request,env,user,id){
 }
 // Kabar status dari Bangun Nusa (ditandatangani x-bn-unit: BN). Selalu dijawab 2xx bila tanda tangan sah agar tidak dikirim ulang terus.
 
-// ===================== V3.4.48 — Tagihan antar unit MAW Group =====================
-// Unit penyedia (Bangun Nusa, DAARP, ATI, TAJAMA) menekan "Tagihkan" → tagihan masuk ke KENDALI.
+// ===================== V3.4.49 — Tagihan antar unit MAW Group =====================
+// Unit penyedia (Bangun Nusa, Ruaka Studio, ATI, TAJAMA) menekan "Tagihkan" → tagihan masuk ke KENDALI.
 // Finance membayar di menu Keuangan dengan bukti transfer → Cash Out proyek langsung tercatat
 // (bukti tersimpan sebagai dokumen) dan unit penagih mencatat pemasukannya. Penagih bisa menolak bukti
 // (Cash Out dibatalkan) atau membatalkan tagihan yang belum dibayar.
-const TU_UNITS={BN:{name:"Bangun Nusa",key:"BANGUN_NUSA_KEY",call:(env,b)=>bnCall(env,"/api/tagihan-unit",b)},TJM:{name:"TAJAMA",key:"TAJAMA_KEY",call:(env,b)=>tjCall(env,"/api/tagihan-unit",b)},DAARP:{name:"DAARP Architect",key:"DAARP_KEY",call:(env,b)=>daarpCall(env,"/api/tagihan-unit",b)},ATI:{name:"ATI",key:"ATI_KEY",call:(env,b)=>atiCall(env,"/api/tagihan-unit",b)}};
+const TU_UNITS={BN:{name:"Bangun Nusa",key:"BANGUN_NUSA_KEY",call:(env,b)=>bnCall(env,"/api/tagihan-unit",b)},TJM:{name:"TAJAMA",key:"TAJAMA_KEY",call:(env,b)=>tjCall(env,"/api/tagihan-unit",b)},DAARP:{name:"Ruaka Studio",key:"DAARP_KEY",call:(env,b)=>daarpCall(env,"/api/tagihan-unit",b)},ATI:{name:"ATI",key:"ATI_KEY",call:(env,b)=>atiCall(env,"/api/tagihan-unit",b)}};
 const TU_MAX_PROOF=1200000;
 function tuB64(buf){const b=new Uint8Array(buf);let s="";for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s);}
 async function tuResolveRef(env,refType,ref){
@@ -3407,6 +3417,7 @@ async function unitBillInbound(request,env){
     const ref=await tuResolveRef(env,String(b.ref_jenis||""),b.ref);
     const d={...(old?.data||{}),unit,unitName:u.name,number:String(b.nomor),refType:String(b.ref_jenis||""),ref:String(b.ref||""),refCollection:ref.collection||"",refId:ref.id||"",refLabel:ref.label||String(b.ref||""),projectId:ref.projectId||old?.data?.projectId||"",title:String(b.judul||"Tagihan").slice(0,200),amount,notes:String(b.keterangan||"").slice(0,1000),dueDate:String(b.jatuh_tempo||""),bankAccount:String(b.rekening||"").slice(0,300),status:"DITAGIHKAN",receivedAt:old?.data?.receivedAt||now,updatedAt:now};
     await upsertRecord(env,"unit_bills",id,d,actor); await audit(env,actor,"UNIT_BILL_IN","unit_bills",id,d.projectId,{unit,number:d.number,amount});
+    try{ await syncWorkflowTask(env,"unit_bills",id,d,null); }catch(e){ console.log("ub task",e?.message); }
     return json({ok:true,status:"DITAGIHKAN"});
   }
   if(b.aksi==="batal"||b.aksi==="tolak"){
@@ -3414,7 +3425,7 @@ async function unitBillInbound(request,env){
     const d={...old.data};
     if(d.cashOutId){ const c=await getRecord(env,"cash_out",d.cashOutId); if(c) await upsertRecord(env,"cash_out",c.id,{...c.data,status:"CANCELLED",notes:`${c.data.notes||""} [Dibatalkan: ${b.aksi==="tolak"?"bukti ditolak":"tagihan dibatalkan"} ${u.name}]`},actor); }
     d.status=b.aksi==="batal"?"DIBATALKAN":"BUKTI_DITOLAK"; d.rejectReason=String(b.alasan||"").slice(0,500); d.cashOutId=""; d.updatedAt=now;
-    await upsertRecord(env,"unit_bills",id,d,actor); await audit(env,actor,b.aksi==="batal"?"UNIT_BILL_CANCELLED":"UNIT_BILL_PROOF_REJECTED","unit_bills",id,d.projectId||"",{unit,number:d.number});
+    await upsertRecord(env,"unit_bills",id,d,actor); try{ await syncWorkflowTask(env,"unit_bills",id,d,null); }catch(e){ console.log("ub task",e?.message); } await audit(env,actor,b.aksi==="batal"?"UNIT_BILL_CANCELLED":"UNIT_BILL_PROOF_REJECTED","unit_bills",id,d.projectId||"",{unit,number:d.number});
     return json({ok:true,status:d.status});
   }
   return json({ok:false,message:"Aksi tidak dikenal."},400);
@@ -3447,6 +3458,7 @@ async function unitBillPayHandler(request,env,user,id){
   try{ await unitBillSend(env,d,{nama:file.name||"bukti",tipe:file.type,data:tuB64(buf)}); d.sendPending=false; }
   catch(e){ sent=false; msg=e.message; d.sendPending=true; d.sendError=String(e.message||e).slice(0,300); }
   const out=await upsertRecord(env,"unit_bills",id,d,user);
+  try{ await syncWorkflowTask(env,"unit_bills",id,d,user); }catch(e){ console.log("ub task",e?.message); }
   await audit(env,user,"UNIT_BILL_PAID","unit_bills",id,projectId,{unit:d.unit,number:d.number,amount:d.paidAmount,sent});
   return json({ok:true,row:out,sent,message:sent?`Pembayaran tercatat dan diterima ${d.unitName}.`:`Pembayaran tercatat, tetapi ${d.unitName} belum menerima (${msg}). Gunakan "Kirim ulang".`});
 }
@@ -3566,21 +3578,21 @@ async function atiRequestPayload(env,id,d,user){
     kebutuhan:[{skill,jenis:jenis||(skill?"":"TUKANG"),level_min:"Pemula",jumlah:Math.max(1,Math.round(num(d.requiredWorkers)||1))}],mulai:String(d.startDate||""),selesai:String(d.endDate||""),
     pemohon:String(user?.name||user?.username||""),kontak:String(user?.phone||""),catatan:String(d.notes||"")};
 }
-// ===================== V3.4.46 — Permintaan Gambar ke DAARP Architect =====================
-// Natara meminta gambar kerja/detail ke DAARP; DAARP mengirim paket serah terima; Natara menekan Diterima atau Minta revisi.
-// Tanda tangan x-maw-*, kunci DAARP_KEY (= KUNCI_NK di website DAARP). DAARP → KENDALI: /api/daarp/status (x-maw-unit: DAARP).
+// ===================== V3.4.46 — Permintaan Gambar ke Ruaka Studio =====================
+// Natara meminta gambar kerja/detail ke DAARP; Ruaka Studio mengirim paket serah terima; Natara menekan Diterima atau Minta revisi.
+// Tanda tangan x-maw-*, kunci DAARP_KEY (= KUNCI_NK di website Ruaka Studio). Ruaka Studio → KENDALI: /api/daarp/status (x-maw-unit: Ruaka Studio).
 const DA_STATUS = {"Masuk":"DIAJUKAN","Diproses":"DIPROSES","Dikirim":"DIKIRIM","Revisi diminta":"REVISI","Selesai":"SELESAI","Ditolak":"DITOLAK","Dibatalkan":"DIBATALKAN"};
 const DA_JENIS = ["Gambar kerja / DED","Gambar konsep","Gambar perizinan (PBG)","Gambar detail tambahan","Revisi gambar","As-built","Lainnya"];
 function daarpBaseUrl(env){ return String(env.DAARP_URL||"https://daarp.natarakonstruksi.workers.dev").replace(/\/+$/,""); }
 async function daarpCall(env,path,bodyObj){
-  const secret=String(env.DAARP_KEY||""); if(!secret) throw new Error("KENDALI belum tersambung ke website DAARP (secret DAARP_KEY belum diisi).");
+  const secret=String(env.DAARP_KEY||""); if(!secret) throw new Error("KENDALI belum tersambung ke website Ruaka Studio (secret DAARP_KEY belum diisi).");
   const body=JSON.stringify(bodyObj||{}); const ts=String(Math.floor(Date.now()/1000));
   const headers={"content-type":"application/json","x-maw-unit":"NK","x-maw-ts":ts,"x-maw-sig":await bnHmac(secret,`${ts}.${body}`)};
   const url=`${daarpBaseUrl(env)}${path}`; const svc=env.UNIT_DAARP; let r;
   try{ r=svc&&typeof svc.fetch==="function"?await svc.fetch(url,{method:"POST",headers,body}):await fetch(url,{method:"POST",headers,body,signal:AbortSignal.timeout(15000)}); }
-  catch(e){ throw new Error(`Website DAARP tidak dapat dihubungi: ${e?.message||e}`); }
+  catch(e){ throw new Error(`Website Ruaka Studio tidak dapat dihubungi: ${e?.message||e}`); }
   let data={}; try{ data=await r.json(); }catch(_){}
-  if(!r.ok||data.ok===false) throw new Error(data.message||`Website DAARP menjawab HTTP ${r.status}.`);
+  if(!r.ok||data.ok===false) throw new Error(data.message||`Website Ruaka Studio menjawab HTTP ${r.status}.`);
   return data;
 }
 function daApply(d,s){
@@ -3592,7 +3604,7 @@ function daApply(d,s){
       gambar:(Array.isArray(x.gambar)?x.gambar:[]).slice(0,300).map(g=>({nomor:String(g.nomor||""),judul:String(g.judul||""),disiplin:String(g.disiplin||""),revisi:num(g.revisi),url:/^https?:\/\//i.test(String(g.url||""))?String(g.url):""}))})),
     updatedAt:new Date().toISOString()};
   if(st==="DITOLAK") d.rejectReason=String(s.keterangan||"");
-  if(s.pesan){ const h=Array.isArray(d.history)?d.history:[]; h.push({at:new Date().toISOString(),by:"daarp",byName:"DAARP Architect",action:`DAARP_${String(s.jenis||"STATUS").toUpperCase()}`,note:String(s.pesan).slice(0,300)}); d.history=h.slice(-40); }
+  if(s.pesan){ const h=Array.isArray(d.history)?d.history:[]; h.push({at:new Date().toISOString(),by:"daarp",byName:"Ruaka Studio",action:`DAARP_${String(s.jenis||"STATUS").toUpperCase()}`,note:String(s.pesan).slice(0,300)}); d.history=h.slice(-40); }
   return d;
 }
 const DAARP_ACTOR={id:"daarp",name:"Website DAARP",username:"daarp"};
@@ -3622,7 +3634,7 @@ async function drawingSaveHandler(request,env,user,id){
   if(old&&d.status!=="DRAFT"){
     try{ const names=await projectNameMap(env); const p=await getRecord(env,"projects",projectId);
       daApply(d,{...(await daarpCall(env,"/api/unit/gambar/ubah",{ref:rid,judul:d.title,proyek:names[String(projectId)]||"",lokasi:String(p?.data?.location||p?.data?.lokasi||p?.data?.address||""),jenis:d.jenis,uraian:d.uraian,tautan:d.refLink,tgl_butuh:d.neededDate})),versi:0}); }
-    catch(e){ return json({ok:false,message:`Gagal mengubah di DAARP: ${e.message}`},502); }
+    catch(e){ return json({ok:false,message:`Gagal mengubah di Ruaka Studio: ${e.message}`},502); }
   }
   if(b.submit){ try{ await daSubmit(env,user,rid,d); }catch(e){ const rec=await upsertRecord(env,"drawing_requests",rid,d,user); await syncWorkflowTask(env,"drawing_requests",rid,d,user); return json({ok:true,row:rec,warning:`Tersimpan sebagai draft, belum terkirim: ${e.message}`}); } }
   const rec=await upsertRecord(env,"drawing_requests",rid,d,user); await syncWorkflowTask(env,"drawing_requests",rid,d,user);
@@ -3632,7 +3644,7 @@ async function drawingSaveHandler(request,env,user,id){
 async function daSubmit(env,user,id,d){
   const names=await projectNameMap(env); const p=await getRecord(env,"projects",d.projectId);
   const r=await daarpCall(env,"/api/unit/gambar",{ref:id,judul:d.title,proyek:names[String(d.projectId)]||"",lokasi:String(p?.data?.location||p?.data?.lokasi||p?.data?.address||""),jenis:d.jenis,uraian:d.uraian,tautan:d.refLink,tgl_butuh:d.neededDate,pemohon:user.name||user.username,kontak:String(user.phone||"")});
-  daApply(d,{...r,jenis:"terkirim",pesan:`Terkirim ke DAARP (${r.nomor||""})`}); if(d.status==="DRAFT") d.status="DIAJUKAN"; d.sentAt=new Date().toISOString();
+  daApply(d,{...r,jenis:"terkirim",pesan:`Terkirim ke Ruaka Studio (${r.nomor||""})`}); if(d.status==="DRAFT") d.status="DIAJUKAN"; d.sentAt=new Date().toISOString();
 }
 async function drawingActionHandler(request,env,user,id){
   const rec=await getRecord(env,"drawing_requests",id); if(!rec) return json({ok:false,message:"Permintaan tidak ditemukan."},404);
@@ -3641,7 +3653,7 @@ async function drawingActionHandler(request,env,user,id){
   let d={...rec.data}; const st=d.status;
   try{
     if(action==="submit"){ if(!cap.drawingCreate) throw new Error("Tidak berwenang."); if(st!=="DRAFT") throw new Error("Sudah dikirim."); await daSubmit(env,user,id,d); d.history=daHist(d,user,"KIRIM_KE_DAARP"); }
-    else if(action==="refresh"){ if(!d.daarp?.nomor) throw new Error("Belum terkirim ke DAARP."); daApply(d,await daarpCall(env,"/api/unit/gambar/status",{ref:id})); }
+    else if(action==="refresh"){ if(!d.daarp?.nomor) throw new Error("Belum terkirim ke Ruaka Studio."); daApply(d,await daarpCall(env,"/api/unit/gambar/status",{ref:id})); }
     else if(action==="accept"||action==="revise"){
       if(!cap.drawingReview) throw new Error("Hanya Site Manager / Admin Teknik / Koordinator Engineering / QC / Head of Operational yang menanggapi gambar.");
       const nomor=String(b.serahTerima||""); const stx=(d.daarp?.serahTerima||[]).find(x=>x.nomor===nomor); if(!stx) throw new Error("Paket serah terima tidak ditemukan.");
