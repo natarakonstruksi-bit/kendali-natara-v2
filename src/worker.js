@@ -29,7 +29,7 @@ async function verifikasiTiketSipatuo(token, secret, kodeUnit, { toleransiDetik 
 }
 // ---- SIPATUO-SSO-VERIFY:END ----
 
-const APP_VERSION = "APP-V3.4.50";
+const APP_VERSION = "APP-V3.4.51";
 const SERVICE_NAME = "Nara System";
 const SESSION_COOKIE = "kendali_session";
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -3046,7 +3046,7 @@ const PAYMENT_CATEGORY_LABEL = {VENDOR:"Vendor",SUBKON:"Subkon",TUKANG:"Tukang",
 const PARTNER_TYPES = {VENDOR:"Vendor",SUBKON:"Subkon",SUPPLIER:"Toko Material",REIMBURSE:"Reimburse / Perorangan"};
 const FINANCE_SETTINGS_ID = "finance";
 const DEFAULT_MATERIAL_HUB_THRESHOLD = 5000000;
-const DEFAULT_UNIT_BILL_APPROVAL = 10000000; // V3.4.50 — bayar tagihan antar unit di atas batas ini perlu ACC Direksi
+const DEFAULT_UNIT_BILL_APPROVAL = 10000000; // V3.4.51 — bayar tagihan antar unit di atas batas ini perlu ACC Direksi
 const rp = v => `Rp ${Math.round(num(v)).toLocaleString("id-ID")}`;
 const nameKey = v => String(v||"").toLowerCase().replace(/\b(pt|cv|ud|tb|toko)\.?\s+/g,"").replace(/[^a-z0-9]+/g," ").trim();
 
@@ -3392,7 +3392,7 @@ async function materialRequestReceiveHandler(request,env,user,id){
 }
 // Kabar status dari Bangun Nusa (ditandatangani x-bn-unit: BN). Selalu dijawab 2xx bila tanda tangan sah agar tidak dikirim ulang terus.
 
-// ===================== V3.4.50 — Tagihan antar unit MAW Group =====================
+// ===================== V3.4.51 — Tagihan antar unit MAW Group =====================
 // Unit penyedia (Bangun Nusa, Ruaka Studio, ATI, TAJAMA) menekan "Tagihkan" → tagihan masuk ke KENDALI.
 // Finance membayar di menu Keuangan dengan bukti transfer → Cash Out proyek langsung tercatat
 // (bukti tersimpan sebagai dokumen) dan unit penagih mencatat pemasukannya. Penagih bisa menolak bukti
@@ -3484,7 +3484,7 @@ async function unitBillApproveHandler(request,env,user,id){
   await audit(env,user,"UNIT_BILL_APPROVED","unit_bills",id,d.projectId||"",{unit:d.unit,number:d.number,amount:d.amount});
   return json({ok:true,row:out,message:"Pembayaran disetujui. Finance sudah bisa membayar."});
 }
-// ===== V3.4.50 — Invoice & kwitansi tagihan antar unit (template sama dengan website unit) =====
+// ===== V3.4.51 — Invoice & kwitansi tagihan antar unit (template sama dengan website unit) =====
 // Invoice & kwitansi tagihan antar unit MAW Group — halaman siap cetak / simpan PDF.
 // File ini identik di Bangun Nusa, ATI, Ruaka Studio, dan TAJAMA (dan disalin ke KENDALI).
 const escC = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
